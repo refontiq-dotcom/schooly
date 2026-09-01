@@ -4,10 +4,16 @@ import { createClient } from "@/lib/supabase/server";
 export const revalidate = 0;
 
 export default async function HomePage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  let user = null;
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user: u },
+    } = await supabase.auth.getUser();
+    user = u;
+  } catch {
+    // Supabase not configured — render landing page without auth state
+  }
 
   return (
     <div className="min-h-[80vh] flex flex-col items-center justify-center text-center px-4">
