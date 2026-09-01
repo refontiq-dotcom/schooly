@@ -31,13 +31,17 @@ create table if not exists establishments (
 -- ----------------------------------------------------------------------------
 -- 2. PROFILS UTILISATEURS + RÔLES
 -- ----------------------------------------------------------------------------
-create type user_role as enum (
-  'admin',        -- Directeur / Administrateur d'établissement
-  'professeur',
-  'secretariat',
-  'censeur',
-  'parent'
-);
+do $$ begin
+  create type user_role as enum (
+    'admin',
+    'professeur',
+    'secretariat',
+    'censeur',
+    'parent'
+  );
+exception
+  when duplicate_object then null;
+end $$;
 
 create table if not exists profiles (
   id uuid primary key references auth.users(id) on delete cascade,
@@ -110,13 +114,17 @@ create table if not exists teacher_assignments (
 -- ----------------------------------------------------------------------------
 -- 4. RÉSERVATIONS (Trouvetou)
 -- ----------------------------------------------------------------------------
-create type reservation_status as enum (
-  'pending_payment',
-  'reserved',       -- payé, place décomptée, en attente de finalisation
-  'confirmed',       -- finalisée sur place -> devient "inscrit"
-  'expired',         -- non finalisée dans le délai -> place libérée
-  'cancelled'
-);
+do $$ begin
+  create type reservation_status as enum (
+    'pending_payment',
+    'reserved',
+    'confirmed',
+    'expired',
+    'cancelled'
+  );
+exception
+  when duplicate_object then null;
+end $$;
 
 create table if not exists reservations (
   id uuid primary key default gen_random_uuid(),
@@ -291,26 +299,29 @@ alter table students enable row level security;
 alter table attendance_records enable row level security;
 alter table grades enable row level security;
 
--- Lecture publique des établissements et de la disponibilité (vitrine Trouvetou)
+drop policy if exists "Établissements visibles publiquement" on establishments;
 create policy "Établissements visibles publiquement"
   on establishments for select using (true);
 
+drop policy if exists "Niveaux et sections visibles publiquement" on levels;
 create policy "Niveaux et sections visibles publiquement"
   on levels for select using (true);
 
+drop policy if exists "Sections visibles publiquement" on sections;
 create policy "Sections visibles publiquement"
   on sections for select using (true);
 
--- Un utilisateur voit son propre profil
+drop policy if exists "Un utilisateur voit son profil" on profiles;
 create policy "Un utilisateur voit son profil"
   on profiles for select using (auth.uid() = id);
 
--- Admin/secrétariat/censeur/professeur : accès limité à leur établissement
+drop policy if exists "Staff accède aux données de son établissement (profiles)" on profiles;
 create policy "Staff accède aux données de son établissement (profiles)"
   on profiles for select using (
     establishment_id in (select establishment_id from profiles where id = auth.uid())
   );
 
+drop policy if exists "Admin gère les niveaux de son établissement" on levels;
 create policy "Admin gère les niveaux de son établissement"
   on levels for all using (
     establishment_id in (
@@ -318,6 +329,7 @@ create policy "Admin gère les niveaux de son établissement"
     )
   );
 
+drop policy if exists "Admin gère les sections de son établissement" on sections;
 create policy "Admin gère les sections de son établissement"
   on sections for all using (
     level_id in (
@@ -327,6 +339,7 @@ create policy "Admin gère les sections de son établissement"
     )
   );
 
+drop policy if exists "Professeur voit ses sections assignées" on sections;
 create policy "Professeur voit ses sections assignées"
   on sections for select using (
     id in (select section_id from teacher_assignments where teacher_id = auth.uid())
@@ -357,36 +370,43 @@ create policy "Admin gère les affectations de son établissement"
     )
   );
 
+drop policy if exists "Staff établissement voit les réservations" on reservations;
 create policy "Staff établissement voit les réservations"
   on reservations for select using (
     establishment_id in (select establishment_id from profiles where id = auth.uid())
   );
 
+drop policy if exists "Professeur gère les présences de ses sections" on attendance_records;
 create policy "Professeur gère les présences de ses sections"
   on attendance_records for all using (
     section_id in (select section_id from teacher_assignments where teacher_id = auth.uid())
   );
 
+drop policy if exists "Professeur gère les notes de ses sections" on grades;
 create policy "Professeur gère les notes de ses sections"
   on grades for all using (
     section_id in (select section_id from teacher_assignments where teacher_id = auth.uid())
   );
 
+drop policy if exists "Parent voit son enfant" on students;
 create policy "Parent voit son enfant"
   on students for select using (
     parent_id = auth.uid()
   );
 
+drop policy if exists "Staff établissement voit les élèves" on students;
 create policy "Staff établissement voit les élèves"
   on students for select using (
     establishment_id in (select establishment_id from profiles where id = auth.uid())
   );
 
+drop policy if exists "Parent voit les présences de son enfant" on attendance_records;
 create policy "Parent voit les présences de son enfant"
   on attendance_records for select using (
     student_id in (select id from students where parent_id = auth.uid())
   );
 
+drop policy if exists "Parent voit les notes de son enfant" on grades;
 create policy "Parent voit les notes de son enfant"
   on grades for select using (
     student_id in (select id from students where parent_id = auth.uid())
