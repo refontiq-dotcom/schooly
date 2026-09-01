@@ -11,8 +11,7 @@ export default function AuthPage() {
   const [role, setRole] = useState<UserRole>("parent");
   const [showPassword, setShowPassword] = useState(false);
   const [loginError, loginAction, loginPending] = useActionState(signIn, null);
-  const [registerError, registerAction, registerPending] =
-    useActionState(signUp, null);
+  const [registerError, registerAction, registerPending] = useActionState(signUp, null);
 
   const isLogin = tab === "login";
   const action = isLogin ? loginAction : registerAction;
@@ -20,7 +19,7 @@ export default function AuthPage() {
   const pending = isLogin ? loginPending : registerPending;
 
   return (
-    <div className="min-h-[85vh] flex items-center justify-center relative overflow-hidden">
+    <div className="min-h-[85vh] flex items-center justify-center relative overflow-hidden px-4">
       {/* Decorative elements - left side */}
       <div className="absolute left-0 top-1/2 -translate-y-1/2 hidden lg:block pointer-events-none">
         <svg width="200" height="300" viewBox="0 0 200 300" fill="none" className="opacity-20">
@@ -39,24 +38,15 @@ export default function AuthPage() {
       {/* Decorative elements - right side */}
       <div className="absolute right-0 top-1/2 -translate-y-1/2 hidden lg:block pointer-events-none">
         <svg width="220" height="320" viewBox="0 0 220 320" fill="none" className="opacity-20">
-          {/* Person sitting illustration - simplified */}
           <circle cx="160" cy="60" r="22" stroke="#3D3D3D" strokeWidth="1.5" fill="none" />
           <path d="M160 82 L160 160" stroke="#3D3D3D" strokeWidth="1.5" />
           <path d="M160 100 L130 140" stroke="#3D3D3D" strokeWidth="1.5" />
           <path d="M160 100 L190 130" stroke="#3D3D3D" strokeWidth="1.5" />
           <path d="M160 160 L140 220" stroke="#3D3D3D" strokeWidth="1.5" />
           <path d="M160 160 L185 220" stroke="#3D3D3D" strokeWidth="1.5" />
-          {/* Laptop */}
           <rect x="170" y="125" width="35" height="25" rx="3" stroke="#3D3D3D" strokeWidth="1.5" fill="none" />
           <rect x="165" y="150" width="45" height="4" rx="1" fill="#C4956A" opacity="0.3" />
-          {/* Decorative shapes */}
           <rect x="30" y="220" width="60" height="80" rx="6" fill="#E8A44A" opacity="0.15" />
-          <rect x="35" y="225" width="8" height="8" rx="1" fill="#3D3D3D" opacity="0.15" />
-          <rect x="50" y="225" width="8" height="8" rx="1" fill="#3D3D3D" opacity="0.15" />
-          <rect x="65" y="225" width="8" height="8" rx="1" fill="#3D3D3D" opacity="0.15" />
-          <rect x="35" y="240" width="8" height="8" rx="1" fill="#3D3D3D" opacity="0.15" />
-          <rect x="50" y="240" width="8" height="8" rx="1" fill="#3D3D3D" opacity="0.15" />
-          <rect x="65" y="240" width="8" height="8" rx="1" fill="#3D3D3D" opacity="0.15" />
           <circle cx="80" cy="100" r="4" fill="#E8A44A" opacity="0.3" />
           <path d="M120 280 Q140 265 160 280" stroke="#C4956A" strokeWidth="1.5" fill="none" />
         </svg>
@@ -118,7 +108,7 @@ export default function AuthPage() {
                 name="email"
                 type="email"
                 required
-                placeholder="Email / Téléphone"
+                placeholder="Email"
                 className="input pr-10"
                 autoComplete="email"
               />
@@ -167,10 +157,7 @@ export default function AuthPage() {
             <button
               type="submit"
               disabled={pending}
-              className="w-full py-3 rounded-xl text-white font-semibold text-sm transition-all disabled:opacity-50"
-              style={{ backgroundColor: "#E8A44A" }}
-              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#D69538")}
-              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#E8A44A")}
+              className="w-full py-3 rounded-xl text-white font-semibold text-sm transition-all disabled:opacity-50 bg-brand hover:bg-brand/90"
             >
               {pending
                 ? "Chargement…"
@@ -187,7 +174,7 @@ export default function AuthPage() {
             <div className="flex-1 h-px bg-slate-200" />
           </div>
 
-          {/* Social Login Buttons */}
+          {/* Google Login */}
           <form action={() => signInWithGoogle(role)}>
             <button
               type="submit"
@@ -210,7 +197,7 @@ export default function AuthPage() {
               onClick={() => setTab(isLogin ? "register" : "login")}
               className="text-amber-600 font-semibold hover:underline"
             >
-              {isLogin ? "S'inscrire" : "Se connecter"}
+              {isLogin ? "S&apos;inscrire" : "Se connecter"}
             </button>
           </p>
         </div>
