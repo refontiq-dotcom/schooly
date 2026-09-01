@@ -12,16 +12,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="fr">
       <body className="min-h-screen flex flex-col">
-        <header className="border-b border-slate-200 bg-white">
-          <div className="mx-auto max-w-6xl px-4 py-4 flex items-center justify-between">
-            <Link href="/" className="text-xl font-bold text-navy">
-              Trouve<span className="text-brand">tou</span>
-              <span className="text-slate-400 font-normal text-sm align-middle">
-                {' '}&middot; Schooly
-              </span>
+        <header className="bg-white/60 backdrop-blur-sm border-b border-slate-200/50">
+          <div className="mx-auto max-w-6xl px-6 py-4 flex items-center justify-between">
+            <Link href="/" className="text-xl font-bold text-slate-800 tracking-tight">
+              Schooly
             </Link>
             <nav className="text-sm text-slate-600 flex gap-5 items-center">
-              <Link href="/" className="hover:text-brand transition-colors">
+              <Link href="/" className="hover:text-amber-600 transition-colors">
                 Accueil
               </Link>
               <Link href="/auth" className="btn-primary text-sm py-2 px-4">
@@ -31,8 +28,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </div>
         </header>
         <main className="flex-1 mx-auto max-w-6xl w-full px-4 py-8">{children}</main>
-        <footer className="border-t border-slate-200 py-8 text-center text-sm text-slate-500">
-          Schooly — un module Trouvetou · Refontiq, Abidjan
+        <footer className="border-t border-slate-200/50 py-6 text-center text-xs text-slate-400">
+          Copyright Schooly {new Date().getFullYear()} &middot; Tous droits réservés
         </footer>
       </body>
     </html>

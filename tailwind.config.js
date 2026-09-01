@@ -4,8 +4,8 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        navy: "#1F3864",
-        brand: "#2E5FA3",
+        navy: "#3D3D3D",
+        brand: "#E8A44A",
       },
     },
   },

@@ -12,29 +12,33 @@ export default async function HomePage() {
     } = await supabase.auth.getUser();
     user = u;
   } catch {
-    // Supabase not configured — render landing page without auth state
+    // Supabase not configured
   }
 
   return (
-    <div className="min-h-[80vh] flex flex-col items-center justify-center text-center px-4">
+    <div className="min-h-[85vh] flex flex-col items-center justify-center text-center px-4">
       {/* Hero */}
-      <div className="max-w-2xl mx-auto mb-12">
-        <h1 className="text-4xl md:text-5xl font-bold text-navy mb-4 leading-tight">
+      <div className="max-w-2xl mx-auto mb-14">
+        <div className="inline-flex items-center gap-2 bg-amber-50 border border-amber-200/50 rounded-full px-4 py-1.5 mb-6">
+          <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+          <span className="text-xs font-medium text-amber-700">Plateforme de gestion scolaire</span>
+        </div>
+
+        <h1 className="text-4xl md:text-5xl font-bold text-slate-800 mb-5 leading-tight">
           Gérez votre établissement
           <br />
-          <span className="text-brand">en toute simplicité</span>
+          <span className="text-amber-600">en toute simplicité</span>
         </h1>
-        <p className="text-lg text-slate-500 max-w-xl mx-auto mb-8">
-          Schooly simplifie la gestion scolaire : inscriptions, suivi des
-          présences, notes des élèves et communication avec les parents — tout
-          en un seul endroit.
+        <p className="text-lg text-slate-500 max-w-xl mx-auto mb-10 leading-relaxed">
+          Inscriptions en ligne, suivi des présences, notes des élèves et
+          communication avec les parents — tout en un seul endroit.
         </p>
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
           {user ? (
             <Link
               href="/dashboard/admin"
-              className="btn-primary text-base px-6 py-3"
+              className="btn-primary text-base px-8 py-3.5 shadow-sm shadow-amber-200/50"
             >
               Accéder au tableau de bord
             </Link>
@@ -42,13 +46,13 @@ export default async function HomePage() {
             <>
               <Link
                 href="/auth"
-                className="btn-primary text-base px-6 py-3"
+                className="btn-primary text-base px-8 py-3.5 shadow-sm shadow-amber-200/50"
               >
                 Commencer gratuitement
               </Link>
               <Link
                 href="/auth"
-                className="btn-secondary text-base px-6 py-3"
+                className="btn-secondary text-base px-8 py-3.5"
               >
                 Se connecter
               </Link>
@@ -58,7 +62,7 @@ export default async function HomePage() {
       </div>
 
       {/* Features */}
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 w-full max-w-4xl text-left">
+      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 w-full max-w-4xl text-left">
         <FeatureCard
           icon="📋"
           title="Inscriptions en ligne"
@@ -104,9 +108,9 @@ function FeatureCard({
   description: string;
 }) {
   return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 hover:shadow-md transition-shadow">
+    <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-5 hover:shadow-md transition-shadow">
       <span className="text-2xl mb-3 block">{icon}</span>
-      <h3 className="font-semibold text-navy mb-1">{title}</h3>
+      <h3 className="font-semibold text-slate-800 mb-1">{title}</h3>
       <p className="text-sm text-slate-500 leading-relaxed">{description}</p>
     </div>
   );

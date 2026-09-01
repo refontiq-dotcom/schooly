@@ -3,19 +3,26 @@
 @tailwind utilities;
 
 body {
-  @apply bg-slate-50 text-slate-800;
+  @apply text-slate-800;
+  background-color: #FBF6EE;
 }
 
 .card {
-  @apply bg-white rounded-xl border border-slate-200 shadow-sm p-5;
+  @apply bg-white rounded-2xl border border-slate-200/60 shadow-sm p-5;
 }
 
 .btn-primary {
-  @apply inline-flex items-center justify-center rounded-lg bg-brand px-4 py-2.5 text-white font-medium hover:bg-navy transition-colors;
+  @apply inline-flex items-center justify-center rounded-xl px-5 py-2.5 text-white font-medium transition-all;
+  background-color: #E8A44A;
+  hover: background-color: #D69538;
+}
+
+.btn-primary:hover {
+  background-color: #D69538;
 }
 
 .btn-secondary {
-  @apply inline-flex items-center justify-center rounded-lg border border-slate-300 px-4 py-2.5 text-slate-700 font-medium hover:bg-slate-100 transition-colors;
+  @apply inline-flex items-center justify-center rounded-xl border border-slate-300 px-5 py-2.5 text-slate-700 font-medium hover:bg-slate-100 transition-colors;
 }
 
 .badge-success {
@@ -31,5 +38,5 @@ body {
 }
 
 .input {
-  @apply w-full rounded-lg border border-slate-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand;
+  @apply w-full rounded-xl border border-slate-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-amber-400 text-sm;
 }
