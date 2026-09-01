@@ -19,11 +19,6 @@ export default async function HomePage() {
     <div className="min-h-[85vh] flex flex-col items-center justify-center text-center px-4">
       {/* Hero */}
       <div className="max-w-2xl mx-auto mb-14">
-        <div className="inline-flex items-center gap-2 bg-amber-50 border border-amber-200/50 rounded-full px-4 py-1.5 mb-6">
-          <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-          <span className="text-xs font-medium text-amber-700">Plateforme de gestion scolaire</span>
-        </div>
-
         <h1 className="text-4xl md:text-5xl font-bold text-slate-800 mb-5 leading-tight">
           Gérez votre établissement
           <br />

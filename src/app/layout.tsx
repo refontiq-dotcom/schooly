@@ -3,9 +3,9 @@ import Link from "next/link";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Schooly — Gestion scolaire simplifiée",
+  title: "Schooly",
   description:
-    "Plateforme de gestion scolaire : inscriptions en ligne, suivi des présences, notes et communication avec les parents.",
+    "Inscriptions en ligne, suivi des présences, notes et communication avec les parents.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
