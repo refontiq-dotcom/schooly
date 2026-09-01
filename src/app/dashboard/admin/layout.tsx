@@ -3,13 +3,14 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { signOut } from "@/lib/auth/actions";
 
 const navItems = [
   { href: "/dashboard/admin", label: "Vue d'ensemble", icon: "📊" },
   { href: "/dashboard/admin/classes", label: "Classes", icon: "📚" },
+  { href: "/dashboard/admin/equipe", label: "Équipe", icon: "👥" },
   { href: "/dashboard/secretariat", label: "Secrétariat", icon: "🧾" },
   { href: "/dashboard/professeur", label: "Professeurs", icon: "🧑‍🏫" },
-  { href: "/dashboard/parent", label: "Parents", icon: "👨‍👩‍👧" },
 ];
 
 const bottomItems = [
@@ -91,13 +92,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               {item.label}
             </Link>
           ))}
-          <Link
-            href="/"
-            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-800 transition-colors"
-          >
-            <span className="text-base">🚪</span>
-            Déconnexion
-          </Link>
+          <form action={signOut}>
+            <button
+              type="submit"
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-800 transition-colors"
+            >
+              <span className="text-base">🚪</span>
+              Déconnexion
+            </button>
+          </form>
         </div>
       </aside>
 

@@ -1,16 +1,22 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { getSessionProfile } from "@/lib/auth/session";
 
 export const revalidate = 0;
 
 export default async function SecretariatDashboardPage() {
-  const supabase = await createClient();
+  const { supabase, profile } = await getSessionProfile();
 
-  const { data: reservations } = await supabase
+  let query = supabase
     .from("reservations")
     .select("*")
     .eq("status", "reserved")
     .order("created_at", { ascending: false });
+
+  if (profile?.establishment_id) {
+    query = query.eq("establishment_id", profile.establishment_id);
+  }
+
+  const { data: reservations } = await query;
 
   return (
     <div className="space-y-6">

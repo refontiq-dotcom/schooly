@@ -1,14 +1,20 @@
-import { createClient } from "@/lib/supabase/server";
 import AddLevelForm from "./add-level-form";
 import AddSectionForm from "./add-section-form";
+import { getSessionProfile } from "@/lib/auth/session";
+import Link from "next/link";
 
 export const revalidate = 0;
 
 export default async function AdminClassesPage() {
-  const supabase = await createClient();
+  const { supabase, profile } = await getSessionProfile();
 
-  const { data: establishments } = await supabase.from("establishments").select("id, name").limit(1);
-  const establishment = establishments?.[0];
+  const { data: establishment } = profile?.establishment_id
+    ? await supabase
+        .from("establishments")
+        .select("id, name")
+        .eq("id", profile.establishment_id)
+        .maybeSingle()
+    : { data: null };
 
   const { data: levels } = await supabase
     .from("levels")
@@ -21,6 +27,15 @@ export default async function AdminClassesPage() {
       <h1 className="text-2xl font-bold text-navy">
         Classes & quotas {establishment ? `— ${establishment.name}` : ""}
       </h1>
+
+      {!establishment && (
+        <div className="card text-slate-500">
+          Aucun établissement rattaché.{" "}
+          <Link href="/onboarding/etablissement" className="text-amber-600 hover:underline">
+            Créer un établissement
+          </Link>
+        </div>
+      )}
 
       {establishment && (
         <div className="card">

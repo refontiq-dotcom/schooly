@@ -1,16 +1,27 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { dashboardHomeForRole } from "@/lib/auth/roles";
+import type { UserRole } from "@/types";
 
 export const revalidate = 0;
 
 export default async function HomePage() {
   let user = null;
+  let dashboardHref = "/auth";
   try {
     const supabase = await createClient();
     const {
       data: { user: u },
     } = await supabase.auth.getUser();
     user = u;
+    if (u) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", u.id)
+        .maybeSingle();
+      dashboardHref = dashboardHomeForRole((profile?.role as UserRole | undefined) ?? "parent");
+    }
   } catch {
     // Supabase not configured
   }
@@ -39,7 +50,7 @@ export default async function HomePage() {
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start">
               <Link
-                href={user ? "/dashboard/admin" : "/auth"}
+                href={user ? dashboardHref : "/auth"}
                 className="inline-flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-400 text-slate-900 font-semibold px-6 py-3 rounded-full transition-colors"
               >
                 {user ? "Mon Espace" : "Commencer"}
