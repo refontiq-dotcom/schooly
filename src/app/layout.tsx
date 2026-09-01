@@ -1,33 +1,37 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Schooly — Trouvez et réservez une place scolaire",
+  title: "Schooly — Gestion scolaire simplifiée",
   description:
-    "Recherchez un établissement scolaire, consultez les places disponibles en temps réel et réservez en ligne.",
+    "Plateforme de gestion scolaire : inscriptions en ligne, suivi des présences, notes et communication avec les parents.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="fr">
-      <body>
+      <body className="min-h-screen flex flex-col">
         <header className="border-b border-slate-200 bg-white">
           <div className="mx-auto max-w-6xl px-4 py-4 flex items-center justify-between">
-            <a href="/" className="text-xl font-bold text-navy">
-              Trouve<span className="text-brand">tou</span>{" "}
+            <Link href="/" className="text-xl font-bold text-navy">
+              Trouve<span className="text-brand">tou</span>
               <span className="text-slate-400 font-normal text-sm align-middle">
-                | Schooly
+                {' '}&middot; Schooly
               </span>
-            </a>
-            <nav className="text-sm text-slate-600 flex gap-5">
-              <a href="/" className="hover:text-brand">Rechercher</a>
-              <a href="/dashboard/admin" className="hover:text-brand">Espace établissement</a>
-              <a href="/dashboard/parent" className="hover:text-brand">Espace parent</a>
+            </Link>
+            <nav className="text-sm text-slate-600 flex gap-5 items-center">
+              <Link href="/" className="hover:text-brand transition-colors">
+                Accueil
+              </Link>
+              <Link href="/auth" className="btn-primary text-sm py-2 px-4">
+                Connexion
+              </Link>
             </nav>
           </div>
         </header>
-        <main className="mx-auto max-w-6xl px-4 py-8">{children}</main>
-        <footer className="mt-16 border-t border-slate-200 py-8 text-center text-sm text-slate-500">
+        <main className="flex-1 mx-auto max-w-6xl w-full px-4 py-8">{children}</main>
+        <footer className="border-t border-slate-200 py-8 text-center text-sm text-slate-500">
           Schooly — un module Trouvetou · Refontiq, Abidjan
         </footer>
       </body>
