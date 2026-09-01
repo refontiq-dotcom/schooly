@@ -1,20 +1,31 @@
-import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
+import { getSessionProfile } from "@/lib/auth/session";
 
 export const revalidate = 0;
 
-/**
- * v1 : affiche toutes les sections regroupées par niveau (de la 6ème à la
- * Terminale, ou tout autre niveau configuré). En production, ne montrer que
- * les sections affectées au professeur connecté via teacher_assignments.
- */
 export default async function ProfesseurDashboardPage() {
-  const supabase = await createClient();
+  const { supabase, profile } = await getSessionProfile();
 
-  const { data: levels } = await supabase
+  const assignedSectionIds =
+    profile?.role === "admin"
+      ? null
+      : (
+          await supabase
+            .from("teacher_assignments")
+            .select("section_id")
+            .eq("teacher_id", profile?.id ?? "")
+        ).data?.map((a) => a.section_id) ?? [];
+
+  let levelsQuery = supabase
     .from("levels")
     .select("id, name, rank, sections(id, name, capacity, seats_taken)")
     .order("rank");
+
+  if (profile?.establishment_id) {
+    levelsQuery = levelsQuery.eq("establishment_id", profile.establishment_id);
+  }
+
+  const { data: levels } = await levelsQuery;
 
   return (
     <div className="space-y-6">
@@ -25,7 +36,12 @@ export default async function ProfesseurDashboardPage() {
 
       <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {levels?.map((level) => {
-          const sections = (level.sections ?? []) as { id: string; name: string }[];
+          const allSections = (level.sections ?? []) as { id: string; name: string }[];
+          const sections =
+            assignedSectionIds === null
+              ? allSections
+              : allSections.filter((s) => assignedSectionIds.includes(s.id));
+          if (assignedSectionIds !== null && sections.length === 0) return null;
           return (
             <div key={level.id} className="card">
               <h2 className="font-semibold text-navy mb-3">{level.name}</h2>
@@ -46,7 +62,13 @@ export default async function ProfesseurDashboardPage() {
             </div>
           );
         })}
-        {(!levels || levels.length === 0) && (
+        {assignedSectionIds !== null && assignedSectionIds.length === 0 && (
+          <div className="card text-slate-500 sm:col-span-2 lg:col-span-3">
+            Aucune classe ne vous a encore été affectée. L&apos;administrateur doit
+            vous assigner une section depuis l&apos;espace direction.
+          </div>
+        )}
+        {assignedSectionIds === null && (!levels || levels.length === 0) && (
           <div className="card text-slate-500 sm:col-span-2 lg:col-span-3">
             Aucun niveau configuré. Rendez-vous dans l&apos;espace administrateur pour créer les
             classes.

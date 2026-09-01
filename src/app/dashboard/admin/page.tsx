@@ -1,13 +1,18 @@
-import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
+import { getSessionProfile } from "@/lib/auth/session";
 
 export const revalidate = 0;
 
 export default async function AdminDashboardPage() {
-  const supabase = await createClient();
+  const { supabase, profile } = await getSessionProfile();
 
-  const { data: establishments } = await supabase.from("establishments").select("id, name").limit(1);
-  const establishment = establishments?.[0];
+  const { data: establishment } = profile?.establishment_id
+    ? await supabase
+        .from("establishments")
+        .select("id, name")
+        .eq("id", profile.establishment_id)
+        .maybeSingle()
+    : { data: null };
 
   const { data: reservations } = await supabase
     .from("reservations")
@@ -38,11 +43,19 @@ export default async function AdminDashboardPage() {
         {/* Header */}
         <div>
           <h1 className="text-2xl font-bold text-slate-800">
-            Bonjour Admin 👋
+            Bonjour {profile?.full_name ?? "Admin"}
           </h1>
           <p className="text-sm text-slate-500 mt-1">
             {establishment ? establishment.name : "Tableau de bord de votre établissement"}
           </p>
+          {!establishment && (
+            <p className="text-sm text-amber-700 mt-2">
+              Aucun établissement rattaché.{" "}
+              <Link href="/onboarding/etablissement" className="underline">
+                Créer un établissement
+              </Link>
+            </p>
+          )}
         </div>
 
         {/* Hero stat card */}

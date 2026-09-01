@@ -1,5 +1,36 @@
 export type UserRole = "admin" | "professeur" | "secretariat" | "censeur" | "parent";
 
+export const STAFF_INVITE_ROLES = [
+  "professeur",
+  "secretariat",
+  "censeur",
+  "admin",
+] as const;
+
+export type StaffInviteRole = (typeof STAFF_INVITE_ROLES)[number];
+
+export interface Profile {
+  id: string;
+  full_name: string;
+  phone: string | null;
+  email: string | null;
+  role: UserRole;
+  establishment_id: string | null;
+  created_at: string;
+}
+
+export interface StaffInvitation {
+  id: string;
+  establishment_id: string;
+  email: string;
+  role: StaffInviteRole;
+  token: string;
+  invited_by: string;
+  accepted_at: string | null;
+  expires_at: string;
+  created_at: string;
+}
+
 export type ReservationStatus =
   | "pending_payment"
   | "reserved"

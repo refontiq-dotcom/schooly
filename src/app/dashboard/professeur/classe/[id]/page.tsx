@@ -1,6 +1,6 @@
-import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import StudentRow from "./student-row";
+import { getSessionProfile } from "@/lib/auth/session";
 
 export const revalidate = 0;
 
@@ -10,7 +10,17 @@ export default async function ClassePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const supabase = await createClient();
+  const { supabase, profile } = await getSessionProfile();
+
+  if (profile?.role === "professeur") {
+    const { data: assignment } = await supabase
+      .from("teacher_assignments")
+      .select("id")
+      .eq("teacher_id", profile.id)
+      .eq("section_id", id)
+      .maybeSingle();
+    if (!assignment) return notFound();
+  }
 
   const { data: section } = await supabase
     .from("sections")

@@ -1,18 +1,15 @@
-import { createClient } from "@/lib/supabase/server";
+import Link from "next/link";
+import { getSessionProfile } from "@/lib/auth/session";
 
 export const revalidate = 0;
 
 /**
- * v1 : affiche le suivi du premier enfant trouvé pour l'utilisateur connecté
- * (students.parent_id = auth.uid()). Pour un parent avec plusieurs enfants,
- * prévoir un sélecteur (Phase 2).
+ * Affiche le suivi du premier enfant rattaché (students.parent_id = auth.uid()).
+ * Le rattachement se fait à la finalisation d'inscription (email/téléphone)
+ * ou au premier login parent via link_parent_to_students().
  */
 export default async function ParentDashboardPage() {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user, profile } = await getSessionProfile();
 
   const { data: students } = await supabase
     .from("students")
@@ -49,9 +46,24 @@ export default async function ParentDashboardPage() {
 
   if (!student) {
     return (
-      <div className="card text-slate-500">
-        Aucun enfant rattaché à votre compte pour le moment. Une fois l&apos;inscription
-        finalisée par l&apos;établissement, le suivi apparaîtra ici automatiquement.
+      <div className="space-y-4">
+        <div className="card text-slate-500">
+          Aucun enfant rattaché à votre compte pour le moment. Une fois
+          l&apos;inscription finalisée par l&apos;établissement (avec le même
+          email), le suivi apparaîtra ici automatiquement.
+        </div>
+        {profile?.role === "parent" && !profile.establishment_id && (
+          <div className="card">
+            <h2 className="font-semibold text-navy mb-2">Vous dirigez un établissement ?</h2>
+            <p className="text-sm text-slate-500 mb-3">
+              Créez votre établissement pour obtenir le rôle administrateur.
+              Le personnel (professeurs, secrétariat) sera ensuite invité.
+            </p>
+            <Link href="/onboarding/etablissement" className="btn-primary">
+              Créer un établissement
+            </Link>
+          </div>
+        )}
       </div>
     );
   }

@@ -56,6 +56,9 @@ L'application est disponible sur `http://localhost:3000`.
 - `/etablissement/[id]` — fiche établissement + réservation
 - `/dashboard/admin` — espace direction (config classes/quotas)
 - `/dashboard/admin/classes` — gestion des niveaux, sections, capacités
+- `/dashboard/admin/equipe` — invitations du personnel
+- `/onboarding/etablissement` — création d'établissement (passe le compte en admin)
+- `/auth/invitation?token=…` — acceptation d'une invitation staff
 - `/dashboard/professeur` — cartes par niveau → sections
 - `/dashboard/professeur/classe/[id]` — présences & notes
 - `/dashboard/secretariat` — réservations à finaliser
@@ -78,16 +81,26 @@ places des réservations non finalisées dans le délai imparti
 ## Rôles et sécurité (RLS)
 
 L'accès aux données est cloisonné par établissement et par rôle via les
-policies Row Level Security de `supabase/schema.sql` :
-- Un **parent** ne voit que les données de son/ses enfant(s).
+policies Row Level Security de `supabase/schema.sql`, plus un contrôle de
+route dans `src/middleware.ts` :
+
+- L'inscription publique crée **toujours** un profil `parent` (trigger
+  `handle_new_user` sur `auth.users`). Le rôle choisi dans le formulaire
+  n'est plus un levier : il n'y a plus de sélecteur « Administrateur ».
+- Un **parent** ne voit que les données de son/ses enfant(s)
+  (`students.parent_id`). Le rattachement se fait à la finalisation
+  d'inscription (email ou téléphone) via `finalize_reservation()`, et au
+  login via `link_parent_to_students()`.
+- Un **administrateur** s'obtient uniquement en créant un établissement
+  (`create_establishment_as_admin`) depuis `/onboarding/etablissement`.
+- **Professeur / secrétariat / censeur / admin supplémentaire** : invitation
+  par un admin (`staff_invitations`) puis acceptation sur
+  `/auth/invitation?token=…`. Un trigger empêche de modifier `role` /
+  `establishment_id` / `email` depuis le client.
 - Un **professeur** ne voit/modifie que les sections qui lui sont affectées
   (table `teacher_assignments`).
-- Un **administrateur** gère les niveaux/sections de son propre établissement.
-
-⚠️ En v1, les dashboards affichent le premier établissement/élève trouvé à des
-fins de démonstration. Avant mise en production, brancher l'authentification
-Supabase (`supabase.auth`) et filtrer chaque requête par
-`profiles.establishment_id` / `auth.uid()` réel de l'utilisateur connecté.
+- Le middleware redirige tout utilisateur connecté dont le rôle ne
+  correspond pas à la route (`/dashboard/admin` inaccessible aux parents).
 
 ## Ce qui n'est PAS encore dans la v1 (roadmap)
 
@@ -103,7 +116,8 @@ Voir le cahier des charges complet pour le détail des phases. Non couvert ici :
   pour le guide de construction du workflow n8n.
 - **Visite virtuelle 360°** hébergée en propre (v1 se contente d'un lien externe).
 - **Indicateurs d'alerte intelligents** (élèves/professeurs) — Phase 3.
-- **Authentification complète par rôle** et écrans de connexion/inscription.
+- **Envoi d'email d'invitation** — v1 affiche le lien à copier dans
+  `/dashboard/admin/equipe` ; brancher un provider (Resend, n8n) en Phase 2.
 
 ## Structure du projet
 
@@ -124,8 +138,11 @@ schooly/
 │   │   │   ├── professeur/                   # présences & notes
 │   │   │   ├── secretariat/                  # scan QR + finalisation
 │   │   │   └── parent/                       # suivi enfant
+│   │   ├── auth/                             # connexion / inscription parent / invitation
+│   │   ├── onboarding/etablissement/         # création d'établissement → rôle admin
 │   │   └── api/reservations/                 # endpoints réservation
-│   ├── lib/supabase/        # clients Supabase (browser/server/admin)
+│   ├── lib/auth/             # actions, rôles, session + sync profiles
+│   ├── lib/supabase/         # clients Supabase (browser/server/admin)
 │   └── types/                # types TypeScript partagés
 └── README.md
 ```

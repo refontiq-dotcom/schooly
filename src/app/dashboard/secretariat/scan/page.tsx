@@ -38,25 +38,17 @@ export default function ScanPage() {
   async function handleFinalize() {
     if (!result) return;
     setLoading(true);
+    setError(null);
     const supabase = createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    // Crée l'élève et marque la réservation comme confirmée
-    await supabase.from("students").insert({
-      reservation_id: result.id,
-      establishment_id: result.establishment_id,
-      section_id: result.section_id,
-      full_name: result.student_full_name,
-      birthdate: result.student_birthdate,
-      parent_phone: result.parent_phone,
+    const { error: finalizeError } = await supabase.rpc("finalize_reservation", {
+      p_reservation_id: result.id,
     });
 
-    await supabase
-      .from("reservations")
-      .update({ status: "confirmed", confirmed_at: new Date().toISOString(), confirmed_by: user?.id ?? null })
-      .eq("id", result.id);
+    if (finalizeError) {
+      setError(finalizeError.message);
+      setLoading(false);
+      return;
+    }
 
     setFinalized(true);
     setLoading(false);
