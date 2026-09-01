@@ -65,7 +65,7 @@ create table if not exists staff_invitations (
   token uuid not null default gen_random_uuid(),
   invited_by uuid not null references profiles(id),
   accepted_at timestamptz,
-  expires_at timestamptz not null default (now() + interval '7 days'),
+  expires_at timestamptz not null default (now() + make_interval(days => 7)),
   created_at timestamptz not null default now(),
   constraint staff_invitations_role_chk check (role in ('professeur', 'secretariat', 'censeur', 'admin'))
 );
