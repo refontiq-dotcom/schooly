@@ -1,12 +1,24 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import Image from "next/image";
 import HeaderNav from "./header-nav";
 import "./globals.css";
+import logo from "../../schooly_logo_vector.svg";
 
 export const metadata: Metadata = {
   title: "Schooly",
   description:
     "Inscriptions en ligne, suivi des présences, notes et communication avec les parents.",
+  manifest: "/manifest.webmanifest",
+  icons: {
+    icon: "/icon.svg",
+    apple: "/icon.svg",
+  },
+  appleWebApp: {
+    capable: true,
+    title: "Schooly",
+    statusBarStyle: "default",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -15,8 +27,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="min-h-screen flex flex-col">
         <header className="bg-white/60 backdrop-blur-sm border-b border-slate-200/50">
           <div className="mx-auto max-w-6xl px-6 py-4 flex items-center justify-between">
-            <Link href="/" className="text-xl font-bold text-slate-800 tracking-tight">
-              Schooly
+            <Link href="/" aria-label="Schooly, accueil" className="shrink-0">
+              <Image
+                src={logo}
+                alt="Schooly"
+                priority
+                className="h-auto w-[150px] sm:w-[180px]"
+              />
             </Link>
             <HeaderNav />
           </div>
