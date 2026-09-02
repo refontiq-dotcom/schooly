@@ -5,7 +5,7 @@ const nextConfig = {
       { protocol: "https", hostname: "**.supabase.co" },
     ],
   },
-  allowedDevOrigins: ["*.daytonaproxy01.net"],
+  allowedDevOrigins: ["*.daytonaproxy01.net", ".monkeycode-ai.live"],
 };
 
 module.exports = nextConfig;

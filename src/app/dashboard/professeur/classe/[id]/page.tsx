@@ -1,6 +1,9 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import StudentRow from "./student-row";
+import BehaviorForm from "./behavior-form";
 import { getSessionProfile } from "@/lib/auth/session";
+import { BEHAVIOR_KIND_LABEL } from "@/lib/operations/labels";
+import type { BehaviorKind } from "@/types";
 
 export const revalidate = 0;
 
@@ -10,7 +13,10 @@ export default async function ClassePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const { supabase, profile } = await getSessionProfile();
+  const { supabase, profile, user } = await getSessionProfile();
+  if (!user || !supabase) {
+    redirect(`/auth?returnTo=/dashboard/professeur/classe/${id}`);
+  }
 
   if (profile?.role === "professeur") {
     const { data: assignment } = await supabase
@@ -50,6 +56,13 @@ export default async function ClassePage({
     .eq("section_id", id)
     .order("evaluation_date", { ascending: false })
     .limit(100);
+
+  const { data: behavior } = await supabase
+    .from("behavior_notes")
+    .select("*")
+    .eq("section_id", id)
+    .order("created_at", { ascending: false })
+    .limit(20);
 
   return (
     <div className="space-y-6">
@@ -109,9 +122,26 @@ export default async function ClassePage({
         </table>
       </div>
 
-      <div className="card bg-slate-50 text-sm text-slate-500">
-        📲 Un récapitulatif hebdomadaire (présence + notes) est envoyé automatiquement par
-        WhatsApp à chaque parent en fin de semaine (workflow n8n — voir README, Phase 2).
+      <div className="card space-y-4">
+        <h2 className="font-semibold text-navy">Comportement & alertes précoces</h2>
+        <p className="text-sm text-slate-500">
+          Visible par les parents. Utilisez-le pour signaler un décrochage, une absence répétée ou un progrès.
+        </p>
+        {(students ?? []).slice(0, 8).map((student) => (
+          <div key={student.id} className="border border-slate-100 rounded-xl p-3">
+            <p className="text-sm font-medium text-navy mb-2">{student.full_name}</p>
+            <BehaviorForm studentId={student.id} sectionId={id} studentName={student.full_name} />
+          </div>
+        ))}
+        <ul className="text-sm space-y-2">
+          {(behavior ?? []).map((n) => (
+            <li key={n.id}>
+              <span className="font-medium">{BEHAVIOR_KIND_LABEL[n.kind as BehaviorKind]}</span>
+              {" — "}
+              {n.title}
+            </li>
+          ))}
+        </ul>
       </div>
     </div>
   );

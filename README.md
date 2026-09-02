@@ -31,8 +31,9 @@ Sur [supabase.com](https://supabase.com), créez un projet, puis dans
 **SQL Editor**, exécutez dans l'ordre :
 
 ```bash
-supabase/schema.sql   # tables, fonctions, RLS
-supabase/seed.sql      # données de démonstration (optionnel)
+supabase/schema.sql                 # tables, fonctions, RLS (auth + inscriptions)
+supabase/migration-operations.sql   # rentrée, paiements, documents, messages
+supabase/seed.sql                   # données de démonstration (optionnel)
 ```
 
 ### 2. Configurer les variables d'environnement
@@ -63,7 +64,15 @@ L'application est disponible sur `http://localhost:3000`.
 - `/dashboard/professeur/classe/[id]` — présences & notes
 - `/dashboard/secretariat` — réservations à finaliser
 - `/dashboard/secretariat/scan` — vérification QR code + finalisation
-- `/dashboard/parent` — suivi de l'enfant
+- `/dashboard/parent` — suivi de l'enfant (notes, absences, alertes)
+- `/dashboard/parent/rentree` — listes de fournitures et estimation des coûts
+- `/dashboard/parent/paiements` — Mobile Money, échéanciers, restes à payer
+- `/dashboard/parent/documents` — checklist (acte de naissance, dossiers d'examen)
+- `/dashboard/parent/messages` — messagerie école ↔ parents
+- `/dashboard/admin/paiements` — catalogue de frais et confirmation des paiements
+- `/dashboard/admin/rentree` — publication des listes de rentrée
+- `/dashboard/admin/documents` — validation des pièces administratives
+- `/dashboard/admin/messages` — communication avec les parents
 
 ## Logique métier clé : anti-survente
 

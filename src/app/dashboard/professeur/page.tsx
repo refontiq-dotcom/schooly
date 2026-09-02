@@ -1,10 +1,14 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { getSessionProfile } from "@/lib/auth/session";
 
 export const revalidate = 0;
 
 export default async function ProfesseurDashboardPage() {
-  const { supabase, profile } = await getSessionProfile();
+  const { supabase, profile, user } = await getSessionProfile();
+  if (!user || !supabase) {
+    redirect("/auth?returnTo=/dashboard/professeur");
+  }
 
   const assignedSectionIds =
     profile?.role === "admin"

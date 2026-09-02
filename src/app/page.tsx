@@ -145,19 +145,19 @@ export default async function HomePage() {
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <FacilityCard
-              icon="💻"
-              title="Gestion en Ligne"
-              description="Inscriptions, réservations et suivi des paiements depuis votre téléphone."
+              icon="🎒"
+              title="Rentrée sereine"
+              description="Listes de fournitures partagées et estimation des coûts, sans improvisation."
             />
             <FacilityCard
-              icon="📊"
-              title="Suivi des Notes"
-              description="Les professeurs saisissent les évaluations, les parents suivent en temps réel."
+              icon="💳"
+              title="Paiements & impayés"
+              description="Mobile Money, échéanciers et historique clair des restes à payer."
             />
             <FacilityCard
-              icon="📱"
-              title="Notifications WhatsApp"
-              description="Récapitulatifs hebdomadaires de présence et de notes envoyés automatiquement."
+              icon="💬"
+              title="École ↔ parents"
+              description="Messagerie unique, notes, absences et documents administratifs."
             />
           </div>
         </div>

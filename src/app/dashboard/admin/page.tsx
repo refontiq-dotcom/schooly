@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { getSessionProfile } from "@/lib/auth/session";
 import { SCHOOL_TYPE_LABELS, SCHOOL_TYPE_ICONS } from "@/types";
 import type { SchoolType } from "@/types";
@@ -22,7 +23,10 @@ function getWeekDays() {
 }
 
 export default async function AdminDashboardPage() {
-  const { supabase, profile } = await getSessionProfile();
+  const { supabase, profile, user } = await getSessionProfile();
+  if (!user || !supabase) {
+    redirect("/auth?returnTo=/dashboard/admin");
+  }
 
   const { data: establishment } = profile?.establishment_id
     ? await supabase
@@ -551,6 +555,28 @@ export default async function AdminDashboardPage() {
               <Link href="/dashboard/admin/classes" className="text-amber-600 hover:underline">Ajouter</Link>
             </p>
           )}
+        </div>
+
+        <div className="bg-white rounded-2xl border border-slate-100 p-5">
+          <h3 className="font-semibold text-slate-800 text-[15px] mb-3">Operations</h3>
+          <div className="grid grid-cols-2 gap-2">
+            <Link href="/dashboard/admin/paiements" className="rounded-xl border border-slate-100 p-3 hover:bg-slate-50 transition-colors">
+              <p className="text-[13px] font-medium text-slate-800">Paiements</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">Mobile Money</p>
+            </Link>
+            <Link href="/dashboard/admin/rentree" className="rounded-xl border border-slate-100 p-3 hover:bg-slate-50 transition-colors">
+              <p className="text-[13px] font-medium text-slate-800">Rentrée</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">Fournitures</p>
+            </Link>
+            <Link href="/dashboard/admin/documents" className="rounded-xl border border-slate-100 p-3 hover:bg-slate-50 transition-colors">
+              <p className="text-[13px] font-medium text-slate-800">Documents</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">Dossiers</p>
+            </Link>
+            <Link href="/dashboard/admin/messages" className="rounded-xl border border-slate-100 p-3 hover:bg-slate-50 transition-colors">
+              <p className="text-[13px] font-medium text-slate-800">Messages</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">Parents</p>
+            </Link>
+          </div>
         </div>
       </div>
     </div>

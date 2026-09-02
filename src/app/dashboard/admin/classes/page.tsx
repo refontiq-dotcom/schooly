@@ -2,11 +2,15 @@ import AddLevelForm from "./add-level-form";
 import AddSectionForm from "./add-section-form";
 import { getSessionProfile } from "@/lib/auth/session";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 export const revalidate = 0;
 
 export default async function AdminClassesPage() {
-  const { supabase, profile } = await getSessionProfile();
+  const { supabase, profile, user } = await getSessionProfile();
+  if (!user || !supabase) {
+    redirect("/auth?returnTo=/dashboard/admin/classes");
+  }
 
   const { data: establishment } = profile?.establishment_id
     ? await supabase

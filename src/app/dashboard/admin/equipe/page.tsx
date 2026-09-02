@@ -12,7 +12,10 @@ const ROLE_LABEL: Record<string, string> = {
 };
 
 export default async function EquipePage() {
-  const { supabase, profile } = await getSessionProfile();
+  const { supabase, profile, user } = await getSessionProfile();
+  if (!user || !supabase) {
+    redirect("/auth?returnTo=/dashboard/admin/equipe");
+  }
 
   if (!profile || profile.role !== "admin" || !profile.establishment_id) {
     redirect("/dashboard/parent");

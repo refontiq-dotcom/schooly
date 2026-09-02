@@ -146,3 +146,114 @@ export interface Grade {
   max_score: number;
   evaluation_date: string;
 }
+
+export type FeeStatus = "pending" | "partial" | "paid" | "overdue";
+export type PaymentMethod =
+  | "orange_money"
+  | "mtn_momo"
+  | "moov"
+  | "wave"
+  | "cash"
+  | "bank";
+export type PaymentStatus = "pending" | "confirmed" | "failed";
+export type DocumentType =
+  | "acte_naissance"
+  | "photo_identite"
+  | "carnet_vaccination"
+  | "bulletin_precedent"
+  | "certificat_scolarite"
+  | "piece_identite"
+  | "dossier_examen"
+  | "autre";
+export type DocumentStatus = "missing" | "submitted" | "validated" | "rejected";
+export type BehaviorKind = "positif" | "a_surveiller" | "incident";
+
+export interface FeeCategory {
+  id: string;
+  establishment_id: string;
+  name: string;
+  description: string | null;
+  amount: number;
+  due_date: string | null;
+  school_year: string;
+  is_optional: boolean;
+}
+
+export interface StudentFee {
+  id: string;
+  student_id: string;
+  fee_category_id: string;
+  establishment_id: string;
+  amount: number;
+  amount_paid: number;
+  due_date: string | null;
+  status: FeeStatus;
+}
+
+export interface Payment {
+  id: string;
+  student_id: string;
+  student_fee_id: string | null;
+  establishment_id: string;
+  amount: number;
+  method: PaymentMethod;
+  reference: string | null;
+  status: PaymentStatus;
+  paid_at: string | null;
+  created_at: string;
+}
+
+export interface SupplyList {
+  id: string;
+  establishment_id: string;
+  level_id: string;
+  school_year: string;
+  title: string;
+  notes: string | null;
+  published: boolean;
+}
+
+export interface SupplyItem {
+  id: string;
+  list_id: string;
+  name: string;
+  quantity: string;
+  estimated_cost: number;
+  is_optional: boolean;
+  sort_order: number;
+}
+
+export interface StudentDocument {
+  id: string;
+  student_id: string;
+  establishment_id: string;
+  doc_type: DocumentType;
+  status: DocumentStatus;
+  required: boolean;
+  alert_from_level: string | null;
+  notes: string | null;
+  submitted_at: string | null;
+}
+
+export interface SchoolMessage {
+  id: string;
+  establishment_id: string;
+  sender_id: string;
+  recipient_id: string | null;
+  student_id: string | null;
+  subject: string;
+  body: string;
+  read_at: string | null;
+  created_at: string;
+}
+
+export interface BehaviorNote {
+  id: string;
+  student_id: string;
+  section_id: string;
+  recorded_by: string;
+  kind: BehaviorKind;
+  title: string;
+  body: string | null;
+  session_date: string;
+}
