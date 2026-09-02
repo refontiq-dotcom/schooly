@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/server";
 
 function authorized(request: NextRequest) {
-  const expected = process.env.TROUVETOU_API_KEY;
+  const expected = process.env.TROUVETOU_API_KEY_PEPPER ?? process.env.TROUVETOU_API_KEY;
   return Boolean(expected && request.headers.get("authorization") === `Bearer ${expected}`);
 }
 

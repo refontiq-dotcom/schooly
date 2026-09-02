@@ -8,7 +8,7 @@ connectée à **Trouvetou**. Développé par **Refontiq** (Abidjan, Côte d'Ivoi
 Un administrateur peut publier ou retirer son établissement depuis son dashboard.
 Les établissements non publiés ne sont jamais retournés par l'API partenaire.
 
-L'API est protégée par `TROUVETOU_API_KEY` et attend l'en-tête
+L'API est protégée par `TROUVETOU_API_KEY_PEPPER` et attend l'en-tête
 `Authorization: Bearer <clé>` :
 
 ```text
@@ -67,7 +67,7 @@ supabase/seed.sql                                    # données de démonstratio
 cp .env.example .env.local
 # Renseignez NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY,
 # SUPABASE_SERVICE_ROLE_KEY depuis Project Settings > API sur Supabase,
-# et TROUVETOU_API_KEY avec la même valeur configurée dans Trouvetou.
+# et TROUVETOU_API_KEY_PEPPER avec la même valeur configurée dans Trouvetou.
 ```
 
 ### 3. Installer et lancer
