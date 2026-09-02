@@ -38,6 +38,8 @@ function SidebarIcon({ name, className = "w-5 h-5" }: { name: string; className?
     wallet: <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M21 12a2.25 2.25 0 00-2.25-2.25H15a3 3 0 11-6 0H5.25A2.25 2.25 0 003 12m18 0v6a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 18v-6m18 0V9M3 12V9m18 0a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 9m18 0V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v3" /></svg>,
     backpack: <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M8 8V7a4 4 0 018 0v1M5 8.25A2.25 2.25 0 017.25 6h9.5A2.25 2.25 0 0119 8.25v9.5A2.25 2.25 0 0116.75 20h-9.5A2.25 2.25 0 015 17.75v-9.5zM9 13h6" /></svg>,
     folder: <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h5.379a1.5 1.5 0 011.06.44l.941.941a1.5 1.5 0 001.061.44H19.5a2.25 2.25 0 012.25 2.25v2.25a2.25 2.25 0 01-2.25 2.25H4.5A2.25 2.25 0 012.25 15.75v-3z" /></svg>,
+    menu: <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg>,
+    close: <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>,
   };
   return icons[name] ?? null;
 }
@@ -45,6 +47,10 @@ function SidebarIcon({ name, className = "w-5 h-5" }: { name: string; className?
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const filteredNavItems = navItems.filter((item) =>
+    item.label.toLocaleLowerCase().includes(searchQuery.toLocaleLowerCase().trim())
+  );
 
   return (
     <div className="flex min-h-[calc(100vh-80px)] gap-0 -mx-4 -mt-8">
@@ -78,12 +84,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
 
         {/* Main Nav */}
-        <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto">
+        <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto" aria-label="Navigation administrateur">
           <p className="px-3 text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-2">
             Menu principal
           </p>
-          {navItems.map((item) => {
-            const active = pathname === item.href;
+          {filteredNavItems.map((item) => {
+            const active = pathname === item.href ||
+              (item.href !== "/dashboard/admin" && pathname.startsWith(`${item.href}/`));
             return (
               <Link
                 key={item.href}
@@ -100,6 +107,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               </Link>
             );
           })}
+          {filteredNavItems.length === 0 && (
+            <p className="px-3 py-2 text-xs text-slate-400">Aucun résultat</p>
+          )}
         </nav>
 
         {/* Bottom Nav */}
@@ -135,13 +145,26 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top bar */}
         <header className="sticky top-0 z-20 bg-white/80 backdrop-blur-md border-b border-slate-100 px-6 py-3 flex items-center gap-3">
-          <button onClick={() => setMobileOpen(!mobileOpen)} className="lg:hidden p-2 rounded-lg hover:bg-slate-100 text-slate-600">
-            <SidebarIcon name="home" className="w-5 h-5" />
+          <button
+            type="button"
+            onClick={() => setMobileOpen(!mobileOpen)}
+            aria-label={mobileOpen ? "Fermer le menu" : "Ouvrir le menu"}
+            aria-expanded={mobileOpen}
+            className="lg:hidden p-2 rounded-lg hover:bg-slate-100 text-slate-600"
+          >
+            <SidebarIcon name={mobileOpen ? "close" : "menu"} className="w-5 h-5" />
           </button>
           <div className="flex-1" />
           <div className="hidden sm:flex items-center gap-1 bg-slate-100/80 rounded-xl px-3 py-2">
             <SidebarIcon name="search" className="w-4 h-4 text-slate-400" />
-            <input type="text" placeholder="Rechercher…" className="bg-transparent text-sm text-slate-600 placeholder-slate-400 outline-none w-40" />
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Rechercher…"
+              aria-label="Rechercher dans le menu"
+              className="bg-transparent text-sm text-slate-600 placeholder-slate-400 outline-none w-40"
+            />
           </div>
           <button className="p-2 rounded-xl hover:bg-slate-100 text-slate-500 relative transition-colors">
             <SidebarIcon name="bell" className="w-5 h-5" />
