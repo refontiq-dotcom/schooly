@@ -6,6 +6,7 @@ import {
   confirmPayment,
   createFeeCategory,
   createSupplyList,
+  finalizeReservation,
   markDocumentStatus,
   sendMessage,
   toggleTrouvetouPublication,
@@ -151,6 +152,31 @@ export function ConfirmPaymentButton({ id }: { id: string }) {
     >
       Confirmer
     </button>
+  );
+}
+
+export function ConfirmReservationButton({ id }: { id: string }) {
+  const router = useRouter();
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <button
+        type="button"
+        disabled={pending}
+        onClick={async () => {
+          setPending(true);
+          setError(await finalizeReservation(id));
+          setPending(false);
+          router.refresh();
+        }}
+        className="rounded-lg bg-emerald-100 px-2.5 py-1 text-[10px] font-semibold text-emerald-700 hover:bg-emerald-200 disabled:opacity-50"
+      >
+        {pending ? "…" : "Confirmer"}
+      </button>
+      {error && <span className="max-w-32 text-right text-[10px] text-red-600">{error}</span>}
+    </div>
   );
 }
 

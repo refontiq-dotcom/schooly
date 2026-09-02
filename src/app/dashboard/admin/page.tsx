@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { getSessionProfile } from "@/lib/auth/session";
 import { SCHOOL_TYPE_LABELS, SCHOOL_TYPE_ICONS } from "@/types";
 import type { SchoolType } from "@/types";
-import { TrouvetouPublicationToggle } from "./_ops-forms";
+import { ConfirmReservationButton, TrouvetouPublicationToggle } from "./_ops-forms";
 
 export const revalidate = 0;
 
@@ -514,6 +514,7 @@ export default async function AdminDashboardPage() {
                     </p>
                   </div>
                   <StatusBadge status={r.status} />
+                  {r.status === "reserved" && <ConfirmReservationButton id={r.id} />}
                 </div>
               ))}
             </div>

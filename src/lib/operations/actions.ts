@@ -87,6 +87,17 @@ export async function confirmPayment(paymentId: string): Promise<string | null> 
   return null;
 }
 
+export async function finalizeReservation(reservationId: string): Promise<string | null> {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("finalize_reservation", {
+    p_reservation_id: reservationId,
+  });
+  if (error) return error.message;
+  revalidatePath("/dashboard/admin");
+  revalidatePath("/dashboard/secretariat");
+  return null;
+}
+
 export async function createFeeCategory(
   _prev: string | null,
   formData: FormData
