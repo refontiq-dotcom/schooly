@@ -311,6 +311,21 @@ drop policy if exists "Sections visibles publiquement" on sections;
 create policy "Sections visibles publiquement"
   on sections for select using (true);
 
+-- Helper RLS : lit le profil de l'utilisateur courant sans déclencher la RLS
+-- de `profiles` (security definer). À utiliser dans les policies à la place des
+-- sous-requêtes auto-référentes sur `profiles` (récursion infinie garantie).
+create or replace function public.my_profile()
+returns table (id uuid, establishment_id uuid, role user_role)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select p.id, p.establishment_id, p.role
+  from public.profiles p
+  where p.id = auth.uid();
+$$;
+
 drop policy if exists "Un utilisateur voit son profil" on profiles;
 create policy "Un utilisateur voit son profil"
   on profiles for select using (auth.uid() = id);
@@ -318,7 +333,11 @@ create policy "Un utilisateur voit son profil"
 drop policy if exists "Staff accède aux données de son établissement (profiles)" on profiles;
 create policy "Staff accède aux données de son établissement (profiles)"
   on profiles for select using (
-    establishment_id in (select establishment_id from profiles where id = auth.uid())
+    establishment_id in (
+      select mp.establishment_id
+      from public.my_profile() mp
+      where mp.role in ('admin', 'censeur', 'secretariat', 'professeur')
+    )
   );
 
 drop policy if exists "Admin gère les niveaux de son établissement" on levels;
@@ -777,6 +796,17 @@ $$;
 drop function if exists public.apply_pending_invitation(uuid);
 
 revoke all on function public.link_parent_to_students(uuid) from public, anon, authenticated;
+-- Privilèges : la RLS filtre les lignes, les GRANT ouvrent l'accès aux objets.
+-- Sans eux : erreur 42501 "permission denied for table …" sur toutes les tables.
+grant usage on schema public to anon, authenticated, service_role;
+
+grant all on all tables in schema public to service_role;
+grant select, insert, update, delete on all tables in schema public to authenticated;
+grant select on all tables in schema public to anon;
+
+grant all on all sequences in schema public to anon, authenticated, service_role;
+grant execute on function public.my_profile() to anon, authenticated, service_role;
+
 revoke all on function public.handle_new_user() from public, anon, authenticated;
 revoke all on function public.profiles_guard() from public, anon, authenticated;
 
