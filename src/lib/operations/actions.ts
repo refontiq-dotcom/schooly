@@ -232,11 +232,14 @@ export async function sendMessage(
 
 export async function markMessageRead(messageId: string) {
   const supabase = await createClient();
-  await supabase
+  const { error } = await supabase
     .from("messages")
     .update({ read_at: new Date().toISOString() })
     .eq("id", messageId)
     .is("read_at", null);
+  if (error) {
+    console.error("markMessageRead:", error.message);
+  }
   revalidatePath("/dashboard/parent/messages");
   revalidatePath("/dashboard/admin/messages");
 }

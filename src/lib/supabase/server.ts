@@ -30,7 +30,7 @@ export async function createClient() {
           );
         } catch {
           // Appelé depuis un Server Component sans possibilité d'écrire les
-          // cookies : sans conséquence si un middleware rafraîchit la session.
+          // cookies : sans conséquence si le proxy (middleware) rafraîchit la session.
         }
       },
     },
