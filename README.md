@@ -31,10 +31,16 @@ Sur [supabase.com](https://supabase.com), créez un projet, puis dans
 **SQL Editor**, exécutez dans l'ordre :
 
 ```bash
-supabase/schema.sql                 # tables, fonctions, RLS (auth + inscriptions)
-supabase/migration-operations.sql   # rentrée, paiements, documents, messages
-supabase/seed.sql                   # données de démonstration (optionnel)
+supabase/schema.sql                                  # tables, fonctions, RLS (base + school_type)
+supabase/migration-operations.sql                    # rentrée, paiements, documents, messages
+supabase/migrations/20260902180000_internat_module.sql  # module internat
+supabase/fix-grants-and-rls.sql                      # correctifs grants + RLS profiles (anti-récursion)
+supabase/seed.sql                                    # données de démonstration (optionnel)
 ```
+
+> Alternative : `supabase/apply-batch-2.sql` regroupe school_type + internat +
+> opérations en un seul script idempotent (utile pour migrer une base existante
+> qui n'a que `schema.sql` v1).
 
 ### 2. Configurer les variables d'environnement
 

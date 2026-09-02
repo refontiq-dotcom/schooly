@@ -857,6 +857,12 @@ create policy "msg_own" on messages for select using (
   sender_id = auth.uid() or recipient_id = auth.uid()
 );
 
+drop policy if exists "msg_own_update" on messages;
+create policy "msg_own_update" on messages for update using (
+  sender_id = auth.uid() or recipient_id = auth.uid()
+)
+with check (sender_id = auth.uid() or recipient_id = auth.uid());
+
 drop policy if exists "msg_staff_select" on messages;
 create policy "msg_staff_select" on messages for select using (
   establishment_id in (select establishment_id from profiles where id = auth.uid() and role in ('admin','secretariat','censeur','professeur'))

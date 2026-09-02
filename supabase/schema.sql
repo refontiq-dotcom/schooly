@@ -7,6 +7,19 @@
 
 create extension if not exists "pgcrypto";
 
+-- Enum du type d'établissement (5 types supportés)
+do $$ begin
+  create type school_type as enum (
+    'primaire',
+    'college',
+    'lycee',
+    'professionnel',
+    'islamique'
+  );
+exception
+  when duplicate_object then null;
+end $$;
+
 -- ----------------------------------------------------------------------------
 -- 1. ÉTABLISSEMENTS
 -- ----------------------------------------------------------------------------
@@ -16,6 +29,7 @@ create table if not exists establishments (
   description text,
   city text not null,
   address text,
+  school_type school_type,
   latitude double precision,
   longitude double precision,
   website_url text,
@@ -590,7 +604,8 @@ create or replace function create_establishment_as_admin(
   p_name text,
   p_city text,
   p_address text default null,
-  p_description text default null
+  p_description text default null,
+  p_school_type school_type default null
 ) returns public.establishments
 language plpgsql
 security definer
@@ -617,8 +632,8 @@ begin
     raise exception 'Le nom et la ville de l''établissement sont requis';
   end if;
 
-  insert into public.establishments (name, city, address, description, created_by)
-  values (trim(p_name), trim(p_city), nullif(trim(p_address), ''), nullif(trim(p_description), ''), auth.uid())
+  insert into public.establishments (name, city, address, description, school_type, created_by)
+  values (trim(p_name), trim(p_city), nullif(trim(p_address), ''), nullif(trim(p_description), ''), p_school_type, auth.uid())
   returning * into v_est;
 
   update public.profiles
@@ -811,12 +826,12 @@ revoke all on function public.handle_new_user() from public, anon, authenticated
 revoke all on function public.profiles_guard() from public, anon, authenticated;
 
 revoke all on function public.ensure_own_profile() from public, anon;
-revoke all on function public.create_establishment_as_admin(text, text, text, text) from public, anon;
+revoke all on function public.create_establishment_as_admin(text, text, text, text, school_type) from public, anon;
 revoke all on function public.accept_staff_invitation(uuid) from public, anon;
 revoke all on function public.finalize_reservation(uuid) from public, anon;
 
 grant execute on function public.ensure_own_profile() to authenticated;
-grant execute on function public.create_establishment_as_admin(text, text, text, text) to authenticated;
+grant execute on function public.create_establishment_as_admin(text, text, text, text, school_type) to authenticated;
 grant execute on function public.accept_staff_invitation(uuid) to authenticated;
 grant execute on function public.finalize_reservation(uuid) to authenticated;
 
