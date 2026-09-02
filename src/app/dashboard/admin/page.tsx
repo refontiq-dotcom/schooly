@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { getSessionProfile } from "@/lib/auth/session";
+import { SCHOOL_TYPE_LABELS, SCHOOL_TYPE_ICONS } from "@/types";
+import type { SchoolType } from "@/types";
 
 export const revalidate = 0;
 
@@ -25,7 +27,7 @@ export default async function AdminDashboardPage() {
   const { data: establishment } = profile?.establishment_id
     ? await supabase
         .from("establishments")
-        .select("id, name, city")
+        .select("id, name, city, school_type")
         .eq("id", profile.establishment_id)
         .maybeSingle()
     : { data: null };
@@ -115,6 +117,12 @@ export default async function AdminDashboardPage() {
                 ? `${establishment.name}${establishment.city ? " · " + establishment.city : ""}`
                 : "Bienvenue sur votre tableau de bord"}
             </p>
+            {establishment?.school_type && (
+              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full mt-2">
+                <span>{SCHOOL_TYPE_ICONS[establishment.school_type as SchoolType]}</span>
+                {SCHOOL_TYPE_LABELS[establishment.school_type as SchoolType]}
+              </span>
+            )}
           </div>
           {establishment && (
             <div className="flex items-center gap-2 text-xs text-slate-500 bg-slate-50 rounded-xl px-3 py-2">

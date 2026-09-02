@@ -38,6 +38,38 @@ export type ReservationStatus =
   | "expired"
   | "cancelled";
 
+export type SchoolType =
+  | "primaire"
+  | "college"
+  | "lycee"
+  | "professionnel"
+  | "islamique";
+
+export const SCHOOL_TYPE_LABELS: Record<SchoolType, string> = {
+  primaire: "École primaire",
+  college: "Collège",
+  lycee: "Lycée",
+  professionnel: "Professionnel & Technique",
+  islamique: "Établissement islamique",
+};
+
+export const SCHOOL_TYPE_ICONS: Record<SchoolType, string> = {
+  primaire: "🎒",
+  college: "📚",
+  lycee: "🎓",
+  professionnel: "🔧",
+  islamique: "🕌",
+};
+
+/** Niveaux prédéfinis par type d'établissement */
+export const SCHOOL_LEVEL_PRESETS: Record<SchoolType, string[]> = {
+  primaire: ["Maternelle", "CP1", "CP2", "CE1", "CE2", "CM1", "CM2"],
+  college: ["6ème", "5ème", "4ème", "3ème"],
+  lycee: ["Seconde", "Première", "Terminale"],
+  professionnel: ["1ère année", "2ème année", "3ème année"],
+  islamique: ["Coran", "Arabe", "Fiqh", "Hadith", "Sira"],
+};
+
 export interface Establishment {
   id: string;
   name: string;
@@ -51,6 +83,7 @@ export interface Establishment {
   tour_360_url: string | null;
   reservation_fee_amount: number;
   reservation_hold_hours: number;
+  school_type: SchoolType | null;
 }
 
 export interface LevelAvailability {

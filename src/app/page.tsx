@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { dashboardHomeForRole } from "@/lib/auth/roles";
-import type { UserRole } from "@/types";
+import type { UserRole, SchoolType } from "@/types";
+import { SCHOOL_TYPE_LABELS, SCHOOL_TYPE_ICONS } from "@/types";
 
 export const revalidate = 0;
 
@@ -92,40 +93,45 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* ── Academic Excellence / Niveaux ── */}
+      {/* ── Types d'établissements ── */}
       <section id="features" className="bg-[#F0F4F8] py-12 md:py-16">
         <div className="max-w-5xl mx-auto px-4">
-          <h2 className="text-2xl md:text-3xl font-bold text-slate-800 text-center mb-10">
-            NOS PROGRAMMES
+          <h2 className="text-2xl md:text-3xl font-bold text-slate-800 text-center mb-3">
+            POUR TOUS LES ÉTABLISSEMENTS
           </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            <LevelCard
+          <p className="text-sm text-slate-500 text-center mb-10 max-w-lg mx-auto">
+            Schooly s'adapte à votre type d'établissement avec des niveaux et fonctionnalités sur mesure.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            <SchoolTypeCard
+              type="primaire"
               color="bg-emerald-500"
-              icon="📖"
-              title="Maternelle & Primaire"
-              description="Un accompagnement bienveillant pour les premiers apprentissages."
-              link="/auth"
+              levels={["Maternelle", "CP1", "CP2", "CE1", "CE2", "CM1", "CM2"]}
+              description="Un accompagnement bienveillant pour les premiers apprentissages, du,cp à la fin du primaire."
             />
-            <LevelCard
+            <SchoolTypeCard
+              type="college"
               color="bg-amber-500"
-              icon="🔬"
-              title="Collège"
+              levels={["6ème", "5ème", "4ème", "3ème"]}
               description="Découvrez les matières fondamentales et développez l'esprit critique."
-              link="/auth"
             />
-            <LevelCard
+            <SchoolTypeCard
+              type="lycee"
               color="bg-[#1B3A4B]"
-              icon="🎓"
-              title="Lycée"
-              description="Préparation au baccalauréat avec un suivi personnalisé."
-              link="/auth"
+              levels={["Seconde", "Première", "Terminale"]}
+              description="Préparation au baccalauréat avec un suivi personnalisé et des filières diversifiées."
             />
-            <LevelCard
+            <SchoolTypeCard
+              type="professionnel"
               color="bg-purple-500"
-              icon="🎨"
-              title="Arts & Sciences"
-              description="Stimulez la créativité et l'innovation dans des espaces dédiés."
-              link="/auth"
+              levels={["1ère année", "2ème année", "3ème année"]}
+              description="Formations techniques et professionnelles : BEP, CAP, Bac Pro, BTS et alternance."
+            />
+            <SchoolTypeCard
+              type="islamique"
+              color="bg-teal-600"
+              levels={["Coran", "Arabe", "Fiqh", "Hadith", "Sira"]}
+              description="Enseignement coranique, langue arabe, sciences islamiques et formation religieuse."
             />
           </div>
         </div>
@@ -194,32 +200,38 @@ function StatCard({ icon, value, label }: { icon: string; value: string; label: 
   );
 }
 
-function LevelCard({
+function SchoolTypeCard({
+  type,
   color,
-  icon,
-  title,
+  levels,
   description,
-  link,
 }: {
+  type: SchoolType;
   color: string;
-  icon: string;
-  title: string;
+  levels: string[];
   description: string;
-  link: string;
 }) {
   return (
     <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 flex flex-col items-start hover:shadow-md transition-shadow">
-      <div className={`w-12 h-12 ${color} rounded-xl flex items-center justify-center text-white text-xl mb-4`}>
-        {icon}
+      <div className="flex items-center gap-3 mb-3">
+        <div className={`w-12 h-12 ${color} rounded-xl flex items-center justify-center text-white text-xl`}>
+          {SCHOOL_TYPE_ICONS[type]}
+        </div>
+        <div>
+          <h3 className="font-bold text-slate-800">{SCHOOL_TYPE_LABELS[type]}</h3>
+        </div>
       </div>
-      <h3 className="font-bold text-slate-800 mb-2">{title}</h3>
-      <p className="text-sm text-slate-500 leading-relaxed mb-4 flex-1">{description}</p>
-      <Link
-        href={link}
-        className="text-sm font-semibold text-amber-600 hover:text-amber-500 transition-colors"
-      >
-        Explorer →
-      </Link>
+      <p className="text-sm text-slate-500 leading-relaxed mb-3 flex-1">{description}</p>
+      <div className="flex flex-wrap gap-1.5">
+        {levels.map((level) => (
+          <span
+            key={level}
+            className="text-[11px] font-medium bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md"
+          >
+            {level}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }

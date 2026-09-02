@@ -133,9 +133,19 @@ export async function createEstablishment(
   const city = String(formData.get("city") ?? "").trim();
   const address = String(formData.get("address") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
+  const schoolType = String(formData.get("school_type") ?? "") as import("@/types").SchoolType | "";
 
   if (!name || !city) {
     return "Le nom et la ville de l'établissement sont requis.";
+  }
+
+  if (!schoolType) {
+    return "Veuillez sélectionner un type d'établissement.";
+  }
+
+  const validTypes = ["primaire", "college", "lycee", "professionnel", "islamique"];
+  if (!validTypes.includes(schoolType)) {
+    return "Type d'établissement invalide.";
   }
 
   const supabase = await createClient();
@@ -152,6 +162,7 @@ export async function createEstablishment(
     p_city: city,
     p_address: address || null,
     p_description: description || null,
+    p_school_type: schoolType,
   });
 
   if (error) {

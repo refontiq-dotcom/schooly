@@ -29,7 +29,7 @@ grant all on all sequences in schema public to anon, authenticated, service_role
 
 -- Fonctions RPC appelées par l'application (re-grant idempotent par sécurité)
 grant execute on function public.ensure_own_profile() to authenticated;
-grant execute on function public.create_establishment_as_admin(text, text, text, text) to authenticated;
+grant execute on function public.create_establishment_as_admin(text, text, text, text, school_type) to authenticated;
 grant execute on function public.accept_staff_invitation(uuid) to authenticated;
 grant execute on function public.finalize_reservation(uuid) to authenticated;
 
