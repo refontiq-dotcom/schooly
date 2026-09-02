@@ -5,20 +5,50 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "@/lib/auth/actions";
 
-const navItems = [
-  { href: "/dashboard/admin", label: "Vue d'ensemble", icon: "home" },
-  { href: "/dashboard/admin/classes", label: "Classes", icon: "layers" },
-  { href: "/dashboard/admin/internat", label: "Internat", icon: "bed" },
-  { href: "/dashboard/admin/paiements", label: "Paiements", icon: "wallet" },
-  { href: "/dashboard/admin/rentree", label: "Rentrée", icon: "backpack" },
-  { href: "/dashboard/admin/documents", label: "Documents", icon: "folder" },
-  { href: "/dashboard/admin/messages", label: "Messages", icon: "chat" },
-  { href: "/dashboard/admin/equipe", label: "Équipe", icon: "users" },
-  { href: "/dashboard/secretariat", label: "Secrétariat", icon: "file-text" },
-  { href: "/dashboard/professeur", label: "Professeurs", icon: "book-open" },
+type NavItem = { href: string; label: string; icon: string };
+
+const navSections: { title: string; items: NavItem[] }[] = [
+  {
+    title: "",
+    items: [{ href: "/dashboard/admin", label: "Vue d'ensemble", icon: "home" }],
+  },
+  {
+    title: "Scolarité",
+    items: [
+      { href: "/dashboard/admin/classes", label: "Classes", icon: "layers" },
+      { href: "/dashboard/admin/rentree", label: "Rentrée", icon: "backpack" },
+    ],
+  },
+  {
+    title: "Vie scolaire",
+    items: [
+      { href: "/dashboard/admin/internat", label: "Internat", icon: "bed" },
+    ],
+  },
+  {
+    title: "Finance",
+    items: [
+      { href: "/dashboard/admin/paiements", label: "Paiements", icon: "wallet" },
+    ],
+  },
+  {
+    title: "Communication",
+    items: [
+      { href: "/dashboard/admin/messages", label: "Messages", icon: "chat" },
+      { href: "/dashboard/admin/documents", label: "Documents", icon: "folder" },
+    ],
+  },
+  {
+    title: "Équipe",
+    items: [
+      { href: "/dashboard/admin/equipe", label: "Équipe", icon: "users" },
+      { href: "/dashboard/secretariat", label: "Secrétariat", icon: "file-text" },
+      { href: "/dashboard/professeur", label: "Professeurs", icon: "book-open" },
+    ],
+  },
 ];
 
-const bottomNavItems = [
+const bottomNavItems: NavItem[] = [
   { href: "#", label: "Paramètres", icon: "settings" },
 ];
 
@@ -48,15 +78,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const filteredNavItems = navItems.filter((item) =>
-    item.label.toLocaleLowerCase().includes(searchQuery.toLocaleLowerCase().trim())
-  );
 
   return (
-    <div className="flex min-h-[calc(100vh-80px)] gap-0 -mx-4 -mt-8">
+    <div className="flex h-screen gap-0">
       {/* ── Sidebar ── */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 w-[260px] bg-white border-r border-slate-100 flex flex-col transition-transform duration-300 ease-in-out lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}
+        className={`fixed inset-y-0 left-0 z-40 w-[260px] bg-white border-r border-slate-100 flex flex-col transition-transform duration-300 ease-in-out lg:static lg:translate-x-0 ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}
       >
         {/* Logo */}
         <div className="px-6 py-6">
@@ -84,30 +111,46 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
 
         {/* Main Nav */}
-        <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto" aria-label="Navigation administrateur">
-          <p className="px-3 text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-2">
-            Menu principal
-          </p>
-          {filteredNavItems.map((item) => {
-            const active = pathname === item.href ||
-              (item.href !== "/dashboard/admin" && pathname.startsWith(`${item.href}/`));
+        <nav className="flex-1 px-3 py-3 space-y-4 overflow-y-auto" aria-label="Navigation administrateur">
+          {navSections.map((section) => {
+            const visibleItems = section.items.filter((item) =>
+              item.label.toLocaleLowerCase().includes(searchQuery.toLocaleLowerCase().trim())
+            );
+            if (visibleItems.length === 0) return null;
             return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={() => setMobileOpen(false)}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all ${
-                  active
-                    ? "bg-slate-900 text-white shadow-sm"
-                    : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"
-                }`}
-              >
-                <SidebarIcon name={item.icon} className="w-[18px] h-[18px]" />
-                {item.label}
-              </Link>
+              <div key={section.title || "main"}>
+                {section.title && (
+                  <p className="px-3 text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1.5">
+                    {section.title}
+                  </p>
+                )}
+                <div className="space-y-0.5">
+                  {visibleItems.map((item) => {
+                    const active = pathname === item.href ||
+                      (item.href !== "/dashboard/admin" && pathname.startsWith(`${item.href}/`));
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        onClick={() => setMobileOpen(false)}
+                        className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all ${
+                          active
+                            ? "bg-slate-900 text-white shadow-sm"
+                            : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"
+                        }`}
+                      >
+                        <SidebarIcon name={item.icon} className="w-[18px] h-[18px]" />
+                        {item.label}
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
             );
           })}
-          {filteredNavItems.length === 0 && (
+          {navSections.every((s) =>
+            s.items.every((i) => !i.label.toLocaleLowerCase().includes(searchQuery.toLocaleLowerCase().trim()))
+          ) && (
             <p className="px-3 py-2 text-xs text-slate-400">Aucun résultat</p>
           )}
         </nav>
@@ -142,7 +185,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       )}
 
       {/* ── Main Content ── */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
         {/* Top bar */}
         <header className="sticky top-0 z-20 bg-white/80 backdrop-blur-md border-b border-slate-100 px-6 py-3 flex items-center gap-3">
           <button
@@ -176,7 +219,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </header>
 
         {/* Page content */}
-        <main className="flex-1 p-6 overflow-y-auto">
+        <main className="flex-1 p-6">
           {children}
         </main>
       </div>
