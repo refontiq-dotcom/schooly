@@ -12,14 +12,17 @@ L'API est protégée par `TROUVETOU_API_KEY_PEPPER` et attend l'en-tête
 `Authorization: Bearer <clé>` :
 
 ```text
-GET  /api/trouvetou   # établissements publiés + places par niveau
-POST /api/trouvetou   # réserve une place disponible
+GET  /api/trouvetou   # établissements publiés dans la catégorie "ecoles" + places
+POST /api/trouvetou   # crée une réservation en attente de paiement
+POST /api/trouvetou/reservations/:id/payment # confirme le paiement et la place
 ```
 
-Le `POST` attend `establishment_id`, `level_id`, `student_full_name`,
+Le premier `POST` attend `establishment_id`, `level_id`, `student_full_name`,
 `parent_full_name` et `parent_phone`, avec `student_birthdate` et
-`parent_email` facultatifs. La réponse est `409` lorsqu'il n'y a plus de place.
-La réservation et le décrément de capacité sont réalisés atomiquement par PostgreSQL.
+`parent_email` facultatifs. Il retourne un dossier `pending_payment`.
+Après paiement confirmé par Trouvetou, le second `POST` attend `payment_reference`
+et `amount_paid`. Schooly réserve alors la place de manière atomique et retourne
+le QR code. La réponse est `409` lorsqu'il n'y a plus de place.
 
 Ce dépôt contient la **version 1 (MVP)** telle que définie dans le cahier des
 charges — Phase 1 :
@@ -53,6 +56,7 @@ supabase/schema.sql                                  # tables, fonctions, RLS (b
 supabase/migration-operations.sql                    # rentrée, paiements, documents, messages
 supabase/migrations/20260902180000_internat_module.sql  # module internat
 supabase/migrations/20260902190000_trouvetou_integration.sql # publication + API Trouvetou
+supabase/migrations/20260902200000_trouvetou_payment_flow.sql # paiement partenaire
 supabase/fix-grants-and-rls.sql                      # correctifs grants + RLS profiles (anti-récursion)
 supabase/seed.sql                                    # données de démonstration (optionnel)
 ```

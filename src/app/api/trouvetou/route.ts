@@ -40,12 +40,13 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     establishments: (establishments ?? []).map((establishment) => ({
       ...establishment,
+      category: "ecoles",
       availability: availabilityByEstablishment.get(establishment.id) ?? [],
     })),
   });
 }
 
-/** POST /api/trouvetou - réserve atomiquement une place disponible. */
+/** POST /api/trouvetou - crée un dossier en attente de paiement. */
 export async function POST(request: NextRequest) {
   if (!authorized(request)) return unauthorized();
 
