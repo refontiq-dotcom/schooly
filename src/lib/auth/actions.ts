@@ -37,14 +37,14 @@ export async function signUp(
 
   const supabase = await createClient();
 
-  const { error } = await supabase.auth.signUp({
+  const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
+      emailRedirectTo: `${PUBLIC_SITE_URL}/auth/callback`,
       data: {
         full_name: fullName || undefined,
         phone: phone || undefined,
-        role: "parent",
       },
     },
   });
@@ -53,15 +53,18 @@ export async function signUp(
     return error.message;
   }
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  if (!data.user) {
+    return "Une erreur est survenue lors de la création du compte. Veuillez réessayer.";
+  }
 
-  if (!user) {
+  if (!data.session) {
     return "Compte créé. Vérifiez votre email pour confirmer l'inscription, puis reconnectez-vous.";
   }
 
-  const { data: profile } = await supabase.rpc("ensure_own_profile");
+  const { data: profile, error: profileError } = await supabase.rpc("ensure_own_profile");
+  if (profileError) {
+    return profileError.message;
+  }
   const role = (profile?.role as UserRole | undefined) ?? "parent";
   redirect(returnTo || dashboardHomeForRole(role));
 }
@@ -89,7 +92,10 @@ export async function signIn(
     return error.message;
   }
 
-  const { data: profile } = await supabase.rpc("ensure_own_profile");
+  const { data: profile, error: profileError } = await supabase.rpc("ensure_own_profile");
+  if (profileError) {
+    return profileError.message;
+  }
   const role = (profile?.role as UserRole | undefined) ?? "parent";
   redirect(returnTo || dashboardHomeForRole(role));
 }

@@ -80,6 +80,7 @@ export default function AuthForm() {
             {!isLogin && (
               <>
                 <input
+                  id="full_name"
                   name="full_name"
                   type="text"
                   placeholder="Nom complet"
@@ -87,6 +88,7 @@ export default function AuthForm() {
                   autoComplete="name"
                 />
                 <input
+                  id="phone"
                   name="phone"
                   type="tel"
                   placeholder="Téléphone (optionnel)"
