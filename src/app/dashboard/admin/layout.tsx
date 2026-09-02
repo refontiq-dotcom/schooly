@@ -56,7 +56,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     <div className="flex min-h-[calc(100vh-80px)] gap-0 -mx-4 -mt-8">
       {/* ── Sidebar ── */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 w-[260px] bg-white border-r border-slate-100 flex flex-col transition-transform duration-300 ease-in-out lg:static lg:translate-x-0 ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}
+        className={`fixed inset-y-0 left-0 z-40 w-[260px] bg-white border-r border-slate-100 flex flex-col transition-transform duration-300 ease-in-out lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}
       >
         {/* Logo */}
         <div className="px-6 py-6">
