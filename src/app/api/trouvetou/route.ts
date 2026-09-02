@@ -30,11 +30,28 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: availabilityError.message }, { status: 500 });
   }
 
+  const { data: ads, error: adsError } = ids.length
+    ? await supabase
+        .from("trouvetou_ads")
+        .select("id, establishment_id, title, description, image_url, target_url, starts_at, ends_at")
+        .in("establishment_id", ids)
+        .eq("active", true)
+        .lte("starts_at", new Date().toISOString())
+        .or(`ends_at.is.null,ends_at.gte.${new Date().toISOString()}`)
+    : { data: [], error: null };
+  if (adsError) return NextResponse.json({ error: adsError.message }, { status: 500 });
+
   const availabilityByEstablishment = new Map<string, typeof availability>();
   for (const level of availability ?? []) {
     const levels = availabilityByEstablishment.get(level.establishment_id) ?? [];
     levels.push(level);
     availabilityByEstablishment.set(level.establishment_id, levels);
+  }
+  const adsByEstablishment = new Map<string, typeof ads>();
+  for (const ad of ads ?? []) {
+    const currentAds = adsByEstablishment.get(ad.establishment_id) ?? [];
+    currentAds.push(ad);
+    adsByEstablishment.set(ad.establishment_id, currentAds);
   }
 
   return NextResponse.json({
@@ -42,6 +59,7 @@ export async function GET(request: NextRequest) {
       ...establishment,
       category: "ecoles",
       availability: availabilityByEstablishment.get(establishment.id) ?? [],
+      advertisements: adsByEstablishment.get(establishment.id) ?? [],
     })),
   });
 }

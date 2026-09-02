@@ -75,6 +75,45 @@ export async function toggleTrouvetouPublication(published: boolean): Promise<st
   return null;
 }
 
+export async function createTrouvetouAd(
+  _prev: string | null,
+  formData: FormData
+): Promise<string | null> {
+  const title = String(formData.get("title") ?? "").trim();
+  const description = String(formData.get("description") ?? "").trim();
+  const imageUrl = String(formData.get("image_url") ?? "").trim();
+  const targetUrl = String(formData.get("target_url") ?? "").trim();
+  const startsAt = String(formData.get("starts_at") ?? "").trim();
+  const endsAt = String(formData.get("ends_at") ?? "").trim();
+  if (!title) return "Titre de la publicité requis.";
+
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return "Non authentifié.";
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role, establishment_id")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (profile?.role !== "admin" || !profile.establishment_id) {
+    return "Action réservée à l'administrateur.";
+  }
+
+  const { error } = await supabase.from("trouvetou_ads").insert({
+    establishment_id: profile.establishment_id,
+    title,
+    description: description || null,
+    image_url: imageUrl || null,
+    target_url: targetUrl || null,
+    starts_at: startsAt ? new Date(startsAt).toISOString() : new Date().toISOString(),
+    ends_at: endsAt ? new Date(endsAt).toISOString() : null,
+    active: true,
+  });
+  if (error) return error.message;
+  revalidatePath("/dashboard/admin/trouvetou");
+  return null;
+}
+
 export async function confirmPayment(paymentId: string): Promise<string | null> {
   const supabase = await createClient();
   const { error } = await supabase.rpc("confirm_fee_payment", {

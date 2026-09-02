@@ -4,6 +4,7 @@ import { useActionState, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   confirmPayment,
+  createTrouvetouAd,
   createFeeCategory,
   createSupplyList,
   finalizeReservation,
@@ -85,6 +86,55 @@ export function TrouvetouPublicationToggle({ published }: { published: boolean }
         {pending ? "Mise à jour…" : published ? "Désactiver" : "Publier l'établissement"}
       </button>
     </div>
+  );
+}
+
+export function TrouvetouAdForm() {
+  const router = useRouter();
+  const formRef = useRef<HTMLFormElement>(null);
+  const [error, action, pending] = useActionState(createTrouvetouAd, null);
+  const last = useRef(pending);
+  useEffect(() => {
+    if (last.current && !pending && !error) {
+      formRef.current?.reset();
+      router.refresh();
+    }
+    last.current = pending;
+  }, [pending, error, router]);
+
+  return (
+    <form ref={formRef} action={action} className="space-y-3">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div>
+          <label className="text-xs text-slate-500" htmlFor="trouvetou-ad-title">Titre</label>
+          <input id="trouvetou-ad-title" name="title" required className="input" placeholder="Admissions ouvertes 2026-2027" />
+        </div>
+        <div>
+          <label className="text-xs text-slate-500" htmlFor="trouvetou-ad-image">URL de la photo</label>
+          <input id="trouvetou-ad-image" name="image_url" type="url" className="input" placeholder="https://..." />
+        </div>
+        <div className="sm:col-span-2">
+          <label className="text-xs text-slate-500" htmlFor="trouvetou-ad-description">Message</label>
+          <textarea id="trouvetou-ad-description" name="description" className="input min-h-24" placeholder="Présentez votre offre aux familles" />
+        </div>
+        <div>
+          <label className="text-xs text-slate-500" htmlFor="trouvetou-ad-target">Lien de destination</label>
+          <input id="trouvetou-ad-target" name="target_url" type="url" className="input" placeholder="https://..." />
+        </div>
+        <div>
+          <label className="text-xs text-slate-500" htmlFor="trouvetou-ad-start">Début</label>
+          <input id="trouvetou-ad-start" name="starts_at" type="datetime-local" className="input" />
+        </div>
+        <div>
+          <label className="text-xs text-slate-500" htmlFor="trouvetou-ad-end">Fin (facultative)</label>
+          <input id="trouvetou-ad-end" name="ends_at" type="datetime-local" className="input" />
+        </div>
+      </div>
+      {error && <p className="text-sm text-red-600" role="alert">{error}</p>}
+      <button type="submit" disabled={pending} className="btn-primary min-h-11">
+        {pending ? "Création…" : "Créer la publicité"}
+      </button>
+    </form>
   );
 }
 
