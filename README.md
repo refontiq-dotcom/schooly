@@ -3,6 +3,24 @@
 Plateforme de réservation de place scolaire et de gestion d'établissement,
 connectée à **Trouvetou**. Développé par **Refontiq** (Abidjan, Côte d'Ivoire).
 
+## Intégration Trouvetou
+
+Un administrateur peut publier ou retirer son établissement depuis son dashboard.
+Les établissements non publiés ne sont jamais retournés par l'API partenaire.
+
+L'API est protégée par `TROUVETOU_API_KEY` et attend l'en-tête
+`Authorization: Bearer <clé>` :
+
+```text
+GET  /api/trouvetou   # établissements publiés + places par niveau
+POST /api/trouvetou   # réserve une place disponible
+```
+
+Le `POST` attend `establishment_id`, `level_id`, `student_full_name`,
+`parent_full_name` et `parent_phone`, avec `student_birthdate` et
+`parent_email` facultatifs. La réponse est `409` lorsqu'il n'y a plus de place.
+La réservation et le décrément de capacité sont réalisés atomiquement par PostgreSQL.
+
 Ce dépôt contient la **version 1 (MVP)** telle que définie dans le cahier des
 charges — Phase 1 :
 
@@ -34,6 +52,7 @@ Sur [supabase.com](https://supabase.com), créez un projet, puis dans
 supabase/schema.sql                                  # tables, fonctions, RLS (base + school_type)
 supabase/migration-operations.sql                    # rentrée, paiements, documents, messages
 supabase/migrations/20260902180000_internat_module.sql  # module internat
+supabase/migrations/20260902190000_trouvetou_integration.sql # publication + API Trouvetou
 supabase/fix-grants-and-rls.sql                      # correctifs grants + RLS profiles (anti-récursion)
 supabase/seed.sql                                    # données de démonstration (optionnel)
 ```
@@ -47,7 +66,8 @@ supabase/seed.sql                                    # données de démonstratio
 ```bash
 cp .env.example .env.local
 # Renseignez NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY,
-# SUPABASE_SERVICE_ROLE_KEY depuis Project Settings > API sur Supabase.
+# SUPABASE_SERVICE_ROLE_KEY depuis Project Settings > API sur Supabase,
+# et TROUVETOU_API_KEY avec la même valeur configurée dans Trouvetou.
 ```
 
 ### 3. Installer et lancer

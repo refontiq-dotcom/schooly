@@ -83,6 +83,7 @@ export interface Establishment {
   tour_360_url: string | null;
   reservation_fee_amount: number;
   reservation_hold_hours: number;
+  published_to_trouvetou: boolean;
   school_type: SchoolType | null;
 }
 

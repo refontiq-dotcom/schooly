@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   confirmPayment,
@@ -8,6 +8,7 @@ import {
   createSupplyList,
   markDocumentStatus,
   sendMessage,
+  toggleTrouvetouPublication,
 } from "@/lib/operations/actions";
 import type { DocumentStatus } from "@/types";
 
@@ -51,6 +52,38 @@ export function FeeCategoryForm() {
         {pending ? "Enregistrement…" : "Publier le frais"}
       </button>
     </form>
+  );
+}
+
+export function TrouvetouPublicationToggle({ published }: { published: boolean }) {
+  const router = useRouter();
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  return (
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <p className="font-semibold text-slate-800">Publication sur Trouvetou</p>
+        <p className="text-sm text-slate-500">
+          {published ? "Votre établissement est visible et réservable." : "Votre établissement reste privé sur Trouvetou."}
+        </p>
+        {error && <p className="mt-1 text-sm text-red-600" role="alert">{error}</p>}
+      </div>
+      <button
+        type="button"
+        disabled={pending}
+        aria-pressed={published}
+        onClick={async () => {
+          setPending(true);
+          setError(await toggleTrouvetouPublication(!published));
+          setPending(false);
+          router.refresh();
+        }}
+        className={`min-h-11 rounded-xl px-4 text-sm font-semibold transition-colors ${published ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200" : "bg-slate-900 text-white hover:bg-slate-800"}`}
+      >
+        {pending ? "Mise à jour…" : published ? "Désactiver" : "Publier l'établissement"}
+      </button>
+    </div>
   );
 }
 

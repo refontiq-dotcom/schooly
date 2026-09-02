@@ -49,6 +49,32 @@ export async function recordPayment(
   return null;
 }
 
+export async function toggleTrouvetouPublication(published: boolean): Promise<string | null> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return "Non authentifié.";
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role, establishment_id")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (profile?.role !== "admin" || !profile.establishment_id) {
+    return "Action réservée à l'administrateur.";
+  }
+
+  const { error } = await supabase
+    .from("establishments")
+    .update({ published_to_trouvetou: published })
+    .eq("id", profile.establishment_id);
+  if (error) return error.message;
+
+  revalidatePath("/dashboard/admin");
+  return null;
+}
+
 export async function confirmPayment(paymentId: string): Promise<string | null> {
   const supabase = await createClient();
   const { error } = await supabase.rpc("confirm_fee_payment", {

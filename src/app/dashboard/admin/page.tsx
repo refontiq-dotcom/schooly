@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getSessionProfile } from "@/lib/auth/session";
 import { SCHOOL_TYPE_LABELS, SCHOOL_TYPE_ICONS } from "@/types";
 import type { SchoolType } from "@/types";
+import { TrouvetouPublicationToggle } from "./_ops-forms";
 
 export const revalidate = 0;
 
@@ -31,7 +32,7 @@ export default async function AdminDashboardPage() {
   const { data: establishment } = profile?.establishment_id
     ? await supabase
         .from("establishments")
-        .select("id, name, city, school_type")
+        .select("id, name, city, school_type, published_to_trouvetou")
         .eq("id", profile.establishment_id)
         .maybeSingle()
     : { data: null };
@@ -253,6 +254,9 @@ export default async function AdminDashboardPage() {
 
         {establishment && (
           <>
+            <div className="card">
+              <TrouvetouPublicationToggle published={establishment.published_to_trouvetou} />
+            </div>
             {/* ── Hero Card ── */}
             <div className="bg-gradient-to-br from-[#1B3A4B] via-[#1F4557] to-[#2A6B7C] rounded-3xl p-6 sm:p-8 text-white relative overflow-hidden shadow-lg shadow-slate-900/10">
               <div className="absolute top-0 right-0 w-48 h-48 bg-white/5 rounded-full -translate-y-12 translate-x-12" />
