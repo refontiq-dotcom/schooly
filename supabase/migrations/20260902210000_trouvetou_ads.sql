@@ -19,6 +19,7 @@ create index if not exists idx_trouvetou_ads_active
 alter table public.trouvetou_ads enable row level security;
 grant select, insert, update, delete on public.trouvetou_ads to authenticated;
 grant select on public.trouvetou_ads to anon;
+grant select on public.trouvetou_ads to service_role;
 
 drop policy if exists "Admin gère ses publicités Trouvetou" on public.trouvetou_ads;
 create policy "Admin gère ses publicités Trouvetou"

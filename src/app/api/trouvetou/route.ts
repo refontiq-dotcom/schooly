@@ -39,7 +39,9 @@ export async function GET(request: NextRequest) {
         .lte("starts_at", new Date().toISOString())
         .or(`ends_at.is.null,ends_at.gte.${new Date().toISOString()}`)
     : { data: [], error: null };
-  if (adsError) return NextResponse.json({ error: adsError.message }, { status: 500 });
+  if (adsError && !adsError.message.includes("trouvetou_ads")) {
+    return NextResponse.json({ error: adsError.message }, { status: 500 });
+  }
 
   const availabilityByEstablishment = new Map<string, typeof availability>();
   for (const level of availability ?? []) {
