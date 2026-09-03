@@ -63,19 +63,17 @@ with my_sections as (
 select
   ms.teacher_id,
   sar.student_id,
-  s.full_name,
+  sar.full_name,
   sar.section_id,
-  sec.name as section_name,
+  sar.section_name,
   sar.current_average,
-  sar.latest_2_avg,
-  sar.previous_2_avg,
-  sar.attendance_pct_30d,
-  sar.alert_level,
-  sar.reasons
+  sar.latest_score as latest_2_avg,
+  sar.previous_score as previous_2_avg,
+  null::numeric as attendance_pct_30d,
+  sar.risk_level as alert_level,
+  null::text[] as reasons
 from my_sections ms
-join public.students_at_risk sar on sar.section_id = ms.section_id
-join public.students s on s.id = sar.student_id
-join public.sections sec on sec.id = sar.section_id;
+join public.students_at_risk sar on sar.section_id = ms.section_id;
 
 grant select on public.teacher_my_at_risk_students to authenticated, service_role;
 
