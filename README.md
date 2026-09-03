@@ -68,6 +68,7 @@ supabase/migrations/20260903160000_secretariat_intelligence.sql # agrégat actio
 supabase/migrations/20260903170000_trouvetou_intelligence.sql # catalogue public + performance par établissement + pubs + entonnoir conversion (voir TROUVETOU_INTELLIGENCE.md)
 supabase/migrations/20260903180000_messages_intelligence.sql # non-lus + activité + threads + engagement + urgents non répondus + mark read bulk (voir MESSAGES_INTELLIGENCE.md)
 supabase/migrations/20260903190000_team_intelligence.sql # effectif par rôle + inactifs + stats staffing + engagement parents + export JSON (voir TEAM_INTELLIGENCE.md)
+supabase/migrations/20260903200000_onboarding_intelligence.sql # état onboarding (10 étapes) + établissements incomplets + agrégat par type + création atomique (voir ONBOARDING_INTELLIGENCE.md)
 supabase/fix-grants-and-rls.sql                      # correctifs grants + RLS profiles (anti-récursion)
 supabase/seed.sql                                    # données de démonstration (optionnel)
 ```
