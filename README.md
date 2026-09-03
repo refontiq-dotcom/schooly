@@ -63,6 +63,7 @@ supabase/migrations/20260903110000_teacher_intelligence.sql # agrégats classe +
 supabase/migrations/20260903120000_parent_intelligence.sql # synthèse 360° par enfant + alertes + score satisfaction + résumé WhatsApp (voir PARENT_INTELLIGENCE.md)
 supabase/migrations/20260903130000_internat_intelligence.sql # dashboard temps réel + élèves à risque + santé + rotation lits + tendances occupation (voir INTERNAT_INTELLIGENCE.md)
 supabase/migrations/20260903140000_classes_intelligence.sql # taux de remplissage sections + alertes déséquilibre + charge profs + suggestion section (voir CLASSES_INTELLIGENCE.md)
+supabase/migrations/20260903150000_teacher_intelligence_v2.sql # vue par prof (workload + homeroom + élèves à risque + comparatif + retards de saisie) (voir TEACHER_INTELLIGENCE_V2.md)
 supabase/fix-grants-and-rls.sql                      # correctifs grants + RLS profiles (anti-récursion)
 supabase/seed.sql                                    # données de démonstration (optionnel)
 ```
