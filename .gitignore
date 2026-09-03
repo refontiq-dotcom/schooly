@@ -23,3 +23,11 @@ yarn-error.log*
 
 # TypeScript
 *.tsbuildinfo
+
+# Lockfiles — un seul gestionnaire de paquets pour ce projet (npm).
+# package-lock.json est committé volontairement ; les autres sont ignorés
+# pour éviter une résolution de dépendances divergente entre environnements.
+bun.lock
+bun.lockb
+yarn.lock
+pnpm-lock.yaml

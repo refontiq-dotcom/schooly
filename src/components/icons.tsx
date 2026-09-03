@@ -93,3 +93,13 @@ export function IconAlert(props: { className?: string }) {
     </svg>
   );
 }
+
+export function IconBed(props: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={props.className} aria-hidden="true">
+      <path d="M3 18v-7a2 2 0 012-2h14a2 2 0 012 2v7" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
+      <path d="M3 18v2M21 18v2" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
+      <path d="M5 13V9a1 1 0 011-1h5a1 1 0 011 1v4" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
