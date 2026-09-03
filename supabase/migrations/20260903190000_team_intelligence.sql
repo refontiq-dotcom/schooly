@@ -59,7 +59,7 @@ last_reservation as (
   group by confirmed_by
 ),
 all_actions as (
-  select user_id, max(last_action_at) as last_action_at from last_grade
+  select user_id, last_action_at from last_grade
   union all select user_id, last_action_at from last_attendance
   union all select user_id, last_action_at from last_payment
   union all select user_id, last_action_at from last_message
