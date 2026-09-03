@@ -65,6 +65,8 @@ supabase/migrations/20260903130000_internat_intelligence.sql # dashboard temps r
 supabase/migrations/20260903140000_classes_intelligence.sql # taux de remplissage sections + alertes déséquilibre + charge profs + suggestion section (voir CLASSES_INTELLIGENCE.md)
 supabase/migrations/20260903150000_teacher_intelligence_v2.sql # vue par prof (workload + homeroom + élèves à risque + comparatif + retards de saisie) (voir TEACHER_INTELLIGENCE_V2.md)
 supabase/migrations/20260903160000_secretariat_intelligence.sql # agrégat actions du jour + complétude dossiers + file QR + finalisation atomique (voir SECRETARIAT_INTELLIGENCE.md)
+supabase/migrations/20260903170000_trouvetou_intelligence.sql # catalogue public + performance par établissement + pubs + entonnoir conversion (voir TROUVETOU_INTELLIGENCE.md)
+supabase/migrations/20260903180000_messages_intelligence.sql # non-lus + activité + threads + engagement + urgents non répondus + mark read bulk (voir MESSAGES_INTELLIGENCE.md)
 supabase/fix-grants-and-rls.sql                      # correctifs grants + RLS profiles (anti-récursion)
 supabase/seed.sql                                    # données de démonstration (optionnel)
 ```
