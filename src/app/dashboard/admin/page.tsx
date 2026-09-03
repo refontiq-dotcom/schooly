@@ -4,6 +4,8 @@ import { getSessionProfile } from "@/lib/auth/session";
 import { SCHOOL_TYPE_LABELS, SCHOOL_TYPE_ICONS } from "@/types";
 import type { SchoolType } from "@/types";
 import { ConfirmReservationButton } from "./_ops-forms";
+import { fetchOnboardingProgress } from "@/lib/onboarding-intelligence/scoring";
+import type { OnboardingProgress } from "@/lib/onboarding-intelligence/scoring";
 
 export const revalidate = 0;
 
@@ -107,10 +109,21 @@ export default async function AdminDashboardPage() {
 
   const hasData = reservations.length > 0 || availability.length > 0;
 
+  // ── Onboarding progress (admin onboarding assistant) ──
+  const onboarding: OnboardingProgress | null = establishment
+    ? await fetchOnboardingProgress(supabase, establishment.id)
+    : null;
+  const showOnboarding = onboarding && onboarding.completion_pct < 100;
+
   return (
     <div className="flex flex-col xl:flex-row gap-6">
       {/* ── Main Content ── */}
       <div className="flex-1 min-w-0 space-y-5">
+        {/* Onboarding Assistant (visible tant que completion < 100%) */}
+        {showOnboarding && onboarding && (
+          <OnboardingAssistant data={onboarding} />
+        )}
+
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-3">
           <div className="flex-1">
@@ -641,6 +654,99 @@ function StatCard({
           {trend}
         </span>
       </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// Onboarding Assistant — bandeau de progression pour l'admin
+// ============================================================================
+function OnboardingAssistant({ data }: { data: OnboardingProgress }) {
+  const steps: { key: keyof OnboardingProgress; label: string; href: string }[] = [
+    { key: "has_description", label: "Description", href: "/onboarding/etablissement" },
+    { key: "has_cover", label: "Image de couverture", href: "/onboarding/etablissement" },
+    { key: "has_tour", label: "Visite 360°", href: "/onboarding/etablissement" },
+    { key: "has_fee_config", label: "Frais de réservation", href: "/dashboard/admin/classes" },
+    { key: "has_levels", label: "Niveaux créés", href: "/dashboard/admin/classes" },
+    { key: "has_sections", label: "Sections créées", href: "/dashboard/admin/classes" },
+    { key: "has_teachers", label: "Professeurs invités", href: "/dashboard/admin/equipe" },
+    { key: "has_staff", label: "Secrétariat", href: "/dashboard/admin/equipe" },
+    { key: "has_students", label: "Élèves ajoutés", href: "/dashboard/admin/classes" },
+    { key: "is_published", label: "Publié sur Trouvetou", href: "/dashboard/admin/trouvetou" },
+  ];
+
+  const completed = steps.filter((s) => data[s.key] === 1).length;
+  const remaining = steps.filter((s) => data[s.key] === 0);
+  const next = remaining[0];
+  const pct = data.completion_pct;
+  const barColor = pct >= 75 ? "bg-emerald-500" : pct >= 40 ? "bg-amber-500" : "bg-rose-500";
+
+  return (
+    <div className="bg-gradient-to-br from-amber-50 to-rose-50 border border-amber-200 rounded-2xl p-5">
+      <div className="flex items-start justify-between gap-4 mb-3">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold text-amber-700 uppercase tracking-wider">Configuration de l&apos;établissement</p>
+          <h2 className="text-lg font-bold text-slate-800 mt-1">
+            {completed === 0
+              ? "Bienvenue ! Configurons votre école 🚀"
+              : pct >= 75
+              ? "Bientôt prêt ! 🎉"
+              : "Encore quelques étapes"}
+          </h2>
+          <p className="text-sm text-slate-600 mt-0.5">
+            {data.next_step}
+          </p>
+        </div>
+        <div className="text-right shrink-0">
+          <p className="text-3xl font-extrabold text-slate-800 tabular-nums">{pct}%</p>
+          <p className="text-xs text-slate-500">{completed}/{data.steps_total} étapes</p>
+        </div>
+      </div>
+
+      <div className="w-full h-2 bg-white/70 rounded-full overflow-hidden mb-4">
+        <div
+          className={`h-full rounded-full transition-all duration-500 ${barColor}`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+        {steps.map((s) => {
+          const done = data[s.key] === 1;
+          return (
+            <Link
+              key={s.key}
+              href={s.href}
+              className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium transition-all ${
+                done
+                  ? "bg-emerald-100 text-emerald-700"
+                  : s.key === next?.key
+                  ? "bg-amber-200 text-amber-900 ring-2 ring-amber-400 hover:bg-amber-300"
+                  : "bg-white/70 text-slate-500 hover:bg-white"
+              }`}
+            >
+              <span className="text-base leading-none">
+                {done ? "✅" : s.key === next?.key ? "👉" : "⭕"}
+              </span>
+              <span className="truncate">{s.label}</span>
+            </Link>
+          );
+        })}
+      </div>
+
+      {next && (
+        <div className="mt-4 flex justify-end">
+          <Link
+            href={next.href}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-xl hover:bg-slate-800 transition-colors"
+          >
+            Faire : {next.label}
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+            </svg>
+          </Link>
+        </div>
+      )}
     </div>
   );
 }
