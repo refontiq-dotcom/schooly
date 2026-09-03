@@ -169,7 +169,7 @@ paid as (
     jsonb_build_object('amount', p.amount, 'method', p.method, 'reference', p.reference) as metadata
   from public.payments p
   join public.students s on s.id = p.student_id
-  where p.status = 'paid' and p.paid_at is not null
+  where p.status = 'confirmed' and p.paid_at is not null
 )
 select * from finalized
 union all
