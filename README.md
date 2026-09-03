@@ -117,6 +117,39 @@ L'application est disponible sur `http://localhost:3000`.
 - `/dashboard/admin/documents` — validation des pièces administratives
 - `/dashboard/admin/messages` — communication avec les parents
 
+## État du projet — 12 modules intelligence livrés (2026-09-03)
+
+Depuis la dernière publication v1, **12 modules intelligence** ont été ajoutés en plus de la base :
+Réservation, Paiement, Professeur (v1 + v2), Parent, Internat, Classes, Secrétariat,
+Trouvetou, Messagerie, Équipe, Onboarding, Auth Health. **186/186 tests Vitest passent**.
+
+Chaque module a :
+- Une migration SQL idempotente (`supabase/migrations/<date>_<module>_intelligence.sql`)
+- Un miroir TypeScript strict (`src/lib/<module>-intelligence/scoring.ts`)
+- Des tests Vitest (`src/lib/<module>-intelligence/__tests__/scoring.test.ts`)
+- Une doc détaillée (`<MODULE>_INTELLIGENCE.md` à la racine)
+
+Voir le détail complet dans **[CHANGELOG.md](./CHANGELOG.md)**.
+
+**Pour exécuter toutes les migrations intelligence** (dans l'ordre, dans Supabase SQL Editor) :
+
+```sql
+supabase/migrations/20260903090000_reservation_intelligence.sql
+supabase/migrations/20260903100000_payment_intelligence.sql
+supabase/migrations/20260903110000_teacher_intelligence.sql
+supabase/migrations/20260903120000_parent_intelligence.sql
+supabase/migrations/20260903130000_internat_intelligence.sql
+supabase/migrations/20260903140000_classes_intelligence.sql
+supabase/migrations/20260903150000_teacher_intelligence_v2.sql
+supabase/migrations/20260903160000_secretariat_intelligence.sql
+supabase/migrations/20260903170000_trouvetou_intelligence.sql
+supabase/migrations/20260903180000_messages_intelligence.sql
+supabase/migrations/20260903190000_team_intelligence.sql
+supabase/migrations/20260903200000_onboarding_intelligence.sql
+supabase/migrations/20260903210000_auth_health.sql
+supabase/migrations/20260904080000_school_health_intelligence.sql  -- méta-vue agrégée
+```
+
 ## Logique métier clé : anti-survente
 
 La fonction Postgres `reserve_seat(reservation_id)` (voir `supabase/schema.sql`)
@@ -176,8 +209,24 @@ Voir le cahier des charges complet pour le détail des phases. Non couvert ici :
 ```
 schooly/
 ├── supabase/
-│   ├── schema.sql          # tables, fonctions, RLS
-│   └── seed.sql            # données de démonstration
+│   ├── schema.sql                              # tables, fonctions, RLS (base)
+│   ├── migration-operations.sql                # rentrée, paiements, documents
+│   ├── migrations/                             # migrations intelligence (13 modules)
+│   │   ├── 20260903090000_reservation_intelligence.sql
+│   │   ├── 20260903100000_payment_intelligence.sql
+│   │   ├── 20260903110000_teacher_intelligence.sql
+│   │   ├── 20260903120000_parent_intelligence.sql
+│   │   ├── 20260903130000_internat_intelligence.sql
+│   │   ├── 20260903140000_classes_intelligence.sql
+│   │   ├── 20260903150000_teacher_intelligence_v2.sql
+│   │   ├── 20260903160000_secretariat_intelligence.sql
+│   │   ├── 20260903170000_trouvetou_intelligence.sql
+│   │   ├── 20260903180000_messages_intelligence.sql
+│   │   ├── 20260903190000_team_intelligence.sql
+│   │   ├── 20260903200000_onboarding_intelligence.sql
+│   │   ├── 20260903210000_auth_health.sql
+│   │   └── 20260904080000_school_health_intelligence.sql
+│   └── seed.sql                                # données de démonstration
 ├── automation/
 │   └── n8n-weekly-whatsapp-summary.README.md
 ├── src/
@@ -186,17 +235,44 @@ schooly/
 │   │   ├── etablissement/[id]/               # fiche + réservation
 │   │   ├── reservation/confirmation/[id]/    # paiement + QR code
 │   │   ├── dashboard/
-│   │   │   ├── admin/                        # config classes & quotas
+│   │   │   ├── admin/                        # config classes/quotas + OnboardingAssistant
 │   │   │   ├── professeur/                   # présences & notes
 │   │   │   ├── secretariat/                  # scan QR + finalisation
 │   │   │   └── parent/                       # suivi enfant
 │   │   ├── auth/                             # connexion / inscription parent / invitation
 │   │   ├── onboarding/etablissement/         # création d'établissement → rôle admin
 │   │   └── api/reservations/                 # endpoints réservation
-│   ├── lib/auth/             # actions, rôles, session + sync profiles
-│   ├── lib/supabase/         # clients Supabase (browser/server/admin)
-│   └── types/                # types TypeScript partagés
-└── README.md
+│   ├── lib/
+│   │   ├── auth/                             # actions, rôles, session + sync profiles
+│   │   ├── auth-health/                      # cohérence auth.users ↔ profiles
+│   │   ├── classes-intelligence/             # miroir TS Classes
+│   │   ├── internat-intelligence/            # miroir TS Internat
+│   │   ├── messages-intelligence/            # miroir TS Messagerie
+│   │   ├── onboarding-intelligence/          # miroir TS Onboarding (10 étapes)
+│   │   ├── parent-intelligence/              # miroir TS Parent
+│   │   ├── payment-intelligence/             # miroir TS Paiement
+│   │   ├── reservation-intelligence/         # miroir TS Réservation
+│   │   ├── secretariat-intelligence/         # miroir TS Secrétariat
+│   │   ├── supabase/                         # clients Supabase (browser/server/admin)
+│   │   ├── teacher-intelligence/             # miroir TS Professeur (v1 + v2)
+│   │   ├── team-intelligence/                # miroir TS Équipe
+│   │   └── trouvetou-intelligence/           # miroir TS Trouvetou
+│   └── types/                                # types TypeScript partagés
+├── CHANGELOG.md                              # historique détaillé
+├── README.md
+├── AGENTS.md
+├── RESERVATION_INTELLIGENCE.md                # doc par module
+├── PAYMENT_INTELLIGENCE.md
+├── TEACHER_INTELLIGENCE.md
+├── TEACHER_INTELLIGENCE_V2.md
+├── PARENT_INTELLIGENCE.md
+├── INTERNAT_INTELLIGENCE.md
+├── CLASSES_INTELLIGENCE.md
+├── SECRETARIAT_INTELLIGENCE.md
+├── MESSAGES_INTELLIGENCE.md
+├── TEAM_INTELLIGENCE.md
+├── ONBOARDING_INTELLIGENCE.md
+└── AUTH_HEALTH.md
 ```
 
 ## Licence
