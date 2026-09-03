@@ -76,6 +76,11 @@ exception
   when duplicate_object then null;
 end $$;
 
+-- Si le type existait déjà (créé par schema.sql avec 5 valeurs),
+-- ajoute les 2 nouvelles valeurs manquantes.
+alter type reservation_status add value if not exists 'waitlisted';
+alter type reservation_status add value if not exists 'rejected_fraud';
+
 -- ----------------------------------------------------------------------------
 -- 3. FONCTION : calcul du score de confiance parent (0..100)
 -- ----------------------------------------------------------------------------
