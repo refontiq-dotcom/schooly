@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import type { InternatIncident, Student } from "@/types";
@@ -9,6 +9,8 @@ import {
   INTERNAT_SEVERITY_COLORS,
   INTERNAT_CATEGORY_LABELS,
 } from "@/types";
+import { fetchStudentsAtRisk } from "@/lib/internat-intelligence/scoring";
+import type { InternatStudentAtRisk } from "@/lib/internat-intelligence/scoring";
 
 interface IncidentWithStudent extends InternatIncident {
   student?: Student;
@@ -17,6 +19,7 @@ interface IncidentWithStudent extends InternatIncident {
 export default function IncidentsPage() {
   const [incidents, setIncidents] = useState<IncidentWithStudent[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
+  const [studentsAtRisk, setStudentsAtRisk] = useState<InternatStudentAtRisk[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [filter, setFilter] = useState<"all" | "mineur" | "majeur" | "grave">("all");
@@ -45,38 +48,33 @@ export default function IncidentsPage() {
       .eq("id", user.id)
       .single();
 
-    if (!profile?.establishment_id) return;
+    if (!profile?.establishment_id) {
+      setLoading(false);
+      return;
+    }
 
     const estId = profile.establishment_id;
 
-    // Load students
-    const { data: studentsData } = await supabase
-      .from("students")
-      .select("*")
-      .eq("establishment_id", estId);
+    const [studentsRes, incidentsRes, atRisk] = await Promise.all([
+      supabase.from("students").select("*").eq("establishment_id", estId),
+      supabase
+        .from("internat_incidents")
+        .select("*")
+        .eq("establishment_id", estId)
+        .order("incident_date", { ascending: false }),
+      fetchStudentsAtRisk(supabase, estId),
+    ]);
 
-    if (studentsData) setStudents(studentsData);
+    if (studentsRes.data) setStudents(studentsRes.data);
+    setStudentsAtRisk(atRisk);
 
-    // Load incidents
-    const { data: incidentsData } = await supabase
-      .from("internat_incidents")
-      .select("*")
-      .eq("establishment_id", estId)
-      .order("incident_date", { ascending: false });
-
-    if (incidentsData) {
-      const enriched = await Promise.all(
-        incidentsData.map(async (inc) => {
-          const { data: student } = await supabase
-            .from("students")
-            .select("*")
-            .eq("id", inc.student_id)
-            .single();
-
-          return { ...inc, student };
-        })
-      );
-
+    if (incidentsRes.data) {
+      const studentMap = new Map<string, Student>();
+      (studentsRes.data ?? []).forEach((s) => studentMap.set(s.id, s as Student));
+      const enriched: IncidentWithStudent[] = incidentsRes.data.map((inc) => ({
+        ...(inc as InternatIncident),
+        student: studentMap.get(inc.student_id),
+      }));
       setIncidents(enriched);
     }
 
@@ -143,11 +141,16 @@ export default function IncidentsPage() {
 
   async function handleDelete(id: string) {
     if (!confirm("Supprimer cet incident ?")) return;
-    
     const supabase = createClient();
     await supabase.from("internat_incidents").delete().eq("id", id);
     loadData();
   }
+
+  const riskByStudentId = useMemo(() => {
+    const m = new Map<string, InternatStudentAtRisk>();
+    studentsAtRisk.forEach((s) => m.set(s.student_id, s));
+    return m;
+  }, [studentsAtRisk]);
 
   const filteredIncidents = incidents.filter((inc) => {
     if (filter === "all") return true;
@@ -159,7 +162,6 @@ export default function IncidentsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 text-sm text-slate-500 mb-1">
@@ -186,14 +188,9 @@ export default function IncidentsPage() {
         </button>
       </div>
 
-      {/* Alert for grave incidents */}
       {graveCount > 0 && (
         <div className="bg-red-50 border border-red-200 rounded-2xl p-4 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center">
-            <svg className="w-5 h-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
-            </svg>
-          </div>
+          <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center text-xl">🚨</div>
           <div>
             <p className="text-sm font-semibold text-red-800">Incidents graves en attente</p>
             <p className="text-xs text-red-600">{graveCount} incident(s) grave(s) nécessitent une attention immédiate</p>
@@ -201,7 +198,34 @@ export default function IncidentsPage() {
         </div>
       )}
 
-      {/* Filters */}
+      {/* Bandeau élèves à risque (top 5) */}
+      {studentsAtRisk.length > 0 && (
+        <div className="bg-white rounded-2xl p-5 border border-slate-100">
+          <h3 className="text-sm font-semibold text-slate-700 mb-3">Élèves à risque (incidents multiples)</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            {studentsAtRisk.slice(0, 5).map((s) => (
+              <div
+                key={s.student_id}
+                className={`p-3 rounded-xl border ${
+                  s.risk_level === "critical" ? "border-red-200 bg-red-50/50" :
+                  s.risk_level === "high" ? "border-orange-200 bg-orange-50/50" :
+                  s.risk_level === "medium" ? "border-amber-200 bg-amber-50/50" :
+                  "border-slate-100"
+                }`}
+              >
+                <p className="text-sm font-medium text-slate-800 truncate">{s.full_name}</p>
+                <p className="text-xs text-slate-500">
+                  {s.incidents_mineur} mineur · {s.incidents_majeur} majeur ·{" "}
+                  <span className={s.incidents_grave > 0 ? "text-red-600 font-semibold" : ""}>
+                    {s.incidents_grave} grave
+                  </span>
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="flex gap-2 overflow-x-auto pb-2">
         {(["all", "mineur", "majeur", "grave"] as const).map((f) => (
           <button
@@ -223,7 +247,6 @@ export default function IncidentsPage() {
         ))}
       </div>
 
-      {/* Create Form Modal */}
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="bg-white rounded-2xl p-6 w-full max-w-lg mx-4 shadow-xl max-h-[90vh] overflow-y-auto">
@@ -336,7 +359,6 @@ export default function IncidentsPage() {
         </div>
       )}
 
-      {/* Incidents List */}
       {loading ? (
         <div className="space-y-3">
           {[1, 2, 3].map((i) => (
@@ -346,9 +368,7 @@ export default function IncidentsPage() {
       ) : filteredIncidents.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-2xl border border-slate-100">
           <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
+            <span className="text-2xl">✅</span>
           </div>
           <h3 className="text-lg font-semibold text-slate-700 mb-2">Aucun incident</h3>
           <p className="text-sm text-slate-500">
@@ -357,68 +377,78 @@ export default function IncidentsPage() {
         </div>
       ) : (
         <div className="space-y-3">
-          {filteredIncidents.map((incident) => (
-            <div
-              key={incident.id}
-              className={`bg-white rounded-2xl border p-5 ${
-                incident.resolved_at ? "border-slate-100" : "border-amber-200"
-              }`}
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex items-start gap-3 flex-1 min-w-0">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                    INTERNAT_SEVERITY_COLORS[incident.severity]
-                  }`}>
-                    <span className="text-lg">
-                      {incident.severity === "grave" ? "🚨" : incident.severity === "majeur" ? "⚠️" : "⚡"}
-                    </span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="text-sm font-semibold text-slate-800">{incident.title}</h3>
-                      <span className={`text-xs font-medium px-2 py-0.5 rounded-lg ${
-                        INTERNAT_SEVERITY_COLORS[incident.severity]
-                      }`}>
-                        {INTERNAT_SEVERITY_LABELS[incident.severity]}
-                      </span>
-                      <span className="text-xs font-medium px-2 py-0.5 rounded-lg bg-slate-100 text-slate-600">
-                        {INTERNAT_CATEGORY_LABELS[incident.category]}
+          {filteredIncidents.map((incident) => {
+            const risk = riskByStudentId.get(incident.student_id);
+            return (
+              <div
+                key={incident.id}
+                className={`bg-white rounded-2xl border p-5 ${
+                  incident.resolved_at ? "border-slate-100" : "border-amber-200"
+                }`}
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-start gap-3 flex-1 min-w-0">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                      INTERNAT_SEVERITY_COLORS[incident.severity]
+                    }`}>
+                      <span className="text-lg">
+                        {incident.severity === "grave" ? "🚨" : incident.severity === "majeur" ? "⚠️" : "⚡"}
                       </span>
                     </div>
-                    <p className="text-sm text-slate-600 mt-1">
-                      {incident.student?.full_name || "Élève inconnu"} • {incident.incident_date}
-                    </p>
-                    {incident.description && (
-                      <p className="text-sm text-slate-500 mt-2">{incident.description}</p>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="text-sm font-semibold text-slate-800">{incident.title}</h3>
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-lg ${
+                          INTERNAT_SEVERITY_COLORS[incident.severity]
+                        }`}>
+                          {INTERNAT_SEVERITY_LABELS[incident.severity]}
+                        </span>
+                        <span className="text-xs font-medium px-2 py-0.5 rounded-lg bg-slate-100 text-slate-600">
+                          {INTERNAT_CATEGORY_LABELS[incident.category]}
+                        </span>
+                        {risk && (risk.risk_level === "critical" || risk.risk_level === "high") && (
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-lg ${
+                            risk.risk_level === "critical" ? "bg-red-100 text-red-700" : "bg-orange-100 text-orange-700"
+                          }`}>
+                            Élève à risque {risk.risk_level === "critical" ? "🚨" : "⚠️"}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-slate-600 mt-1">
+                        {incident.student?.full_name || "Élève inconnu"} • {incident.incident_date}
+                      </p>
+                      {incident.description && (
+                        <p className="text-sm text-slate-500 mt-2">{incident.description}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {incident.resolved_at ? (
+                      <span className="text-xs font-medium text-green-600 bg-green-50 px-3 py-1.5 rounded-lg">
+                        ✓ Résolu
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => handleResolve(incident.id)}
+                        className="text-xs font-medium text-green-600 hover:text-green-700 px-3 py-1.5 rounded-lg hover:bg-green-50 transition-colors"
+                      >
+                        Résoudre
+                      </button>
                     )}
+                    <button
+                      onClick={() => handleDelete(incident.id)}
+                      className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-red-500 transition-colors"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                      </svg>
+                    </button>
                   </div>
                 </div>
-                
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  {incident.resolved_at ? (
-                    <span className="text-xs font-medium text-green-600 bg-green-50 px-3 py-1.5 rounded-lg">
-                      ✓ Résolu
-                    </span>
-                  ) : (
-                    <button
-                      onClick={() => handleResolve(incident.id)}
-                      className="text-xs font-medium text-green-600 hover:text-green-700 px-3 py-1.5 rounded-lg hover:bg-green-50 transition-colors"
-                    >
-                      Résoudre
-                    </button>
-                  )}
-                  <button
-                    onClick={() => handleDelete(incident.id)}
-                    className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-red-500 transition-colors"
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
-                    </svg>
-                  </button>
-                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

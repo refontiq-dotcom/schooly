@@ -12,6 +12,20 @@ import type { FeeStatus, PaymentMethod, PaymentStatus } from "@/types";
 
 export const revalidate = 0;
 
+type PaymentSummary = {
+  student_id: string;
+  full_name: string;
+  parent_id: string | null;
+  total_fees: number;
+  total_paid: number;
+  total_remaining: number;
+  paid_count: number;
+  overdue_count: number;
+  pending_count: number;
+  partial_count: number;
+  next_due_date: string | null;
+};
+
 export default async function ParentPaymentsPage() {
   const { supabase, user } = await getSessionProfile();
   if (!user || !supabase) redirect("/auth?returnTo=/dashboard/parent/paiements");
@@ -20,40 +34,112 @@ export default async function ParentPaymentsPage() {
     .from("students")
     .select("id, full_name")
     .eq("parent_id", user.id);
-  const student = students?.[0];
-  if (!student) {
+
+  if (!students || students.length === 0) {
     return <div className="card text-slate-500">Aucun enfant rattaché.</div>;
   }
 
-  const [{ data: fees }, { data: categories }, { data: payments }] = await Promise.all([
-    supabase.from("student_fees").select("*").eq("student_id", student.id).order("due_date"),
-    supabase.from("fee_categories").select("id, name"),
-    supabase.from("payments").select("*").eq("student_id", student.id).order("created_at", { ascending: false }),
-  ]);
-
-  const catName = Object.fromEntries((categories ?? []).map((c) => [c.id, c.name]));
-  const remaining = (fees ?? []).reduce((s, f) => s + Number(f.amount) - Number(f.amount_paid), 0);
-  const paid = (fees ?? []).reduce((s, f) => s + Number(f.amount_paid), 0);
-
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-bold text-navy">Paiements — {student.full_name}</h1>
+        <h1 className="text-2xl font-bold text-navy">Paiements</h1>
         <p className="text-sm text-slate-500 mt-1">
           Mobile Money, échéanciers et historique clair des restes à payer.
         </p>
       </div>
 
-      <div className="grid sm:grid-cols-2 gap-4">
+      {students.map((s) => (
+        <StudentPayments key={s.id} studentId={s.id} />
+      ))}
+    </div>
+  );
+}
+
+async function StudentPayments({ studentId }: { studentId: string }) {
+  const { supabase } = await getSessionProfile();
+  if (!supabase) return null;
+
+  const [{ data: summary }, { data: fees }, { data: categories }, { data: payments }] =
+    await Promise.all([
+      supabase
+        .from("student_payment_summary")
+        .select("*")
+        .eq("student_id", studentId)
+        .maybeSingle<PaymentSummary>(),
+      supabase
+        .from("student_fees")
+        .select("*")
+        .eq("student_id", studentId)
+        .order("due_date"),
+      supabase.from("fee_categories").select("id, name"),
+      supabase
+        .from("payments")
+        .select("*")
+        .eq("student_id", studentId)
+        .order("created_at", { ascending: false }),
+    ]);
+
+  const catName = Object.fromEntries((categories ?? []).map((c) => [c.id, c.name]));
+  const totalRemaining = summary?.total_remaining ?? 0;
+  const totalPaid = summary?.total_paid ?? 0;
+  const overdueCount = summary?.overdue_count ?? 0;
+  const nextDueDate = summary?.next_due_date;
+
+  const today = new Date();
+  const daysToNext = nextDueDate
+    ? Math.ceil((new Date(nextDueDate).getTime() - today.getTime()) / (24 * 60 * 60 * 1000))
+    : null;
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-xl font-bold text-navy">{summary?.full_name ?? ""}</h2>
+      </div>
+
+      <div className="grid sm:grid-cols-3 gap-4">
         <div className="card">
           <p className="text-xs uppercase tracking-wide text-slate-500">Déjà versé</p>
-          <p className="text-2xl font-bold text-emerald-700 tabular-nums">{formatXof(paid)}</p>
+          <p className="text-2xl font-bold text-emerald-700 tabular-nums">
+            {formatXof(totalPaid)}
+          </p>
         </div>
         <div className="card">
           <p className="text-xs uppercase tracking-wide text-slate-500">Reste à payer</p>
-          <p className="text-2xl font-bold text-navy tabular-nums">{formatXof(remaining)}</p>
+          <p
+            className={`text-2xl font-bold tabular-nums ${
+              totalRemaining > 0 ? "text-red-700" : "text-emerald-700"
+            }`}
+          >
+            {formatXof(totalRemaining)}
+          </p>
+        </div>
+        <div className="card">
+          <p className="text-xs uppercase tracking-wide text-slate-500">Prochaine échéance</p>
+          {nextDueDate && daysToNext !== null ? (
+            <>
+              <p
+                className={`text-2xl font-bold tabular-nums ${
+                  daysToNext < 0 ? "text-red-700" : daysToNext < 7 ? "text-amber-700" : "text-navy"
+                }`}
+              >
+                {daysToNext < 0 ? `${Math.abs(daysToNext)} j de retard` : `dans ${daysToNext} j`}
+              </p>
+              <p className="text-xs text-slate-400 mt-1">
+                {new Date(nextDueDate).toLocaleDateString("fr-FR")}
+              </p>
+            </>
+          ) : (
+            <p className="text-2xl font-bold text-slate-400">—</p>
+          )}
         </div>
       </div>
+
+      {overdueCount > 0 && (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+          ⚠️ {overdueCount} échéance{overdueCount > 1 ? "s" : ""} en retard. Contactez
+          l&apos;établissement pour régulariser.
+        </div>
+      )}
 
       <div className="space-y-4">
         {(fees ?? []).map((fee) => {
@@ -62,10 +148,14 @@ export default async function ParentPaymentsPage() {
             <div key={fee.id} className="card space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
-                  <h2 className="font-semibold text-navy">{catName[fee.fee_category_id] ?? "Frais"}</h2>
+                  <h3 className="font-semibold text-navy">
+                    {catName[fee.fee_category_id] ?? "Frais"}
+                  </h3>
                   <p className="text-sm text-slate-500">
                     {formatXof(Number(fee.amount_paid))} / {formatXof(Number(fee.amount))}
-                    {fee.due_date ? ` · échéance ${new Date(fee.due_date).toLocaleDateString("fr-FR")}` : ""}
+                    {fee.due_date
+                      ? ` · échéance ${new Date(fee.due_date).toLocaleDateString("fr-FR")}`
+                      : ""}
                   </p>
                 </div>
                 <span className={feeStatusClass(fee.status as FeeStatus)}>
@@ -74,8 +164,20 @@ export default async function ParentPaymentsPage() {
               </div>
               <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-amber-500 rounded-full"
-                  style={{ width: `${Number(fee.amount) > 0 ? Math.min(100, (Number(fee.amount_paid) / Number(fee.amount)) * 100) : 0}%` }}
+                  className={`h-full rounded-full ${
+                    fee.status === "paid"
+                      ? "bg-emerald-500"
+                      : fee.status === "overdue"
+                      ? "bg-red-500"
+                      : "bg-amber-500"
+                  }`}
+                  style={{
+                    width: `${
+                      Number(fee.amount) > 0
+                        ? Math.min(100, (Number(fee.amount_paid) / Number(fee.amount)) * 100)
+                        : 0
+                    }%`,
+                  }}
                 />
               </div>
               {left > 0 && <PayFeeForm feeId={fee.id} remaining={left} />}
@@ -83,12 +185,14 @@ export default async function ParentPaymentsPage() {
           );
         })}
         {(!fees || fees.length === 0) && (
-          <div className="card text-slate-500">Aucun frais publié par l&apos;établissement.</div>
+          <div className="card text-slate-500">
+            Aucun frais publié par l&apos;établissement.
+          </div>
         )}
       </div>
 
       <div className="card overflow-x-auto">
-        <h2 className="font-semibold text-navy mb-4">Historique</h2>
+        <h3 className="font-semibold text-navy mb-4">Historique des paiements</h3>
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-slate-500 border-b border-slate-200">
@@ -108,7 +212,11 @@ export default async function ParentPaymentsPage() {
               </tr>
             ))}
             {(!payments || payments.length === 0) && (
-              <tr><td colSpan={4} className="py-4 text-slate-400">Aucun paiement.</td></tr>
+              <tr>
+                <td colSpan={4} className="py-4 text-slate-400">
+                  Aucun paiement.
+                </td>
+              </tr>
             )}
           </tbody>
         </table>

@@ -74,3 +74,14 @@ export function documentStatusClass(status: DocumentStatus) {
   if (status === "rejected" || status === "missing") return "badge-danger";
   return "badge-warning";
 }
+
+export const DOCUMENT_TYPES: DocumentType[] = [
+  "acte_naissance",
+  "photo_identite",
+  "carnet_vaccination",
+  "bulletin_precedent",
+  "certificat_scolarite",
+  "piece_identite",
+  "dossier_examen",
+  "autre",
+];

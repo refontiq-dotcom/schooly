@@ -36,7 +36,29 @@ export type ReservationStatus =
   | "reserved"
   | "confirmed"
   | "expired"
-  | "cancelled";
+  | "cancelled"
+  | "waitlisted"
+  | "rejected_fraud";
+
+export const RESERVATION_STATUS_LABEL: Record<ReservationStatus, string> = {
+  pending_payment: "En attente de paiement",
+  reserved: "Réservée",
+  confirmed: "Inscription finalisée",
+  expired: "Expirée",
+  cancelled: "Annulée",
+  waitlisted: "Liste d'attente",
+  rejected_fraud: "Rejetée (fraude)",
+};
+
+export const RESERVATION_STATUS_COLOR: Record<ReservationStatus, string> = {
+  pending_payment: "badge-warning",
+  reserved: "badge-success",
+  confirmed: "badge-success",
+  expired: "badge-danger",
+  cancelled: "badge-muted",
+  waitlisted: "badge-info",
+  rejected_fraud: "badge-danger",
+};
 
 export type SchoolType =
   | "primaire"
@@ -119,6 +141,11 @@ export interface Reservation {
   qr_code_token: string;
   expires_at: string | null;
   created_at: string;
+  parent_trust_score: number | null;
+  fraud_flags: string[];
+  waitlist_position: number | null;
+  promoted_at: string | null;
+  cancelled_at: string | null;
 }
 
 export interface Student {

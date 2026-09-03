@@ -57,6 +57,12 @@ supabase/migration-operations.sql                    # rentrée, paiements, docu
 supabase/migrations/20260902180000_internat_module.sql  # module internat
 supabase/migrations/20260902190000_trouvetou_integration.sql # publication + API Trouvetou
 supabase/migrations/20260902200000_trouvetou_payment_flow.sql # paiement partenaire
+supabase/migrations/20260903090000_reservation_intelligence.sql # scoring parent + anti-fraude + file d'attente + dashboard conversion (voir RESERVATION_INTELLIGENCE.md)
+supabase/migrations/20260903100000_payment_intelligence.sql # scoring risque impayé + détection anomalies + réconciliation MM + vues agrégées (voir PAYMENT_INTELLIGENCE.md)
+supabase/migrations/20260903110000_teacher_intelligence.sql # agrégats classe + détection décrochage + prédiction moyenne + saisie en lot (voir TEACHER_INTELLIGENCE.md)
+supabase/migrations/20260903120000_parent_intelligence.sql # synthèse 360° par enfant + alertes + score satisfaction + résumé WhatsApp (voir PARENT_INTELLIGENCE.md)
+supabase/migrations/20260903130000_internat_intelligence.sql # dashboard temps réel + élèves à risque + santé + rotation lits + tendances occupation (voir INTERNAT_INTELLIGENCE.md)
+supabase/migrations/20260903140000_classes_intelligence.sql # taux de remplissage sections + alertes déséquilibre + charge profs + suggestion section (voir CLASSES_INTELLIGENCE.md)
 supabase/fix-grants-and-rls.sql                      # correctifs grants + RLS profiles (anti-récursion)
 supabase/seed.sql                                    # données de démonstration (optionnel)
 ```

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import type { DocumentStatus, DocumentType, PaymentMethod } from "@/types";
+import type { DocumentStatus, PaymentMethod } from "@/types";
 
 const METHODS: PaymentMethod[] = [
   "orange_money",
@@ -358,13 +358,116 @@ export async function seedMissingStudentOps(studentId: string) {
   await supabase.rpc("seed_student_documents", { p_student_id: studentId });
 }
 
-export const DOCUMENT_TYPES: DocumentType[] = [
-  "acte_naissance",
-  "photo_identite",
-  "carnet_vaccination",
-  "bulletin_precedent",
-  "certificat_scolarite",
-  "piece_identite",
-  "dossier_examen",
-  "autre",
-];
+/* ------------------------------------------------------------------ */
+/* Paiements intelligents                                              */
+/* ------------------------------------------------------------------ */
+
+export async function generateYearlySchedule(schoolYear: string): Promise<string | null> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return "Non authentifié.";
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role, establishment_id")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (profile?.role !== "admin" || !profile.establishment_id) {
+    return "Action réservée à l'administrateur.";
+  }
+
+  const { error } = await supabase.rpc("generate_yearly_schedule", {
+    p_establishment_id: profile.establishment_id,
+    p_school_year: schoolYear,
+  });
+  if (error) return error.message;
+
+  revalidatePath("/dashboard/admin/paiements");
+  revalidatePath("/dashboard/parent/paiements");
+  return null;
+}
+
+export async function markFeeReminder(
+  studentFeeId: string,
+  channel: "sms" | "whatsapp" | "email" | "in_app" = "in_app",
+  note?: string
+): Promise<string | null> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return "Non authentifié.";
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role, establishment_id")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (
+    !profile ||
+    !["admin", "secretariat", "censeur"].includes(profile.role) ||
+    !profile.establishment_id
+  ) {
+    return "Action non autorisée."
+  }
+
+  const { error } = await supabase.from("fee_reminders").insert({
+    student_fee_id: studentFeeId,
+    channel,
+    sent_by: user.id,
+    note: note ?? null,
+  });
+  if (error) return error.message;
+
+  revalidatePath("/dashboard/admin/paiements");
+  return null;
+}
+
+export async function reconcilePayment(
+  paymentId: string,
+  matchedReconciliationId: string | null,
+  note?: string
+): Promise<string | null> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return "Non authentifié.";
+
+  const { data: payProfile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (!payProfile || !["admin", "secretariat", "censeur"].includes(payProfile.role)) {
+    return "Action non autorisée.";
+  }
+
+  const { error: payError } = await supabase
+    .from("payments")
+    .update({
+      reconciled_at: new Date().toISOString(),
+      reconciled_by: user.id,
+      reconciliation_note: note ?? null,
+    })
+    .eq("id", paymentId);
+  if (payError) return payError.message;
+
+  if (matchedReconciliationId) {
+    const { error: reconError } = await supabase
+      .from("payment_reconciliations")
+      .update({
+        status: "matched",
+        payment_id: paymentId,
+        matched_at: new Date().toISOString(),
+        matched_by: user.id,
+      })
+      .eq("id", matchedReconciliationId);
+    if (reconError) return reconError.message;
+  }
+
+  revalidatePath("/dashboard/admin/paiements");
+  return null;
+}
