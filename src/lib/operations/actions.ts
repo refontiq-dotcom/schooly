@@ -75,6 +75,71 @@ export async function toggleTrouvetouPublication(published: boolean): Promise<st
   return null;
 }
 
+export async function updateEstablishment(
+  _prev: string | null,
+  formData: FormData
+): Promise<string | null> {
+  const name = String(formData.get("name") ?? "").trim();
+  const city = String(formData.get("city") ?? "").trim();
+  const address = String(formData.get("address") ?? "").trim();
+  const description = String(formData.get("description") ?? "").trim();
+  const websiteUrl = String(formData.get("website_url") ?? "").trim();
+  const coverImageUrl = String(formData.get("cover_image_url") ?? "").trim();
+  const tour360Url = String(formData.get("tour_360_url") ?? "").trim();
+  const latitude = Number(formData.get("latitude"));
+  const longitude = Number(formData.get("longitude"));
+  const reservationFeeAmount = Number(formData.get("reservation_fee_amount"));
+  const reservationHoldHours = Number(formData.get("reservation_hold_hours"));
+
+  if (!name || !city) return "Le nom et la ville sont obligatoires.";
+  if (!Number.isFinite(reservationFeeAmount) || reservationFeeAmount < 0) {
+    return "Les frais de réservation sont invalides.";
+  }
+  if (!Number.isInteger(reservationHoldHours) || reservationHoldHours < 1) {
+    return "Le délai de réservation doit être d'au moins une heure.";
+  }
+  if (websiteUrl && !/^https?:\/\//i.test(websiteUrl)) return "Le site web doit commencer par http:// ou https://.";
+  if (coverImageUrl && !/^https?:\/\//i.test(coverImageUrl)) return "L'URL de la photo est invalide.";
+  if (tour360Url && !/^https?:\/\//i.test(tour360Url)) return "L'URL de la visite 360° est invalide.";
+  if ((Number.isFinite(latitude) && (latitude < -90 || latitude > 90)) || (Number.isFinite(longitude) && (longitude < -180 || longitude > 180))) {
+    return "Les coordonnées GPS sont invalides.";
+  }
+
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return "Non authentifié.";
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role, establishment_id")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (profile?.role !== "admin" || !profile.establishment_id) {
+    return "Action réservée à l'administrateur.";
+  }
+
+  const { error } = await supabase
+    .from("establishments")
+    .update({
+      name,
+      city,
+      address: address || null,
+      description: description || null,
+      website_url: websiteUrl || null,
+      cover_image_url: coverImageUrl || null,
+      tour_360_url: tour360Url || null,
+      latitude: Number.isFinite(latitude) ? latitude : null,
+      longitude: Number.isFinite(longitude) ? longitude : null,
+      reservation_fee_amount: reservationFeeAmount,
+      reservation_hold_hours: reservationHoldHours,
+    })
+    .eq("id", profile.establishment_id);
+  if (error) return error.message;
+
+  revalidatePath("/dashboard/admin/trouvetou");
+  revalidatePath("/dashboard/admin");
+  return null;
+}
+
 export async function createTrouvetouAd(
   _prev: string | null,
   formData: FormData

@@ -8,6 +8,7 @@ import {
   createFeeCategory,
   createSupplyList,
   finalizeReservation,
+  updateEstablishment,
   markDocumentStatus,
   sendMessage,
   toggleTrouvetouPublication,
@@ -133,6 +134,88 @@ export function TrouvetouAdForm() {
       {error && <p className="text-sm text-red-600" role="alert">{error}</p>}
       <button type="submit" disabled={pending} className="btn-primary min-h-11">
         {pending ? "Création…" : "Créer la publicité"}
+      </button>
+    </form>
+  );
+}
+
+export function EstablishmentEditForm({
+  establishment,
+}: {
+  establishment: {
+    name: string;
+    city: string;
+    address: string | null;
+    description: string | null;
+    website_url: string | null;
+    cover_image_url: string | null;
+    tour_360_url: string | null;
+    latitude: number | null;
+    longitude: number | null;
+    reservation_fee_amount: number;
+    reservation_hold_hours: number;
+  };
+}) {
+  const router = useRouter();
+  const formRef = useRef<HTMLFormElement>(null);
+  const [error, action, pending] = useActionState(updateEstablishment, null);
+  const last = useRef(pending);
+  useEffect(() => {
+    if (last.current && !pending && !error) router.refresh();
+    last.current = pending;
+  }, [pending, error, router]);
+
+  return (
+    <form ref={formRef} action={action} className="space-y-4">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div>
+          <label className="text-xs text-slate-500" htmlFor="establishment-name">Nom de l'établissement</label>
+          <input id="establishment-name" name="name" required defaultValue={establishment.name} className="input" />
+        </div>
+        <div>
+          <label className="text-xs text-slate-500" htmlFor="establishment-city">Ville</label>
+          <input id="establishment-city" name="city" required defaultValue={establishment.city} className="input" />
+        </div>
+        <div className="sm:col-span-2">
+          <label className="text-xs text-slate-500" htmlFor="establishment-address">Adresse</label>
+          <input id="establishment-address" name="address" defaultValue={establishment.address ?? ""} className="input" />
+        </div>
+        <div className="sm:col-span-2">
+          <label className="text-xs text-slate-500" htmlFor="establishment-description">Description</label>
+          <textarea id="establishment-description" name="description" defaultValue={establishment.description ?? ""} className="input min-h-24" />
+        </div>
+        <div>
+          <label className="text-xs text-slate-500" htmlFor="establishment-cover">URL de la photo</label>
+          <input id="establishment-cover" name="cover_image_url" type="url" defaultValue={establishment.cover_image_url ?? ""} className="input" placeholder="https://..." />
+        </div>
+        <div>
+          <label className="text-xs text-slate-500" htmlFor="establishment-website">Site web</label>
+          <input id="establishment-website" name="website_url" type="url" defaultValue={establishment.website_url ?? ""} className="input" placeholder="https://..." />
+        </div>
+        <div>
+          <label className="text-xs text-slate-500" htmlFor="establishment-tour">Visite 360°</label>
+          <input id="establishment-tour" name="tour_360_url" type="url" defaultValue={establishment.tour_360_url ?? ""} className="input" placeholder="https://..." />
+        </div>
+        <div>
+          <label className="text-xs text-slate-500" htmlFor="establishment-fee">Frais de réservation (FCFA)</label>
+          <input id="establishment-fee" name="reservation_fee_amount" type="number" min={0} step="0.01" defaultValue={establishment.reservation_fee_amount} className="input" />
+        </div>
+        <div>
+          <label className="text-xs text-slate-500" htmlFor="establishment-hold">Délai de réservation (heures)</label>
+          <input id="establishment-hold" name="reservation_hold_hours" type="number" min={1} step={1} defaultValue={establishment.reservation_hold_hours} className="input" />
+        </div>
+        <div>
+          <label className="text-xs text-slate-500" htmlFor="establishment-latitude">Latitude</label>
+          <input id="establishment-latitude" name="latitude" type="number" step="any" defaultValue={establishment.latitude ?? ""} className="input" />
+        </div>
+        <div>
+          <label className="text-xs text-slate-500" htmlFor="establishment-longitude">Longitude</label>
+          <input id="establishment-longitude" name="longitude" type="number" step="any" defaultValue={establishment.longitude ?? ""} className="input" />
+        </div>
+      </div>
+      {error && <p className="text-sm text-red-600" role="alert">{error}</p>}
+      <button type="submit" disabled={pending} className="btn-primary min-h-11">
+        {pending ? "Enregistrement…" : "Enregistrer les modifications"}
       </button>
     </form>
   );

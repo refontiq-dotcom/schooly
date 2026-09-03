@@ -1,6 +1,6 @@
 import { getSessionProfile } from "@/lib/auth/session";
 import { redirect } from "next/navigation";
-import { TrouvetouAdForm, TrouvetouPublicationToggle } from "../_ops-forms";
+import { EstablishmentEditForm, TrouvetouAdForm, TrouvetouPublicationToggle } from "../_ops-forms";
 
 export const revalidate = 0;
 
@@ -11,7 +11,7 @@ export default async function TrouvetouAdminPage() {
   const { data: establishment } = profile?.establishment_id
     ? await supabase
         .from("establishments")
-        .select("id, name, city, school_type, published_to_trouvetou")
+        .select("id, name, city, address, description, school_type, website_url, cover_image_url, tour_360_url, latitude, longitude, reservation_fee_amount, reservation_hold_hours, published_to_trouvetou")
         .eq("id", profile.establishment_id)
         .maybeSingle()
     : { data: null };
@@ -43,6 +43,12 @@ export default async function TrouvetouAdminPage() {
               <div><span className="block text-xs text-slate-400">Catégorie</span>Écoles</div>
               <div><span className="block text-xs text-slate-400">Localisation</span>{establishment.city}</div>
             </div>
+          </section>
+
+          <section className="card">
+            <h2 className="font-semibold text-slate-800">Modifier la fiche établissement</h2>
+            <p className="mb-4 mt-1 text-sm text-slate-500">Ces informations seront visibles sur Schooly et Trouvetou.</p>
+            <EstablishmentEditForm establishment={establishment} />
           </section>
 
           <section className="card">
