@@ -168,6 +168,11 @@ export interface Student {
   full_name: string;
   section_id: string;
   parent_phone: string;
+  establishment_id?: string;
+  birthdate?: string | null;
+  parent_id?: string | null;
+  reservation_id?: string | null;
+  created_at?: string;
 }
 
 export interface AttendanceRecord {

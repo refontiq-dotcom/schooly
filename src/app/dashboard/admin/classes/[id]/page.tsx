@@ -216,7 +216,14 @@ export default async function AdminClassDetailPage({
             <tbody>
               {students.map((s) => (
                 <tr key={s.id} className="border-b border-slate-100 last:border-0">
-                  <td className="py-2.5 pr-3 font-medium text-slate-800">{s.full_name}</td>
+                  <td className="py-2.5 pr-3 font-medium">
+                    <Link
+                      href={`/dashboard/admin/eleves/${s.id}?from=classe&section=${id}`}
+                      className="text-navy hover:underline min-h-11 inline-flex items-center"
+                    >
+                      {s.full_name}
+                    </Link>
+                  </td>
                   <td className="py-2.5 pr-3 text-slate-500">
                     {s.birthdate ? new Date(s.birthdate).toLocaleDateString("fr-FR") : "—"}
                   </td>
