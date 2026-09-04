@@ -10,9 +10,13 @@ async function getEstablishment(id: string) {
 
   const { data: establishment } = await supabase
     .from("establishments")
-    .select("*")
+    .select("*, school_groups(name, logo_url, headquarters_city)")
     .eq("id", id)
     .single() as { data: Establishment | null };
+
+  const group = (establishment as unknown as {
+    school_groups: { name: string; logo_url: string | null; headquarters_city: string | null } | null;
+  } | null)?.school_groups ?? null;
 
   const { data: availability } = await supabase
     .from("level_availability")
@@ -20,7 +24,7 @@ async function getEstablishment(id: string) {
     .eq("establishment_id", id)
     .order("level_name") as { data: LevelAvailability[] | null };
 
-  return { establishment, availability: availability ?? [] };
+  return { establishment, group, availability: availability ?? [] };
 }
 
 export default async function EstablishmentPage({
@@ -29,7 +33,7 @@ export default async function EstablishmentPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const { establishment, availability } = await getEstablishment(id);
+  const { establishment, group, availability } = await getEstablishment(id);
 
   if (!establishment) return notFound();
 
@@ -43,6 +47,18 @@ export default async function EstablishmentPage({
         <div>
           <h1 className="text-2xl font-bold text-navy">{establishment.name}</h1>
           <p className="text-slate-500">{establishment.city} — {establishment.address}</p>
+          {group && (
+            <p className="mt-2 inline-flex items-center gap-2 text-sm">
+              <span className="badge-info">
+                🏢 Réseau : {group.name}
+              </span>
+              {group.headquarters_city && group.headquarters_city !== establishment.city && (
+                <span className="text-xs text-slate-400">
+                  Siège : {group.headquarters_city}
+                </span>
+              )}
+            </p>
+          )}
         </div>
 
         {establishment.description && (

@@ -23,6 +23,7 @@ type Props = {
   establishments: Establishment[];
   selectedEstablishmentId: string | null;
   logoUrl: string | null;
+  groupsByEstab?: Record<string, { name: string; logo_url: string | null }>;
 };
 
 function SidebarIcon({
@@ -121,6 +122,7 @@ export default function ParentSidebar({
   establishments,
   selectedEstablishmentId,
   logoUrl,
+  groupsByEstab = {},
 }: Props) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -132,6 +134,9 @@ export default function ParentSidebar({
   );
   const currentChildren = selectedEstab?.students ?? [];
   const selectedStudentId = searchParams.get("student");
+  const selectedGroup = selectedEstablishmentId
+    ? groupsByEstab[selectedEstablishmentId]
+    : undefined;
 
   /** Build sidebar nav links that preserve ?estab=… */
   function navHref(href: string) {
@@ -182,6 +187,11 @@ export default function ParentSidebar({
             >
               <SidebarIcon name="school" className="w-5 h-5 text-slate-500 shrink-0" />
               <div className="flex-1 min-w-0">
+                {selectedGroup && (
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-orange-600 truncate">
+                    {selectedGroup.name}
+                  </p>
+                )}
                 <p className="text-sm font-medium text-slate-800 truncate">
                   {selectedEstab?.name ?? "Sélectionner"}
                 </p>
@@ -213,7 +223,14 @@ export default function ParentSidebar({
                         : "text-slate-600 hover:bg-slate-50"
                     }`}
                   >
-                    <span className="truncate">{estab.name}</span>
+                    <span className="min-w-0">
+                      {groupsByEstab[estab.id] && (
+                        <span className="block text-[10px] font-semibold uppercase tracking-wide text-orange-600 truncate">
+                          {groupsByEstab[estab.id].name}
+                        </span>
+                      )}
+                      <span className="block truncate">{estab.name}</span>
+                    </span>
                     <span className="text-xs text-slate-400 ml-auto shrink-0">
                       {estab.students.length}
                     </span>

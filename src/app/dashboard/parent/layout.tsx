@@ -31,6 +31,31 @@ export default async function ParentLayout({
     })),
   }));
 
+  // Group (réseau) info per establishment — shows "Réseau X" badge in sidebar
+  const estabIds = groups.map((g) => g.establishment.id);
+  const groupByEstab: Record<
+    string,
+    { name: string; logo_url: string | null }
+  > = {};
+  if (estabIds.length > 0) {
+    const { data: estRows } = await supabase
+      .from("establishments")
+      .select("id, school_groups(name, logo_url)")
+      .in("id", estabIds);
+    for (const row of ((estRows ?? []) as unknown as {
+      id: string;
+      school_groups: { name: string; logo_url: string | null }[] | null;
+    }[])) {
+      const group = row.school_groups?.[0];
+      if (group) {
+        groupByEstab[row.id] = {
+          name: group.name,
+          logo_url: group.logo_url,
+        };
+      }
+    }
+  }
+
   // Fetch logo for the first establishment (or could be any)
   let logoUrl: string | null = null;
   if (groups.length > 0) {
@@ -48,6 +73,7 @@ export default async function ParentLayout({
         establishments={establishments}
         selectedEstablishmentId={groups[0]?.establishment.id ?? null}
         logoUrl={logoUrl}
+        groupsByEstab={groupByEstab}
       />
 
       {/* Main content */}
