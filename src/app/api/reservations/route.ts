@@ -15,6 +15,7 @@ export async function POST(req: NextRequest) {
   const {
     establishment_id,
     level_id,
+    modality,
     student_full_name,
     student_birthdate,
     parent_full_name,
@@ -56,6 +57,7 @@ export async function POST(req: NextRequest) {
       establishment_id,
       level_id,
       section_id: section.id,
+      modality: modality || "standard",
       student_full_name,
       student_birthdate: student_birthdate || null,
       parent_full_name,

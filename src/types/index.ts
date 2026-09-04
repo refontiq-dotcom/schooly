@@ -168,6 +168,51 @@ export type DocumentType =
 export type DocumentStatus = "missing" | "submitted" | "validated" | "rejected";
 export type BehaviorKind = "positif" | "a_surveiller" | "incident";
 
+// ── Modalités d'inscription ─────────────────────────────────────
+export type InscriptionModality =
+  | "standard"
+  | "bourse"
+  | "transfert"
+  | "fratrie"
+  | "convention";
+
+export const INSCRIPTION_MODALITY_LABELS: Record<InscriptionModality, string> = {
+  standard: "Inscription standard",
+  bourse: "Bourse / Aide financière",
+  transfert: "Transfert scolaire",
+  fratrie: "Réduction fratrie",
+  convention: "Convention / Partenariat",
+};
+
+export const INSCRIPTION_MODALITY_ICONS: Record<InscriptionModality, string> = {
+  standard: "📝",
+  bourse: "🎓",
+  transfert: "🔄",
+  fratrie: "👨‍👩‍👧‍👦",
+  convention: "🤝",
+};
+
+export const INSCRIPTION_MODALITY_COLORS: Record<InscriptionModality, string> = {
+  standard: "bg-slate-100 text-slate-700",
+  bourse: "bg-emerald-100 text-emerald-700",
+  transfert: "bg-blue-100 text-blue-700",
+  fratrie: "bg-amber-100 text-amber-700",
+  convention: "bg-purple-100 text-purple-700",
+};
+
+export interface InscriptionModalityConfig {
+  id: string;
+  establishment_id: string;
+  modality: InscriptionModality;
+  name: string;
+  description: string | null;
+  fee_multiplier: number;
+  required_documents: string[] | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface FeeCategory {
   id: string;
   establishment_id: string;

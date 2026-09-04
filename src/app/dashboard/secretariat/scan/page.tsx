@@ -5,6 +5,9 @@ import { createClient } from "@/lib/supabase/client";
 import type { Reservation } from "@/types";
 
 type LookupResult = Reservation & {
+  modality?: string;
+  modality_name?: string;
+  modality_description?: string;
   establishments?: { name: string };
   levels?: { name: string };
   sections?: { name: string };
@@ -83,6 +86,12 @@ export default function ScanPage() {
           <p><strong>Établissement :</strong> {result.establishments?.name}</p>
           <p><strong>Niveau / Section :</strong> {result.levels?.name} — {result.sections?.name}</p>
           <p><strong>Statut :</strong> {result.status}</p>
+          {result.modality_name && (
+            <p><strong>Modalité :</strong> {result.modality_name}</p>
+          )}
+          {result.modality_description && (
+            <p className="text-sm text-slate-500 mt-1">{result.modality_description}</p>
+          )}
           <button onClick={handleFinalize} disabled={loading} className="btn-primary w-full mt-3">
             Finaliser l&apos;inscription
           </button>

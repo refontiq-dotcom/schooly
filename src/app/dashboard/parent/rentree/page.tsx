@@ -1,19 +1,28 @@
 import { redirect } from "next/navigation";
 import { getSessionProfile } from "@/lib/auth/session";
+import { findParentStudents, groupByEstablishment, resolveEstablishmentId } from "@/lib/parent/context";
 import { SupplyToggle } from "../_forms";
 import { formatXof } from "@/lib/operations/labels";
 
 export const revalidate = 0;
 
-export default async function ParentRentreePage() {
+export default async function ParentRentreePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ estab?: string; student?: string }>;
+}) {
   const { supabase, user } = await getSessionProfile();
   if (!user || !supabase) redirect("/auth?returnTo=/dashboard/parent/rentree");
 
-  const { data: students } = await supabase
-    .from("students")
-    .select("id, full_name, section_id, sections(level_id, name, levels(name))")
-    .eq("parent_id", user.id);
-  const student = students?.[0];
+  const params = await searchParams;
+  const students = await findParentStudents(supabase, user.id);
+  const groups = groupByEstablishment(students);
+  const selectedEstabId = resolveEstablishmentId(groups, params.estab ?? null);
+
+  const selectedGroup = groups.find((g) => g.establishment.id === selectedEstabId);
+  const currentStudents = selectedGroup?.students ?? [];
+  const selectedStudentId = params.student ?? currentStudents[0]?.id ?? null;
+  const student = currentStudents.find((s) => s.id === selectedStudentId) ?? currentStudents[0];
   if (!student) return <div className="card text-slate-500">Aucun enfant rattaché.</div>;
 
   const sectionRel = student.sections as unknown as

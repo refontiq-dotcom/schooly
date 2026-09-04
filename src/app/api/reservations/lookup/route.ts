@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import {
+  INSCRIPTION_MODALITY_LABELS,
+} from "@/types";
+import type { InscriptionModality } from "@/types";
 
 /**
  * GET /api/reservations/lookup?token=<qr_code_token>
@@ -21,5 +25,26 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Réservation introuvable ou QR code invalide" }, { status: 404 });
   }
 
-  return NextResponse.json({ reservation });
+  // Enrichir avec les infos de modalité
+  const modality = reservation.modality as InscriptionModality | null;
+  const enriched = {
+    ...reservation,
+    modality_name: modality ? INSCRIPTION_MODALITY_LABELS[modality] : null,
+    modality_description: null as string | null,
+  };
+
+  // Récupérer la description de la modalité si elle existe
+  if (modality && reservation.establishment_id) {
+    const { data: modalityConfig } = await supabase
+      .from("inscription_modalities")
+      .select("description")
+      .eq("establishment_id", reservation.establishment_id)
+      .eq("modality", modality)
+      .eq("is_active", true)
+      .single();
+
+    enriched.modality_description = modalityConfig?.description ?? null;
+  }
+
+  return NextResponse.json({ reservation: enriched });
 }

@@ -100,6 +100,94 @@ export async function signIn(
   redirect(returnTo || dashboardHomeForRole(role));
 }
 
+export async function signInParent(
+  prevState: string | null,
+  formData: FormData
+): Promise<string | null> {
+  const phone = String(formData.get("phone") ?? "").trim();
+  const returnTo = safeReturnPath(String(formData.get("returnTo") ?? "") || null);
+
+  if (!phone) {
+    return "Veuillez saisir votre numéro de téléphone.";
+  }
+
+  const supabase = await createClient();
+
+  // 1. Check if phone exists in students table (parent_phone)
+  const { data: studentMatch } = await supabase
+    .from("students")
+    .select("id")
+    .ilike("parent_phone", phone)
+    .limit(1)
+    .maybeSingle();
+
+  // 2. Check if phone exists in profiles table (parent role)
+  let parentName = "Parent";
+  let phoneFound = !!studentMatch;
+
+  if (!phoneFound) {
+    const { data: profileMatch } = await supabase
+      .from("profiles")
+      .select("id, full_name")
+      .ilike("phone", phone)
+      .eq("role", "parent")
+      .maybeSingle();
+
+    if (profileMatch) {
+      phoneFound = true;
+      parentName = profileMatch.full_name || "Parent";
+    }
+  }
+
+  if (!phoneFound) {
+    return "Ce numéro n'est pas associé à un élève inscrit. Veuillez contacter votre établissement.";
+  }
+
+  // 3. Construct a deterministic email for this phone
+  const authEmail = `${phone}@schooly.parent`;
+  const defaultPassword = "Schooly2024!";
+
+  // 4. Try to sign in — if user doesn't exist, create account first
+  let { error } = await supabase.auth.signInWithOtp({
+    email: authEmail,
+    options: {
+      emailRedirectTo: `${PUBLIC_SITE_URL}/auth/callback`,
+    },
+  });
+
+  if (error) {
+    // User doesn't exist yet — create account via admin client
+    try {
+      const { createAdminClient } = await import("@/lib/supabase/server");
+      const admin = await createAdminClient();
+
+      await admin.auth.admin.createUser({
+        email: authEmail,
+        password: defaultPassword,
+        email_confirm: true,
+        user_metadata: { full_name: parentName, phone, role: "parent" },
+      });
+    } catch {
+      // Account may already exist — proceed to send OTP anyway
+    }
+
+    // Retry sending the magic link
+    const retry = await supabase.auth.signInWithOtp({
+      email: authEmail,
+      options: {
+        emailRedirectTo: `${PUBLIC_SITE_URL}/auth/callback`,
+      },
+    });
+
+    if (retry.error) {
+      return "Impossible d'envoyer le lien de connexion. Veuillez réessayer.";
+    }
+  }
+
+  // 5. Success — inform the user
+  return `__SUCCESS__Lien de connexion envoyé ! Vérifiez votre boîte mail et cliquez sur le lien pour accéder à votre espace parent.`;
+}
+
 export async function signInWithGoogle() {
   const supabase = await createClient();
 
