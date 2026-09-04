@@ -6,6 +6,7 @@ import type { SchoolType } from "@/types";
 import { ConfirmReservationButton } from "./_ops-forms";
 import { fetchOnboardingProgress } from "@/lib/onboarding-intelligence/scoring";
 import type { OnboardingProgress } from "@/lib/onboarding-intelligence/scoring";
+import LogoUpload from "./logo-upload";
 
 export const revalidate = 0;
 
@@ -34,7 +35,7 @@ export default async function AdminDashboardPage() {
   const { data: establishment } = profile?.establishment_id
     ? await supabase
         .from("establishments")
-        .select("id, name, city, school_type, published_to_trouvetou")
+        .select("id, name, city, school_type, published_to_trouvetou, logo_url")
         .eq("id", profile.establishment_id)
         .maybeSingle()
     : { data: null };
@@ -122,6 +123,17 @@ export default async function AdminDashboardPage() {
         {/* Onboarding Assistant (visible tant que completion < 100%) */}
         {showOnboarding && onboarding && (
           <OnboardingAssistant data={onboarding} />
+        )}
+
+        {/* Logo upload */}
+        {estId && (
+          <div className="bg-white rounded-2xl border border-slate-100 p-5">
+            <LogoUpload
+              establishmentId={estId}
+              currentLogoUrl={(establishment as unknown as { logo_url: string | null })?.logo_url ?? null}
+              establishmentName={establishment?.name ?? ""}
+            />
+          </div>
         )}
 
         {/* Header */}

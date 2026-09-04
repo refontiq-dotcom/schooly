@@ -75,32 +75,34 @@ export default async function EmploiDuTempsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-navy">📅 Emploi du temps</h1>
-        <p className="text-sm text-slate-500 mt-1">
-          {DAYS[currentDay]} — {now.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}
-        </p>
-      </div>
-
-      {/* Prochain cours */}
-      {nextSlot && (
-        <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-5 text-white">
-          <p className="text-sm opacity-80 mb-1">Prochain cours</p>
-          <div className="flex items-center gap-3">
-            <span className="text-3xl">📖</span>
-            <div>
-              <p className="text-xl font-bold">{nextSlot.subject}</p>
-              <p className="text-sm opacity-90">
-                {nextSlot.start_time?.slice(0, 5)} — {nextSlot.end_time?.slice(0, 5)}
-                {(nextSlot.sections as unknown as { name: string })?.name &&
-                  ` · ${(nextSlot.sections as unknown as { name: string }).name}`}
-                {nextSlot.room && ` · Salle ${nextSlot.room}`}
-              </p>
+      {/* Hero */}
+      <div className="bg-gradient-to-r from-[#0E2D52] to-[#1A4580] rounded-3xl p-6 lg:p-8 text-white relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-48 h-48 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+        <div className="relative">
+          <p className="text-3xl mb-2">📅</p>
+          <h1 className="text-2xl lg:text-3xl font-bold">Emploi du temps</h1>
+          <p className="text-sm opacity-80 mt-1">
+            {DAYS[currentDay]} — {now.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}
+          </p>
+          {nextSlot && (
+            <div className="mt-4 bg-white/15 backdrop-blur-sm rounded-2xl p-4">
+              <p className="text-xs opacity-60 mb-1">Prochain cours</p>
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">📖</span>
+                <div>
+                  <p className="text-lg font-bold">{nextSlot.subject}</p>
+                  <p className="text-sm opacity-80">
+                    {nextSlot.start_time?.slice(0, 5)} — {nextSlot.end_time?.slice(0, 5)}
+                    {(nextSlot.sections as unknown as { name: string })?.name &&
+                      ` · ${(nextSlot.sections as unknown as { name: string }).name}`}
+                    {nextSlot.room && ` · Salle ${nextSlot.room}`}
+                  </p>
+                </div>
+              </div>
             </div>
-          </div>
+          )}
         </div>
-      )}
+      </div>
 
       {/* Aujourd'hui - liste */}
       {todaySlots.length > 0 && (

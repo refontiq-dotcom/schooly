@@ -10,7 +10,6 @@ export default async function PresencesPage() {
     redirect("/auth?returnTo=/dashboard/professeur/presences");
   }
 
-  // Récupérer les sections assignées au professeur
   const { data: assignments } = profile?.role === "professeur"
     ? await supabase
         .from("teacher_assignments")
@@ -18,7 +17,6 @@ export default async function PresencesPage() {
         .eq("teacher_id", profile.id)
     : { data: null };
 
-  // Si admin, récupérer toutes les sections
   const { data: allSections } = profile?.role === "admin"
     ? await supabase
         .from("sections")
@@ -26,7 +24,13 @@ export default async function PresencesPage() {
     : { data: null };
 
   const sections = profile?.role === "admin"
-    ? allSections ?? []
+    ? (allSections ?? []).map((s) => ({
+        id: s.id,
+        name: s.name,
+        capacity: s.capacity,
+        seats_taken: s.seats_taken,
+        levels: (s as unknown as { levels: { name: string } | null }).levels ?? null,
+      }))
     : (assignments ?? []).map((a) => ({
         id: a.section_id,
         name: (a.sections as unknown as { name: string })?.name ?? "",
@@ -35,7 +39,6 @@ export default async function PresencesPage() {
         levels: (a.sections as unknown as { levels: { name: string } | null })?.levels ?? null,
       }));
 
-  // Stats de présence récentes par section
   const today = new Date().toISOString().slice(0, 10);
   const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
 
@@ -48,7 +51,6 @@ export default async function PresencesPage() {
         .gte("session_date", thirtyDaysAgo)
     : { data: null };
 
-  // Calcul des stats par section
   const statsMap = new Map<string, { total: number; present: number; todayDone: boolean }>();
   for (const rec of recentAttendance ?? []) {
     const stat = statsMap.get(rec.section_id) ?? { total: 0, present: 0, todayDone: false };
@@ -59,130 +61,123 @@ export default async function PresencesPage() {
   }
 
   const todayRecords = (recentAttendance ?? []).filter((r) => r.session_date === today);
+  const totalTodayPresent = todayRecords.filter((r) => r.present).length;
+  const totalTodayAbsent = todayRecords.filter((r) => !r.present).length;
+  const completedCount = [...statsMap.values()].filter((s) => s.todayDone).length;
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Hero */}
+      <div className="bg-gradient-to-r from-emerald-500 to-teal-600 rounded-3xl p-6 lg:p-8 text-white relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-48 h-48 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+        <div className="relative">
+          <p className="text-3xl mb-2">✅</p>
+          <h1 className="text-2xl lg:text-3xl font-bold">Présences</h1>
+          <p className="text-sm opacity-80 mt-1">
+            {new Date().toLocaleDateString("fr-FR", {
+              weekday: "long",
+              day: "numeric",
+              month: "long",
+              year: "numeric",
+            })}
+          </p>
+          <div className="flex gap-4 mt-4">
+            <div className="bg-white/15 backdrop-blur-sm rounded-xl px-4 py-2">
+              <p className="text-xl font-bold">{totalTodayPresent}</p>
+              <p className="text-xs opacity-60">Présents</p>
+            </div>
+            <div className="bg-white/15 backdrop-blur-sm rounded-xl px-4 py-2">
+              <p className="text-xl font-bold">{totalTodayAbsent}</p>
+              <p className="text-xs opacity-60">Absents</p>
+            </div>
+            <div className="bg-white/15 backdrop-blur-sm rounded-xl px-4 py-2">
+              <p className="text-xl font-bold">{completedCount}/{sections.length}</p>
+              <p className="text-xs opacity-60">Fait</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Classes grid */}
       <div>
-        <h1 className="text-2xl font-bold text-navy">✅ Gestion des présences</h1>
-        <p className="text-sm text-slate-500 mt-1">
-          {new Date().toLocaleDateString("fr-FR", {
-            weekday: "long",
-            day: "numeric",
-            month: "long",
-            year: "numeric",
-          })}
-        </p>
-      </div>
+        <h2 className="font-bold text-navy text-lg mb-4">Sélectionnez une classe</h2>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {sections.map((section) => {
+            const stat = statsMap.get(section.id);
+            const rate = stat && stat.total > 0
+              ? Math.round((stat.present / stat.total) * 100)
+              : null;
+            const todayDone = stat?.todayDone ?? false;
+            const levelName = (section.levels as unknown as { name: string } | null)?.name ?? "";
 
-      {/* Stats du jour */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="card bg-gradient-to-br from-emerald-50 to-emerald-100 border-emerald-200">
-          <p className="text-3xl mb-1">🟢</p>
-          <p className="text-2xl font-bold text-emerald-700">
-            {todayRecords.filter((r) => r.present).length}
-          </p>
-          <p className="text-xs text-emerald-600">Présents aujourd&apos;hui</p>
-        </div>
-        <div className="card bg-gradient-to-br from-red-50 to-red-100 border-red-200">
-          <p className="text-3xl mb-1">🔴</p>
-          <p className="text-2xl font-bold text-red-700">
-            {todayRecords.filter((r) => !r.present).length}
-          </p>
-          <p className="text-xs text-red-600">Absents aujourd&apos;hui</p>
-        </div>
-        <div className="card bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
-          <p className="text-3xl mb-1">📋</p>
-          <p className="text-2xl font-bold text-blue-700">{sections.length}</p>
-          <p className="text-xs text-blue-600">Mes classes</p>
-        </div>
-        <div className="card bg-gradient-to-br from-amber-50 to-amber-100 border-amber-200">
-          <p className="text-3xl mb-1">⏳</p>
-          <p className="text-2xl font-bold text-amber-700">
-            {sections.length - [...statsMap.values()].filter((s) => s.todayDone).length}
-          </p>
-          <p className="text-xs text-amber-600">À faire</p>
-        </div>
-      </div>
-
-      {/* Liste des classes */}
-      <div className="space-y-3">
-        <h2 className="font-semibold text-navy text-sm uppercase tracking-wide">
-          Choisir une classe pour la présence
-        </h2>
-        {sections.map((section) => {
-          const stat = statsMap.get(section.id);
-          const rate = stat && stat.total > 0
-            ? Math.round((stat.present / stat.total) * 100)
-            : null;
-          const todayDone = stat?.todayDone ?? false;
-
-          return (
-            <Link
-              key={section.id}
-              href={`/dashboard/professeur/classe/${section.id}`}
-              className={`block p-4 rounded-2xl border transition-all hover:shadow-md ${
-                todayDone
-                  ? "bg-white border-emerald-200"
-                  : "bg-white border-slate-200 hover:border-blue-300"
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
+            return (
+              <Link
+                key={section.id}
+                href={`/dashboard/professeur/classe/${section.id}`}
+                className="block bg-white rounded-2xl border border-slate-200 p-5 hover:shadow-lg hover:border-blue-300 transition-all group relative overflow-hidden"
+              >
+                {todayDone && (
+                  <div className="absolute top-3 right-3">
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-bold">
+                      ✓ FAIT
+                    </span>
+                  </div>
+                )}
+                <div className="flex items-center gap-3 mb-3">
                   <div
-                    className={`w-12 h-12 rounded-xl flex items-center justify-center text-lg font-bold ${
+                    className={`w-12 h-12 rounded-2xl flex items-center justify-center text-lg font-bold shadow-md ${
                       todayDone
-                        ? "bg-emerald-100 text-emerald-600"
-                        : "bg-blue-100 text-blue-600"
+                        ? "bg-gradient-to-br from-emerald-400 to-teal-500 text-white shadow-emerald-500/20"
+                        : "bg-gradient-to-br from-blue-400 to-indigo-500 text-white shadow-blue-500/20"
                     }`}
                   >
-                    {todayDone ? "✓" : "📝"}
+                    {todayDone ? "✓" : levelName.slice(0, 2)}
                   </div>
-                  <div>
-                    <p className="font-semibold text-navy text-sm">
-                      {(section.levels as unknown as { name: string } | null)?.name ?? ""}{" "}
-                      {section.name}
+                  <div className="min-w-0">
+                    <p className="font-bold text-navy text-sm">
+                      {levelName} {section.name}
                     </p>
                     <p className="text-xs text-slate-400">
                       {section.seats_taken} / {section.capacity} élèves
                     </p>
                   </div>
                 </div>
-                <div className="text-right">
-                  {rate !== null ? (
-                    <div>
-                      <p
-                        className={`text-lg font-bold ${
-                          rate >= 90
-                            ? "text-emerald-600"
-                            : rate >= 75
-                            ? "text-amber-600"
-                            : "text-red-600"
+
+                {rate !== null ? (
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs text-slate-500">Taux 30j</span>
+                      <span
+                        className={`text-sm font-bold ${
+                          rate >= 90 ? "text-emerald-600" : rate >= 75 ? "text-amber-600" : "text-red-600"
                         }`}
                       >
                         {rate}%
-                      </p>
-                      <p className="text-[10px] text-slate-400">30 jours</p>
+                      </span>
                     </div>
-                  ) : (
-                    <p className="text-sm text-slate-300">—</p>
-                  )}
-                  {todayDone && (
-                    <span className="inline-block mt-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-semibold">
-                      FAIT
-                    </span>
-                  )}
-                </div>
-              </div>
-            </Link>
-          );
-        })}
-        {sections.length === 0 && (
-          <div className="text-center py-12 text-slate-400">
-            <p className="text-4xl mb-3">📚</p>
-            <p>Aucune classe assignée.</p>
-          </div>
-        )}
+                    <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all ${
+                          rate >= 90 ? "bg-emerald-500" : rate >= 75 ? "bg-amber-500" : "bg-red-500"
+                        }`}
+                        style={{ width: `${rate}%` }}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-300 text-center py-1">Aucune donnée</p>
+                )}
+              </Link>
+            );
+          })}
+
+          {sections.length === 0 && (
+            <div className="bg-white rounded-2xl border border-dashed border-slate-300 p-8 text-center sm:col-span-2 lg:col-span-3">
+              <p className="text-4xl mb-3">📚</p>
+              <p className="text-slate-500 font-medium">Aucune classe assignée</p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
