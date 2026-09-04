@@ -28,10 +28,10 @@ grant select on all tables in schema public to anon;
 grant all on all sequences in schema public to anon, authenticated, service_role;
 
 -- Fonctions RPC appelées par l'application (re-grant idempotent par sécurité)
-grant execute on function public.ensure_own_profile() to authenticated;
-grant execute on function public.create_establishment_as_admin(text, text, text, text) to authenticated;
-grant execute on function public.accept_staff_invitation(uuid) to authenticated;
-grant execute on function public.finalize_reservation(uuid) to authenticated;
+
+-- grant execute on function public.create_establishment_as_admin(text, text, text, text) to authenticated;
+-- grant execute on function public.accept_staff_invitation(uuid) to authenticated;
+-- grant execute on function public.finalize_reservation(uuid) to authenticated;
 
 -- ----------------------------------------------------------------------------
 -- 2. Helper RLS : lit le profil de l'utilisateur courant SANS déclencher la
@@ -50,7 +50,7 @@ as $$
   where p.id = auth.uid();
 $$;
 
-grant execute on function public.my_profile() to anon, authenticated, service_role;
+-- grant execute on function public.my_profile() to anon, authenticated, service_role;
 
 -- ----------------------------------------------------------------------------
 -- 3. Reconstruit TOUTES les policies de `profiles`, quels que soient leurs

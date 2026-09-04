@@ -3,6 +3,27 @@
 Plateforme de réservation de place scolaire et de gestion d'établissement,
 connectée à **Trouvetou**. Développé par **Refontiq** (Abidjan, Côte d'Ivoire).
 
+## Intégration Trouvetou
+
+Un administrateur peut publier ou retirer son établissement depuis son dashboard.
+Les établissements non publiés ne sont jamais retournés par l'API partenaire.
+
+L'API est protégée par `TROUVETOU_API_KEY_PEPPER` et attend l'en-tête
+`Authorization: Bearer <clé>` :
+
+```text
+GET  /api/trouvetou   # établissements publiés dans la catégorie "ecoles" + places
+POST /api/trouvetou   # crée une réservation en attente de paiement
+POST /api/trouvetou/reservations/:id/payment # confirme le paiement et la place
+```
+
+Le premier `POST` attend `establishment_id`, `level_id`, `student_full_name`,
+`parent_full_name` et `parent_phone`, avec `student_birthdate` et
+`parent_email` facultatifs. Il retourne un dossier `pending_payment`.
+Après paiement confirmé par Trouvetou, le second `POST` attend `payment_reference`
+et `amount_paid`. Schooly réserve alors la place de manière atomique et retourne
+le QR code. La réponse est `409` lorsqu'il n'y a plus de place.
+
 Ce dépôt contient la **version 1 (MVP)** telle que définie dans le cahier des
 charges — Phase 1 :
 
@@ -34,6 +55,21 @@ Sur [supabase.com](https://supabase.com), créez un projet, puis dans
 supabase/schema.sql                                  # tables, fonctions, RLS (base + school_type)
 supabase/migration-operations.sql                    # rentrée, paiements, documents, messages
 supabase/migrations/20260902180000_internat_module.sql  # module internat
+supabase/migrations/20260902190000_trouvetou_integration.sql # publication + API Trouvetou
+supabase/migrations/20260902200000_trouvetou_payment_flow.sql # paiement partenaire
+supabase/migrations/20260903090000_reservation_intelligence.sql # scoring parent + anti-fraude + file d'attente + dashboard conversion (voir RESERVATION_INTELLIGENCE.md)
+supabase/migrations/20260903100000_payment_intelligence.sql # scoring risque impayé + détection anomalies + réconciliation MM + vues agrégées (voir PAYMENT_INTELLIGENCE.md)
+supabase/migrations/20260903110000_teacher_intelligence.sql # agrégats classe + détection décrochage + prédiction moyenne + saisie en lot (voir TEACHER_INTELLIGENCE.md)
+supabase/migrations/20260903120000_parent_intelligence.sql # synthèse 360° par enfant + alertes + score satisfaction + résumé WhatsApp (voir PARENT_INTELLIGENCE.md)
+supabase/migrations/20260903130000_internat_intelligence.sql # dashboard temps réel + élèves à risque + santé + rotation lits + tendances occupation (voir INTERNAT_INTELLIGENCE.md)
+supabase/migrations/20260903140000_classes_intelligence.sql # taux de remplissage sections + alertes déséquilibre + charge profs + suggestion section (voir CLASSES_INTELLIGENCE.md)
+supabase/migrations/20260903150000_teacher_intelligence_v2.sql # vue par prof (workload + homeroom + élèves à risque + comparatif + retards de saisie) (voir TEACHER_INTELLIGENCE_V2.md)
+supabase/migrations/20260903160000_secretariat_intelligence.sql # agrégat actions du jour + complétude dossiers + file QR + finalisation atomique (voir SECRETARIAT_INTELLIGENCE.md)
+supabase/migrations/20260903170000_trouvetou_intelligence.sql # catalogue public + performance par établissement + pubs + entonnoir conversion (voir TROUVETOU_INTELLIGENCE.md)
+supabase/migrations/20260903180000_messages_intelligence.sql # non-lus + activité + threads + engagement + urgents non répondus + mark read bulk (voir MESSAGES_INTELLIGENCE.md)
+supabase/migrations/20260903190000_team_intelligence.sql # effectif par rôle + inactifs + stats staffing + engagement parents + export JSON (voir TEAM_INTELLIGENCE.md)
+supabase/migrations/20260903200000_onboarding_intelligence.sql # état onboarding (10 étapes) + établissements incomplets + agrégat par type + création atomique (voir ONBOARDING_INTELLIGENCE.md)
+supabase/migrations/20260903210000_auth_health.sql # cohérence auth.users↔profiles + orphelins + inscriptions incomplètes + doublons + bannis (voir AUTH_HEALTH.md)
 supabase/fix-grants-and-rls.sql                      # correctifs grants + RLS profiles (anti-récursion)
 supabase/seed.sql                                    # données de démonstration (optionnel)
 ```
@@ -47,7 +83,8 @@ supabase/seed.sql                                    # données de démonstratio
 ```bash
 cp .env.example .env.local
 # Renseignez NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY,
-# SUPABASE_SERVICE_ROLE_KEY depuis Project Settings > API sur Supabase.
+# SUPABASE_SERVICE_ROLE_KEY depuis Project Settings > API sur Supabase,
+# et TROUVETOU_API_KEY_PEPPER avec la même valeur configurée dans Trouvetou.
 ```
 
 ### 3. Installer et lancer
@@ -79,6 +116,39 @@ L'application est disponible sur `http://localhost:3000`.
 - `/dashboard/admin/rentree` — publication des listes de rentrée
 - `/dashboard/admin/documents` — validation des pièces administratives
 - `/dashboard/admin/messages` — communication avec les parents
+
+## État du projet — 12 modules intelligence livrés (2026-09-03)
+
+Depuis la dernière publication v1, **12 modules intelligence** ont été ajoutés en plus de la base :
+Réservation, Paiement, Professeur (v1 + v2), Parent, Internat, Classes, Secrétariat,
+Trouvetou, Messagerie, Équipe, Onboarding, Auth Health. **186/186 tests Vitest passent**.
+
+Chaque module a :
+- Une migration SQL idempotente (`supabase/migrations/<date>_<module>_intelligence.sql`)
+- Un miroir TypeScript strict (`src/lib/<module>-intelligence/scoring.ts`)
+- Des tests Vitest (`src/lib/<module>-intelligence/__tests__/scoring.test.ts`)
+- Une doc détaillée (`<MODULE>_INTELLIGENCE.md` à la racine)
+
+Voir le détail complet dans **[CHANGELOG.md](./CHANGELOG.md)**.
+
+**Pour exécuter toutes les migrations intelligence** (dans l'ordre, dans Supabase SQL Editor) :
+
+```sql
+supabase/migrations/20260903090000_reservation_intelligence.sql
+supabase/migrations/20260903100000_payment_intelligence.sql
+supabase/migrations/20260903110000_teacher_intelligence.sql
+supabase/migrations/20260903120000_parent_intelligence.sql
+supabase/migrations/20260903130000_internat_intelligence.sql
+supabase/migrations/20260903140000_classes_intelligence.sql
+supabase/migrations/20260903150000_teacher_intelligence_v2.sql
+supabase/migrations/20260903160000_secretariat_intelligence.sql
+supabase/migrations/20260903170000_trouvetou_intelligence.sql
+supabase/migrations/20260903180000_messages_intelligence.sql
+supabase/migrations/20260903190000_team_intelligence.sql
+supabase/migrations/20260903200000_onboarding_intelligence.sql
+supabase/migrations/20260903210000_auth_health.sql
+supabase/migrations/20260904080000_school_health_intelligence.sql  -- méta-vue agrégée
+```
 
 ## Logique métier clé : anti-survente
 
@@ -139,8 +209,24 @@ Voir le cahier des charges complet pour le détail des phases. Non couvert ici :
 ```
 schooly/
 ├── supabase/
-│   ├── schema.sql          # tables, fonctions, RLS
-│   └── seed.sql            # données de démonstration
+│   ├── schema.sql                              # tables, fonctions, RLS (base)
+│   ├── migration-operations.sql                # rentrée, paiements, documents
+│   ├── migrations/                             # migrations intelligence (13 modules)
+│   │   ├── 20260903090000_reservation_intelligence.sql
+│   │   ├── 20260903100000_payment_intelligence.sql
+│   │   ├── 20260903110000_teacher_intelligence.sql
+│   │   ├── 20260903120000_parent_intelligence.sql
+│   │   ├── 20260903130000_internat_intelligence.sql
+│   │   ├── 20260903140000_classes_intelligence.sql
+│   │   ├── 20260903150000_teacher_intelligence_v2.sql
+│   │   ├── 20260903160000_secretariat_intelligence.sql
+│   │   ├── 20260903170000_trouvetou_intelligence.sql
+│   │   ├── 20260903180000_messages_intelligence.sql
+│   │   ├── 20260903190000_team_intelligence.sql
+│   │   ├── 20260903200000_onboarding_intelligence.sql
+│   │   ├── 20260903210000_auth_health.sql
+│   │   └── 20260904080000_school_health_intelligence.sql
+│   └── seed.sql                                # données de démonstration
 ├── automation/
 │   └── n8n-weekly-whatsapp-summary.README.md
 ├── src/
@@ -149,17 +235,44 @@ schooly/
 │   │   ├── etablissement/[id]/               # fiche + réservation
 │   │   ├── reservation/confirmation/[id]/    # paiement + QR code
 │   │   ├── dashboard/
-│   │   │   ├── admin/                        # config classes & quotas
+│   │   │   ├── admin/                        # config classes/quotas + OnboardingAssistant
 │   │   │   ├── professeur/                   # présences & notes
 │   │   │   ├── secretariat/                  # scan QR + finalisation
 │   │   │   └── parent/                       # suivi enfant
 │   │   ├── auth/                             # connexion / inscription parent / invitation
 │   │   ├── onboarding/etablissement/         # création d'établissement → rôle admin
 │   │   └── api/reservations/                 # endpoints réservation
-│   ├── lib/auth/             # actions, rôles, session + sync profiles
-│   ├── lib/supabase/         # clients Supabase (browser/server/admin)
-│   └── types/                # types TypeScript partagés
-└── README.md
+│   ├── lib/
+│   │   ├── auth/                             # actions, rôles, session + sync profiles
+│   │   ├── auth-health/                      # cohérence auth.users ↔ profiles
+│   │   ├── classes-intelligence/             # miroir TS Classes
+│   │   ├── internat-intelligence/            # miroir TS Internat
+│   │   ├── messages-intelligence/            # miroir TS Messagerie
+│   │   ├── onboarding-intelligence/          # miroir TS Onboarding (10 étapes)
+│   │   ├── parent-intelligence/              # miroir TS Parent
+│   │   ├── payment-intelligence/             # miroir TS Paiement
+│   │   ├── reservation-intelligence/         # miroir TS Réservation
+│   │   ├── secretariat-intelligence/         # miroir TS Secrétariat
+│   │   ├── supabase/                         # clients Supabase (browser/server/admin)
+│   │   ├── teacher-intelligence/             # miroir TS Professeur (v1 + v2)
+│   │   ├── team-intelligence/                # miroir TS Équipe
+│   │   └── trouvetou-intelligence/           # miroir TS Trouvetou
+│   └── types/                                # types TypeScript partagés
+├── CHANGELOG.md                              # historique détaillé
+├── README.md
+├── AGENTS.md
+├── RESERVATION_INTELLIGENCE.md                # doc par module
+├── PAYMENT_INTELLIGENCE.md
+├── TEACHER_INTELLIGENCE.md
+├── TEACHER_INTELLIGENCE_V2.md
+├── PARENT_INTELLIGENCE.md
+├── INTERNAT_INTELLIGENCE.md
+├── CLASSES_INTELLIGENCE.md
+├── SECRETARIAT_INTELLIGENCE.md
+├── MESSAGES_INTELLIGENCE.md
+├── TEAM_INTELLIGENCE.md
+├── ONBOARDING_INTELLIGENCE.md
+└── AUTH_HEALTH.md
 ```
 
 ## Licence

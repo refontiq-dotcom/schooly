@@ -1,59 +1,56 @@
-import { redirect } from "next/navigation";
+import Link from "next/link";
+import { IconBackpack, IconBed, IconChat, IconFile, IconHome, IconWallet } from "@/components/icons";
 import { getSessionProfile } from "@/lib/auth/session";
-import { findParentStudents, groupByEstablishment, resolveEstablishmentId } from "@/lib/parent/context";
-import ParentSidebar from "./parent-sidebar";
-import type { Metadata } from "next";
 
-export const metadata: Metadata = {
-  title: "Espace parent — Schooly",
-};
-
-export default async function ParentLayout({
-  children,
-  searchParams,
-}: {
-  children: React.ReactNode;
-  searchParams: Promise<{ estab?: string; student?: string }>;
-}) {
+export default async function ParentLayout({ children }: { children: React.ReactNode }) {
   const { supabase, user } = await getSessionProfile();
 
-  if (!user || !supabase) {
-    redirect("/auth?returnTo=/dashboard/parent");
+  let hasInternat = false;
+  if (user && supabase) {
+    const { data: students } = await supabase
+      .from("students")
+      .select("id")
+      .eq("parent_id", user.id);
+    const studentIds = (students ?? []).map((s) => s.id);
+    if (studentIds.length > 0) {
+      const { count } = await supabase
+        .from("internat_assignments")
+        .select("id", { count: "exact", head: true })
+        .in("student_id", studentIds)
+        .eq("status", "actif");
+      hasInternat = Boolean(count && count > 0);
+    }
   }
 
-  const params = await searchParams;
-  const students = await findParentStudents(supabase, user.id);
-  const groups = groupByEstablishment(students);
-  const selectedEstabId = resolveEstablishmentId(groups, params.estab ?? null);
-
-  // Find the selected student within the selected establishment
-  const selectedGroup = groups.find((g) => g.establishment.id === selectedEstabId);
-  const currentStudents = selectedGroup?.students ?? [];
-  const selectedStudentId = params.student ?? currentStudents[0]?.id ?? null;
-
-  // Serialize for client component
-  const establishments = groups.map((g) => ({
-    id: g.establishment.id,
-    name: g.establishment.name,
-    city: g.establishment.city,
-    students: g.students.map((s) => ({
-      id: s.id,
-      full_name: s.full_name,
-      section_name: s.sections?.name,
-      level_name: s.sections?.levels?.name,
-    })),
-  }));
+  const items = [
+    { href: "/dashboard/parent", label: "Suivi", icon: IconHome },
+    { href: "/dashboard/parent/rentree", label: "Rentrée", icon: IconBackpack },
+    { href: "/dashboard/parent/paiements", label: "Paiements", icon: IconWallet },
+    { href: "/dashboard/parent/documents", label: "Documents", icon: IconFile },
+    { href: "/dashboard/parent/messages", label: "Messages", icon: IconChat },
+    ...(hasInternat
+      ? [{ href: "/dashboard/parent/internat", label: "Internat", icon: IconBed }]
+      : []),
+  ];
 
   return (
-    <div className="flex h-screen gap-0">
-      <ParentSidebar
-        establishments={establishments}
-        selectedEstablishmentId={selectedEstabId}
-      />
-      <main className="flex-1 overflow-y-auto">
-        {/* Inject student/establishment context into children via search params is handled by the pages reading searchParams */}
-        {children}
-      </main>
+    <div className="space-y-6">
+      <nav className="flex gap-2 overflow-x-auto pb-1" aria-label="Espace parent">
+        {items.map((item) => {
+          const Icon = item.icon;
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:border-amber-300 hover:text-amber-700 transition-colors whitespace-nowrap"
+            >
+              <Icon className="w-4 h-4" />
+              {item.label}
+            </Link>
+          );
+        })}
+      </nav>
+      {children}
     </div>
   );
 }

@@ -5,9 +5,12 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import type { InternatBlock } from "@/types";
 import { INTERNAT_GENDER_LABELS, INTERNAT_GENDER_ICONS } from "@/types";
+import { fetchInternatDashboard } from "@/lib/internat-intelligence/scoring";
+import type { InternatDashboardRow } from "@/lib/internat-intelligence/scoring";
 
 export default function BatimentsPage() {
   const [blocks, setBlocks] = useState<InternatBlock[]>([]);
+  const [dashboard, setDashboard] = useState<InternatDashboardRow | null>(null);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
@@ -32,15 +35,24 @@ export default function BatimentsPage() {
       .eq("id", user.id)
       .single();
 
-    if (!profile?.establishment_id) return;
+    if (!profile?.establishment_id) {
+      setLoading(false);
+      return;
+    }
 
-    const { data } = await supabase
-      .from("internat_blocks")
-      .select("*")
-      .eq("establishment_id", profile.establishment_id)
-      .order("name");
+    const estId = profile.establishment_id;
 
-    if (data) setBlocks(data);
+    const [blocksRes, dash] = await Promise.all([
+      supabase
+        .from("internat_blocks")
+        .select("*")
+        .eq("establishment_id", estId)
+        .order("name"),
+      fetchInternatDashboard(supabase, estId),
+    ]);
+
+    if (blocksRes.data) setBlocks(blocksRes.data);
+    setDashboard(dash);
     setLoading(false);
   }
 
@@ -77,7 +89,6 @@ export default function BatimentsPage() {
 
   async function handleDelete(id: string) {
     if (!confirm("Supprimer ce bâtiment et toutes ses chambres ?")) return;
-    
     const supabase = createClient();
     await supabase.from("internat_blocks").delete().eq("id", id);
     loadBlocks();
@@ -85,7 +96,6 @@ export default function BatimentsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 text-sm text-slate-500 mb-1">
@@ -109,7 +119,31 @@ export default function BatimentsPage() {
         </button>
       </div>
 
-      {/* Create Form Modal */}
+      {/* Bandeau d'intelligence */}
+      {dashboard && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="bg-white rounded-2xl p-5 border border-slate-100">
+            <p className="text-xs text-slate-500">Capacité totale</p>
+            <p className="text-2xl font-bold text-slate-800 mt-1">{dashboard.total_beds}</p>
+            <p className="text-xs text-slate-400 mt-1">
+              {dashboard.occupied_beds} occupés · {dashboard.free_beds} libres · {dashboard.maintenance_beds} maintenance
+            </p>
+          </div>
+          <div className="bg-white rounded-2xl p-5 border border-slate-100">
+            <p className="text-xs text-slate-500">Incidents 30j</p>
+            <p className="text-2xl font-bold text-slate-800 mt-1">{dashboard.incidents_30d}</p>
+            <p className="text-xs text-slate-400 mt-1">
+              {dashboard.incidents_7d} sur 7j · {dashboard.grave_open_incidents} grave(s) ouvert(s)
+            </p>
+          </div>
+          <div className="bg-white rounded-2xl p-5 border border-slate-100">
+            <p className="text-xs text-slate-500">Visites du jour</p>
+            <p className="text-2xl font-bold text-slate-800 mt-1">{dashboard.visits_today}</p>
+            <p className="text-xs text-slate-400 mt-1">Registre des visiteurs</p>
+          </div>
+        </div>
+      )}
+
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="bg-white rounded-2xl p-6 w-full max-w-md mx-4 shadow-xl">
@@ -126,7 +160,7 @@ export default function BatimentsPage() {
                   required
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Type</label>
                 <div className="grid grid-cols-3 gap-2">
@@ -181,7 +215,6 @@ export default function BatimentsPage() {
         </div>
       )}
 
-      {/* Blocks Grid */}
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {[1, 2, 3].map((i) => (
@@ -191,9 +224,7 @@ export default function BatimentsPage() {
       ) : blocks.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-2xl border border-slate-100">
           <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75M6.75 21v-3.375c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21M3 3h12m-.75 4.5H21m-3.75 3h.008v.008h-.008v-.008zm0 3h.008v.008h-.008v-.008zm0 3h.008v.008h-.008v-.008z" />
-            </svg>
+            <span className="text-2xl">🏗️</span>
           </div>
           <h3 className="text-lg font-semibold text-slate-700 mb-2">Aucun bâtiment</h3>
           <p className="text-sm text-slate-500 mb-4">Commencez par ajouter un bâtiment à l&apos;internat</p>
@@ -201,9 +232,6 @@ export default function BatimentsPage() {
             onClick={() => setShowForm(true)}
             className="inline-flex items-center gap-2 px-4 py-2.5 bg-amber-500 text-white rounded-xl text-sm font-medium hover:bg-amber-600 transition-colors"
           >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-            </svg>
             Ajouter un bâtiment
           </button>
         </div>
@@ -214,7 +242,6 @@ export default function BatimentsPage() {
               key={block.id}
               className="bg-white rounded-2xl border border-slate-100 overflow-hidden hover:shadow-lg transition-shadow"
             >
-              {/* Header */}
               <div className={`p-5 ${
                 block.gender === "garcon" ? "bg-blue-50" :
                 block.gender === "fille" ? "bg-pink-50" :
@@ -238,14 +265,13 @@ export default function BatimentsPage() {
                   </button>
                 </div>
               </div>
-              
-              {/* Stats */}
+
               <div className="p-5">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-slate-500">Capacité</span>
                   <span className="font-bold text-slate-800">{block.capacity} lits</span>
                 </div>
-                
+
                 <Link
                   href={`/dashboard/admin/internat/batiments/${block.id}`}
                   className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 text-white text-sm font-medium hover:bg-slate-800 transition-colors"

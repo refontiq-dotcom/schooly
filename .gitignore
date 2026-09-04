@@ -23,3 +23,19 @@ yarn-error.log*
 
 # TypeScript
 *.tsbuildinfo
+
+# Playwright
+/playwright-report/
+/test-results/
+/e2e/test-ids.json
+
+# Supabase local
+/.supabase/
+
+# Lockfiles — un seul gestionnaire de paquets pour ce projet (npm).
+# package-lock.json est committé volontairement ; les autres sont ignorés
+# pour éviter une résolution de dépendances divergente entre environnements.
+bun.lock
+bun.lockb
+yarn.lock
+pnpm-lock.yaml

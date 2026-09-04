@@ -10,12 +10,16 @@ export default function StudentRow({
   studentName,
   initialPresent,
   average,
+  prediction,
+  atRisk,
 }: {
   studentId: string;
   sectionId: string;
   studentName: string;
   initialPresent: boolean;
   average: string;
+  prediction?: string;
+  atRisk?: boolean;
 }) {
   const router = useRouter();
   const [present, setPresent] = useState(initialPresent);
@@ -69,8 +73,11 @@ export default function StudentRow({
   }
 
   return (
-    <tr className="border-b border-slate-100 last:border-0">
-      <td className="py-2 font-medium">{studentName}</td>
+    <tr className={`border-b border-slate-100 last:border-0 ${atRisk ? "bg-red-50" : ""}`}>
+      <td className="py-2 font-medium flex items-center gap-2">
+        {studentName}
+        {atRisk && <span className="badge-danger text-[10px]">⚠️</span>}
+      </td>
       <td className="py-2">
         <button
           onClick={togglePresence}
@@ -79,6 +86,8 @@ export default function StudentRow({
           {present ? "Présent" : "Absent"}
         </button>
       </td>
+      <td className="py-2 text-slate-600 tabular-nums">{average}</td>
+      <td className="py-2 text-slate-500 tabular-nums text-xs">{prediction ?? "—"}</td>
       <td className="py-2">
         <div className="flex gap-2">
           <input
@@ -96,7 +105,6 @@ export default function StudentRow({
           </button>
         </div>
       </td>
-      <td className="py-2 text-slate-600">{average}</td>
     </tr>
   );
 }

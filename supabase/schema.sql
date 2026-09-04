@@ -134,7 +134,9 @@ do $$ begin
     'reserved',
     'confirmed',
     'expired',
-    'cancelled'
+    'cancelled',
+    'waitlisted',
+    'rejected_fraud'
   );
 exception
   when duplicate_object then null;

@@ -81,6 +81,31 @@ grant execute on function public.create_establishment_as_admin(text, text, text,
 -- SCHOOLY — Module Internat (10 tables)
 -- ============================================================================
 
+do $$ begin
+  create type internat_gender as enum ('garcon', 'fille', 'mixte');
+exception when duplicate_object then null; end $$;
+do $$ begin
+  create type internat_room_status as enum ('disponible', 'maintenance', 'complet');
+exception when duplicate_object then null; end $$;
+do $$ begin
+  create type internat_bed_status as enum ('libre', 'occupe', 'maintenance');
+exception when duplicate_object then null; end $$;
+do $$ begin
+  create type internat_assignment_status as enum ('actif', 'suspendu', 'termine');
+exception when duplicate_object then null; end $$;
+do $$ begin
+  create type internat_roll_call_type as enum ('matin', 'soir');
+exception when duplicate_object then null; end $$;
+do $$ begin
+  create type internat_meal_type as enum ('petit_dejeuner', 'dejeuner', 'diner');
+exception when duplicate_object then null; end $$;
+do $$ begin
+  create type internat_incident_severity as enum ('mineur', 'majeur', 'grave');
+exception when duplicate_object then null; end $$;
+do $$ begin
+  create type internat_incident_category as enum ('discipline', 'sante', 'comportement', 'autre');
+exception when duplicate_object then null; end $$;
+
 -- 1. BÂTIMENTS
 create table if not exists internat_blocks (
   id uuid primary key default gen_random_uuid(),
@@ -91,10 +116,6 @@ create table if not exists internat_blocks (
   created_at timestamptz not null default now(),
   unique (establishment_id, name)
 );
-
-do $$ begin
-  create type internat_gender as enum ('garcon', 'fille', 'mixte');
-exception when duplicate_object then null; end $$;
 
 -- 2. CHAMBRES
 create table if not exists internat_rooms (
@@ -107,10 +128,6 @@ create table if not exists internat_rooms (
   unique (block_id, number)
 );
 
-do $$ begin
-  create type internat_room_status as enum ('disponible', 'maintenance', 'complet');
-exception when duplicate_object then null; end $$;
-
 -- 3. LITS
 create table if not exists internat_beds (
   id uuid primary key default gen_random_uuid(),
@@ -120,10 +137,6 @@ create table if not exists internat_beds (
   created_at timestamptz not null default now(),
   unique (room_id, bed_number)
 );
-
-do $$ begin
-  create type internat_bed_status as enum ('libre', 'occupe', 'maintenance');
-exception when duplicate_object then null; end $$;
 
 -- 4. AFFECTATIONS
 create table if not exists internat_assignments (
@@ -140,10 +153,6 @@ create table if not exists internat_assignments (
   unique (bed_id, academic_year)
 );
 
-do $$ begin
-  create type internat_assignment_status as enum ('actif', 'suspendu', 'termine');
-exception when duplicate_object then null; end $$;
-
 -- 5. APPELS (Roll calls)
 create table if not exists internat_roll_calls (
   id uuid primary key default gen_random_uuid(),
@@ -154,10 +163,6 @@ create table if not exists internat_roll_calls (
   created_at timestamptz not null default now(),
   unique (block_id, roll_call_date, roll_call_type)
 );
-
-do $$ begin
-  create type internat_roll_call_type as enum ('matin', 'soir');
-exception when duplicate_object then null; end $$;
 
 -- 6. DÉTAIL APPEL
 create table if not exists internat_roll_items (
@@ -182,10 +187,6 @@ create table if not exists internat_meals (
   created_at timestamptz not null default now(),
   unique (establishment_id, meal_date, meal_type)
 );
-
-do $$ begin
-  create type internat_meal_type as enum ('petit_dejeuner', 'dejeuner', 'diner');
-exception when duplicate_object then null; end $$;
 
 -- 8. PRÉSENCE REPAS
 create table if not exists internat_meal_attendance (
@@ -213,13 +214,6 @@ create table if not exists internat_incidents (
   created_at timestamptz not null default now()
 );
 
-do $$ begin
-  create type internat_incident_severity as enum ('mineur', 'majeur', 'grave');
-exception when duplicate_object then null; end $$;
-
-do $$ begin
-  create type internat_incident_category as enum ('discipline', 'sante', 'comportement', 'autre');
-exception when duplicate_object then null; end $$;
 
 -- 10. VISITES
 create table if not exists internat_visits (
@@ -271,7 +265,7 @@ left join internat_beds bd on bd.room_id = r.id
 group by b.id, b.establishment_id, b.name, b.gender, b.capacity;
 
 -- Vue: statut des chambres
-create or replace view internat_room_status as
+create or replace view internat_rooms_status_view as
 select
   r.id as room_id,
   r.block_id,
@@ -378,7 +372,7 @@ exception when duplicate_object then null; end $$;
 
 -- Grants
 grant select, insert, update, delete on all tables in schema public to authenticated;
-grant select on internat_block_capacity, internat_room_status to authenticated;
+grant select on internat_block_capacity, internat_rooms_status_view to authenticated;
 grant execute on all functions in schema public to authenticated;
 
 -- ############ 3/3 : OPÉRATIONS (rentrée, paiements, documents, messages, comportement) ############

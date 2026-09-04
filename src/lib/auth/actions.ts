@@ -222,6 +222,7 @@ export async function createEstablishment(
   const address = String(formData.get("address") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
   const schoolType = String(formData.get("school_type") ?? "") as import("@/types").SchoolType | "";
+  const publishToTrouvetou = String(formData.get("publish_to_trouvetou") ?? "") === "on";
 
   if (!name || !city) {
     return "Le nom et la ville de l'établissement sont requis.";
@@ -255,6 +256,21 @@ export async function createEstablishment(
 
   if (error) {
     return error.message;
+  }
+
+  if (publishToTrouvetou) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("establishment_id")
+      .eq("id", user.id)
+      .maybeSingle();
+    if (!profile?.establishment_id) return "Établissement créé, mais publication Trouvetou impossible.";
+
+    const { error: publicationError } = await supabase
+      .from("establishments")
+      .update({ published_to_trouvetou: true })
+      .eq("id", profile.establishment_id);
+    if (publicationError) return publicationError.message;
   }
 
   redirect("/dashboard/admin");

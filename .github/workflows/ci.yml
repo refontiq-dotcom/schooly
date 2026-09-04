@@ -1,0 +1,99 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main, master]
+  push:
+    branches: [main, master]
+
+env:
+  NODE_VERSION: 20
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npm run lint
+
+  test:
+    name: Unit + Integration tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run vitest
+        run: npx vitest run
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage/
+
+  e2e:
+    name: E2E (Playwright)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+
+      - name: Install Supabase CLI + psql
+        run: |
+          npm install -g supabase
+          sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Start Supabase (local)
+        run: supabase start
+
+      - name: Extract Supabase credentials
+        run: |
+          STATUS_JSON=$(supabase status --output json 2>/dev/null || echo '{}')
+          ANON_KEY=$(node -e "const s=JSON.parse(process.argv[1]); console.log(s.api?.anon_key||s.api?.key||'')" "$STATUS_JSON")
+          SERVICE_KEY=$(node -e "const s=JSON.parse(process.argv[1]); console.log(s.api?.service_role_key||s.api?.service_role||'')" "$STATUS_JSON")
+          echo "NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321" >> $GITHUB_ENV
+          echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY" >> $GITHUB_ENV
+          echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_KEY" >> $GITHUB_ENV
+
+      - name: Apply schema + seed
+        run: ./supabase/setup-local-db.sh
+
+      - name: Run Playwright tests
+        run: npx playwright test

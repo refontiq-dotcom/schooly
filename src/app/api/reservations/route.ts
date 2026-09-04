@@ -1,76 +1,91 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/server";
 
 /**
  * POST /api/reservations
- * Crée une réservation au statut "pending_payment". La place n'est
- * décomptée qu'après confirmation du paiement (voir /api/reservations/[id]/confirm),
- * via la fonction Postgres reserve_seat() qui verrouille la section
- * pour éviter toute survente en cas de réservations simultanées.
+ *
+ * Crée une réservation via `create_reservation_smart` qui encapsule :
+ *   - attribution atomique d'une section (anti-survente par `FOR UPDATE`) ;
+ *   - calcul du score de confiance du parent (compute_parent_trust_score) ;
+ *   - détection de fraude (detect_reservation_fraud) ;
+ *   - mise en file d'attente (status = 'waitlisted') si plus de place ;
+ *   - rejet pour fraude si plus de 2 flags sont levés (status = 'rejected_fraud').
+ *
+ * Réponse 201 :
+ *   - { reservation } : réservation créée (status = reserved | waitlisted | rejected_fraud)
+ *   - { waitlist_position } : position dans la file (null si place dispo)
+ *   - { parent_trust_score } : score 0..100
+ *   - { fraud_flags } : flags de fraude détectés
+ *
+ * Réponse 409 : données invalides ou frauduleuses (avec détail).
  */
 export async function POST(req: NextRequest) {
-  const supabase = await createClient();
-  const body = await req.json();
+  const body = await req.json().catch(() => null);
+  if (!body || typeof body !== "object") {
+    return NextResponse.json({ error: "Corps de requête invalide" }, { status: 400 });
+  }
 
   const {
     establishment_id,
     level_id,
-    modality,
     student_full_name,
     student_birthdate,
     parent_full_name,
     parent_phone,
     parent_email,
-  } = body;
+  } = body as Record<string, unknown>;
 
-  if (!establishment_id || !level_id || !student_full_name || !parent_full_name || !parent_phone) {
-    return NextResponse.json({ error: "Champs obligatoires manquants" }, { status: 400 });
+  if (
+    !establishment_id ||
+    !level_id ||
+    !student_full_name ||
+    !parent_full_name ||
+    !parent_phone
+  ) {
+    return NextResponse.json(
+      { error: "Champs obligatoires manquants (establishment_id, level_id, student_full_name, parent_full_name, parent_phone)" },
+      { status: 400 }
+    );
   }
 
-  // Vérifie qu'il reste au moins une place sur le niveau avant de créer la réservation
-  const { data: availability } = await supabase
-    .from("level_availability")
-    .select("seats_available")
-    .eq("level_id", level_id)
-    .single();
+  const supabase = await createAdminClient();
 
-  if (!availability || availability.seats_available <= 0) {
-    return NextResponse.json({ error: "Plus de place disponible pour ce niveau" }, { status: 409 });
-  }
-
-  // Assigne automatiquement la première section du niveau ayant de la place
-  const { data: openSection } = await supabase
-    .from("sections")
-    .select("id, capacity, seats_taken")
-    .eq("level_id", level_id)
-    .order("name")
-    .limit(50);
-
-  const section = (openSection ?? []).find((s) => s.seats_taken < s.capacity);
-  if (!section) {
-    return NextResponse.json({ error: "Plus de place disponible pour ce niveau" }, { status: 409 });
-  }
-
-  const { data: reservation, error } = await supabase
-    .from("reservations")
-    .insert({
-      establishment_id,
-      level_id,
-      section_id: section.id,
-      modality: modality || "standard",
-      student_full_name,
-      student_birthdate: student_birthdate || null,
-      parent_full_name,
-      parent_phone,
-      parent_email: parent_email || null,
-      status: "pending_payment",
-    })
-    .select()
-    .single();
+  const { data: reservation, error } = await supabase.rpc("create_reservation_smart", {
+    p_establishment_id: establishment_id,
+    p_level_id: level_id,
+    p_student_full_name: String(student_full_name),
+    p_student_birthdate: student_birthdate ? String(student_birthdate) : null,
+    p_parent_full_name: String(parent_full_name),
+    p_parent_phone: String(parent_phone),
+    p_parent_email: parent_email ? String(parent_email) : null,
+  });
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: error.message }, { status: 409 });
   }
 
-  return NextResponse.json({ reservation }, { status: 201 });
+  if (!reservation) {
+    return NextResponse.json({ error: "Réservation impossible" }, { status: 409 });
+  }
+
+  if (reservation.status === "rejected_fraud") {
+    return NextResponse.json(
+      {
+        error: "Réservation rejetée : motifs de sécurité",
+        code: "FRAUD_REJECTED",
+        fraud_flags: reservation.fraud_flags,
+      },
+      { status: 403 }
+    );
+  }
+
+  return NextResponse.json(
+    {
+      reservation,
+      waitlist_position: reservation.waitlist_position ?? null,
+      parent_trust_score: reservation.parent_trust_score ?? 50,
+      fraud_flags: reservation.fraud_flags ?? [],
+    },
+    { status: 201 }
+  );
 }
