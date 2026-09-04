@@ -36,7 +36,7 @@ alter table public.reservations
   add column if not exists cancelled_at timestamptz;
 
 alter table public.reservations
-  add column if not expires_at timestamptz;
+  add column if not exists expires_at timestamptz;
 
 alter table public.reservations
   drop constraint if exists reservations_section_required_when_reserved;
@@ -184,7 +184,7 @@ begin
   end if;
 
   -- 2) Même téléphone mais avec des noms de parents incohérents (peut être usurpation)
-  select count(distinct) into v_distinct_names_count
+  select count(distinct lower(trim(parent_full_name))) into v_distinct_names_count
   from public.reservations
   where establishment_id = p_establishment_id
     and regexp_replace(coalesce(parent_phone, ''), '\s+', '', 'g') = v_phone_normalized
@@ -226,7 +226,7 @@ $$;
 -- ----------------------------------------------------------------------------
 -- 5. FONCTION : réservation publique intelligente (anti-survente + scoring + fraude)
 -- ----------------------------------------------------------------------------
--- Remplace la logique applicative分散ée par un point d'entrée atomique.
+-- Remplace la logique applicative dispersée par un point d'entrée atomique.
 -- Si une place est dispo, crée une réservation normale.
 -- Sinon, crée une réservation `waitlisted` avec position, score et ETA.
 -- Si la fraude est sévère (>2 flags), crée une réservation `rejected_fraud`.

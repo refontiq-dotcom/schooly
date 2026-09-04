@@ -128,7 +128,7 @@ select
   count(s.id) as students_count,
   coalesce(round(avg((g.score::numeric / g.max_score) * 20)::numeric, 2), 0) as class_average,
   count(*) filter (
-    where sar.alert_level is not null
+    where sar.risk_level is not null
   ) as at_risk_count
 from public.sections sec
 join public.profiles p on p.id = sec.homeroom_teacher_id

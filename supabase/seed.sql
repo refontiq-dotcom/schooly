@@ -79,6 +79,7 @@ insert into student_supply_checks (student_id, supply_item_id, purchased)
   select '00000000-0000-0000-0000-000000002002', id, (sort_order = 0) from supply_items where list_id = '00000000-0000-0000-0000-000000003301';
 
 -- Documents exigés (statuts de rentrée)
+-- NB : le trigger after_student_insert a déjà semé ces lignes → upsert.
 insert into student_documents (student_id, establishment_id, doc_type, status, submitted_at) values
   ('00000000-0000-0000-0000-000000002001', '00000000-0000-0000-0000-000000000001', 'acte_naissance',     'submitted', now()),
   ('00000000-0000-0000-0000-000000002001', '00000000-0000-0000-0000-000000000001', 'photo_identite',     'missing',   null),
@@ -87,7 +88,10 @@ insert into student_documents (student_id, establishment_id, doc_type, status, s
   ('00000000-0000-0000-0000-000000002002', '00000000-0000-0000-0000-000000000001', 'acte_naissance',     'submitted', now()),
   ('00000000-0000-0000-0000-000000002002', '00000000-0000-0000-0000-000000000001', 'photo_identite',     'missing',   null),
   ('00000000-0000-0000-0000-000000002002', '00000000-0000-0000-0000-000000000001', 'carnet_vaccination', 'missing',   null),
-  ('00000000-0000-0000-0000-000000002002', '00000000-0000-0000-0000-000000000001', 'bulletin_precedent', 'missing',   null);
+  ('00000000-0000-0000-0000-000000002002', '00000000-0000-0000-0000-000000000001', 'bulletin_precedent', 'missing',   null)
+on conflict (student_id, doc_type) do update
+  set status = excluded.status,
+      submitted_at = excluded.submitted_at;
 
 -- ============================================================================
 -- MODULE INTERNAT
