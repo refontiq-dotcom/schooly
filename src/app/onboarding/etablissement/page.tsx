@@ -79,22 +79,6 @@ export default function CreateEstablishmentPage() {
             </div>
           )}
 
-          <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <input
-              type="checkbox"
-              name="publish_to_trouvetou"
-              className="mt-1 h-4 w-4 accent-amber-500"
-            />
-            <span>
-              <span className="block text-sm font-semibold text-slate-700">
-                Publier cet établissement sur Trouvetou
-              </span>
-              <span className="mt-1 block text-xs text-slate-500">
-                Votre école apparaîtra dans la catégorie Écoles avec ses informations et ses places disponibles. Vous pourrez désactiver cette publication plus tard.
-              </span>
-            </span>
-          </label>
-
           {/* ── Infos de base ── */}
           <div className="space-y-4">
             <div>

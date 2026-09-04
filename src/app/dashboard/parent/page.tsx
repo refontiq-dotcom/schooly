@@ -84,18 +84,6 @@ export default async function ParentDashboardPage() {
           l&apos;inscription finalisée par l&apos;établissement (avec le même
           email), le suivi apparaîtra ici automatiquement.
         </div>
-        {profile?.role === "parent" && !profile.establishment_id && (
-          <div className="card">
-            <h2 className="font-semibold text-navy mb-2">Vous dirigez un établissement ?</h2>
-            <p className="text-sm text-slate-500 mb-3">
-              Créez votre établissement pour obtenir le rôle administrateur.
-              Le personnel (professeurs, secrétariat) sera ensuite invité.
-            </p>
-            <Link href="/onboarding/etablissement" className="btn-primary min-h-11">
-              Créer un établissement
-            </Link>
-          </div>
-        )}
       </div>
     );
   }
