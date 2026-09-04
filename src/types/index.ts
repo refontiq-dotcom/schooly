@@ -517,3 +517,38 @@ export interface InternatBlockCapacity {
   free_beds: number;
   capacity: number;
 }
+
+// ============================================================================
+// School Groups (multi-branch / réseau scolaire)
+// ============================================================================
+
+export interface SchoolGroup {
+  id: string;
+  name: string;
+  description: string | null;
+  logo_url: string | null;
+  headquarters_city: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SchoolGroupStats {
+  group_id: string;
+  group_name: string;
+  branch_count: number;
+  total_students: number;
+  admin_count: number;
+  teacher_count: number;
+  secretariat_count: number;
+}
+
+export interface GroupBranch {
+  id: string;
+  name: string;
+  city: string;
+  branch_name: string | null;
+  school_type: SchoolType | null;
+  logo_url: string | null;
+  student_count: number;
+}

@@ -53,6 +53,12 @@ const navSections: { title: string; items: NavItem[] }[] = [
       { href: "/dashboard/professeur", label: "Professeurs", icon: "book-open" },
     ],
   },
+  {
+    title: "Réseau",
+    items: [
+      { href: "/dashboard/admin/reseau", label: "Mon réseau", icon: "school" },
+    ],
+  },
 ];
 
 const bottomNavItems: NavItem[] = [
@@ -87,12 +93,26 @@ interface AdminLayoutProps {
   children: React.ReactNode;
   logoUrl: string | null;
   establishmentName: string;
+  groupName: string | null;
+  branches: { id: string; name: string; city: string; branch_name: string | null }[];
+  currentBranchId: string | null;
 }
 
-export default function AdminLayout({ children, logoUrl, establishmentName }: AdminLayoutProps) {
+export default function AdminLayout({
+  children,
+  logoUrl,
+  establishmentName,
+  groupName,
+  branches,
+  currentBranchId,
+}: AdminLayoutProps) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [branchOpen, setBranchOpen] = useState(false);
+
+  const hasGroup = branches.length > 1;
+  const currentBranch = branches.find((b) => b.id === currentBranchId);
 
   return (
     <div className="flex h-screen gap-0">
@@ -116,6 +136,57 @@ export default function AdminLayout({ children, logoUrl, establishmentName }: Ad
           </Link>
         </div>
 
+        {/* Branch Selector (only shown if establishment is part of a group) */}
+        {hasGroup && (
+          <div className="px-3 mb-2">
+            <p className="px-3 text-[10px] font-semibold text-[#F25A2E] uppercase tracking-widest mb-1">
+              {groupName}
+            </p>
+            <button
+              type="button"
+              onClick={() => setBranchOpen(!branchOpen)}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors text-left"
+            >
+              <SidebarIcon name="layers" className="w-4 h-4 text-slate-500 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-slate-800 truncate">
+                  {currentBranch?.branch_name || currentBranch?.name || establishmentName}
+                </p>
+                <p className="text-xs text-slate-400 truncate">
+                  {currentBranch?.city} · {branches.length} succursale{branches.length > 1 ? "s" : ""}
+                </p>
+              </div>
+              <SidebarIcon
+                name="chevronDown"
+                className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${branchOpen ? "rotate-180" : ""}`}
+              />
+            </button>
+            {branchOpen && (
+              <div className="mt-1 bg-white border border-slate-100 rounded-xl shadow-lg overflow-hidden">
+                {branches.map((branch) => (
+                  <Link
+                    key={branch.id}
+                    href="/dashboard/admin"
+                    onClick={() => setBranchOpen(false)}
+                    className={`flex items-center gap-3 px-3 py-2.5 text-sm transition-colors ${
+                      branch.id === currentBranchId
+                        ? "bg-slate-900 text-white"
+                        : "text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    <span className="truncate">
+                      {branch.branch_name || branch.name}
+                    </span>
+                    <span className={`text-xs ml-auto shrink-0 ${branch.id === currentBranchId ? "text-white/50" : "text-slate-400"}`}>
+                      {branch.city}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* User Profile */}
         <div className="px-5 py-4 mx-3 mb-2 bg-slate-50 rounded-2xl">
           <div className="flex items-center gap-3">
@@ -131,8 +202,12 @@ export default function AdminLayout({ children, logoUrl, establishmentName }: Ad
               </div>
             )}
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-slate-800 truncate">{establishmentName || "Admin"}</p>
-              <p className="text-xs text-slate-400">Directeur</p>
+              <p className="text-sm font-semibold text-slate-800 truncate">
+                {currentBranch?.branch_name || establishmentName || "Admin"}
+              </p>
+              <p className="text-xs text-slate-400">
+                {groupName ? `${groupName} · Directeur` : "Directeur"}
+              </p>
             </div>
           </div>
         </div>
