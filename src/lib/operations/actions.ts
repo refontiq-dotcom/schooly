@@ -198,6 +198,7 @@ export async function finalizeReservation(reservationId: string): Promise<string
   });
   if (error) return error.message;
   revalidatePath("/dashboard/admin");
+  revalidatePath("/dashboard/admin/classes");
   revalidatePath("/dashboard/secretariat");
   return null;
 }

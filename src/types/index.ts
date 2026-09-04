@@ -118,12 +118,27 @@ export interface LevelAvailability {
   seats_available: number;
 }
 
+export interface Level {
+  id: string;
+  establishment_id: string;
+  name: string;
+  rank: number;
+}
+
 export interface Section {
   id: string;
   level_id: string;
   name: string;
   capacity: number;
   seats_taken: number;
+  homeroom_teacher_id: string | null;
+}
+
+export interface TeacherAssignment {
+  id: string;
+  teacher_id: string;
+  section_id: string;
+  subject: string;
 }
 
 export interface Reservation {

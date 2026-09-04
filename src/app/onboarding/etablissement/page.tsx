@@ -74,7 +74,7 @@ export default function CreateEstablishmentPage() {
                 ))}
               </div>
               <p className="text-[11px] text-slate-400 mt-2">
-                Ces niveaux seront proposés lors de la configuration des classes. Vous pourrez les modifier.
+                Ces niveaux et une section par défaut seront créés automatiquement. Vous pourrez les modifier ensuite.
               </p>
             </div>
           )}

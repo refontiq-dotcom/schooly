@@ -3,6 +3,10 @@ import {
   isAlertCritical,
   summarizeFillStatus,
   colorForFillStatus,
+  fillRateFromCounts,
+  fillStatusLabel,
+  workloadLabel,
+  effectifMismatch,
 } from '@/lib/classes-intelligence/scoring';
 import type { ClassBalanceAlert, FillStatus } from '@/lib/classes-intelligence/scoring';
 
@@ -70,6 +74,39 @@ describe('classes-intelligence/scoring', () => {
       (Object.keys(expected) as FillStatus[]).forEach((s) => {
         expect(colorForFillStatus(s)).toBe(expected[s]);
       });
+    });
+  });
+
+  describe('fillRateFromCounts', () => {
+    it('calcule le pourcentage arrondi', () => {
+      expect(fillRateFromCounts(15, 30)).toBe(50);
+      expect(fillRateFromCounts(2, 30)).toBe(7);
+    });
+    it('retourne 0 si capacité nulle ou invalide', () => {
+      expect(fillRateFromCounts(5, 0)).toBe(0);
+      expect(fillRateFromCounts(5, -1)).toBe(0);
+    });
+  });
+
+  describe('fillStatusLabel', () => {
+    it('libellés FR', () => {
+      expect(fillStatusLabel('full')).toBe('Complète');
+      expect(fillStatusLabel('low')).toBe('Sous-remplie');
+    });
+  });
+
+  describe('workloadLabel', () => {
+    it('libellés de charge', () => {
+      expect(workloadLabel('high')).toBe('Charge élevée');
+      expect(workloadLabel('low')).toBe("Titulaire d'une classe");
+      expect(workloadLabel('none')).toBe('Sans classe titulaire');
+    });
+  });
+
+  describe('effectifMismatch', () => {
+    it('détecte un écart compteur / élèves', () => {
+      expect(effectifMismatch(2, 4)).toBe(true);
+      expect(effectifMismatch(2, 2)).toBe(false);
     });
   });
 });

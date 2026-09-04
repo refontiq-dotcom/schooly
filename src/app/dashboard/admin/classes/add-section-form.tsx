@@ -1,50 +1,53 @@
 "use client";
 
-import { useState } from "react";
+import { useActionState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { addSection } from "@/lib/classes-intelligence/actions";
+import { DEFAULT_SECTION_CAPACITY } from "@/lib/classes-intelligence/scoring";
 
 export default function AddSectionForm({ levelId }: { levelId: string }) {
   const router = useRouter();
-  const [name, setName] = useState("");
-  const [capacity, setCapacity] = useState(30);
-  const [loading, setLoading] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
+  const [error, action, pending] = useActionState(addSection, null);
+  const lastPending = useRef(pending);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!name.trim() || capacity <= 0) return;
-    setLoading(true);
-    const supabase = createClient();
-    await supabase.from("sections").insert({ level_id: levelId, name: name.trim(), capacity });
-    setLoading(false);
-    setName("");
-    router.refresh();
-  }
+  useEffect(() => {
+    if (lastPending.current && !pending && !error) {
+      formRef.current?.reset();
+      router.refresh();
+    }
+    lastPending.current = pending;
+  }, [pending, error, router]);
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-wrap gap-2 items-end">
+    <form ref={formRef} action={action} className="flex flex-wrap gap-2 items-end">
+      <input type="hidden" name="level_id" value={levelId} />
       <div>
-        <label className="text-xs text-slate-500">Nom de la section</label>
+        <label className="text-xs text-slate-500" htmlFor={`section-name-${levelId}`}>Nom de la section</label>
         <input
+          id={`section-name-${levelId}`}
+          name="name"
           className="input"
           placeholder="Ex: 6ème1"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
+          required
         />
       </div>
       <div>
-        <label className="text-xs text-slate-500">Capacité</label>
+        <label className="text-xs text-slate-500" htmlFor={`section-cap-${levelId}`}>Capacité</label>
         <input
+          id={`section-cap-${levelId}`}
+          name="capacity"
           type="number"
           min={1}
+          defaultValue={DEFAULT_SECTION_CAPACITY}
           className="input w-28"
-          value={capacity}
-          onChange={(e) => setCapacity(Number(e.target.value))}
+          required
         />
       </div>
-      <button type="submit" disabled={loading} className="btn-secondary whitespace-nowrap">
-        + Ajouter la section
+      <button type="submit" disabled={pending} className="btn-secondary whitespace-nowrap min-h-11">
+        {pending ? "Ajout…" : "Ajouter la section"}
       </button>
+      {error && <p className="w-full text-sm text-red-600" role="alert">{error}</p>}
     </form>
   );
 }
