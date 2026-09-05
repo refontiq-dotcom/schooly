@@ -6,313 +6,96 @@ import { SCHOOL_TYPE_LABELS, SCHOOL_TYPE_ICONS } from "@/types";
 
 export const revalidate = 0;
 
+const schoolTypes: Array<{
+  type: SchoolType;
+  accent: string;
+  levels: string[];
+  description: string;
+}> = [
+  { type: "primaire", accent: "from-emerald-500 to-teal-500", levels: ["Maternelle", "CP1", "CP2", "CE1", "CE2", "CM1", "CM2"], description: "Un accompagnement bienveillant pour les premiers apprentissages, du CP à la fin du primaire." },
+  { type: "college", accent: "from-amber-400 to-orange-500", levels: ["6ème", "5ème", "4ème", "3ème"], description: "Découvrez les matières fondamentales et développez l'esprit critique." },
+  { type: "lycee", accent: "from-blue-600 to-indigo-600", levels: ["Seconde", "Première", "Terminale"], description: "Préparation au baccalauréat avec un suivi personnalisé et des filières diversifiées." },
+  { type: "professionnel", accent: "from-violet-500 to-fuchsia-500", levels: ["1ère année", "2ème année", "3ème année"], description: "Formations techniques et professionnelles : BEP, CAP, Bac Pro, BTS et alternance." },
+  { type: "islamique", accent: "from-teal-500 to-emerald-600", levels: ["Coran", "Arabe", "Fiqh", "Hadith", "Sira"], description: "Enseignement coranique, langue arabe, sciences islamiques et formation religieuse." },
+];
+
+const features = [
+  ["students", "Gestion des élèves", "Centralisez les informations et le suivi de tous vos élèves."],
+  ["teachers", "Gestion des enseignants", "Gérez les enseignants, matières, affectations et classes."],
+  ["grades", "Notes & bulletins", "Saisissez les notes et générez les bulletins plus facilement."],
+  ["attendance", "Présences & absences", "Suivez les présences et repérez rapidement les absences."],
+  ["messages", "Communication", "Communiquez simplement avec les parents et les élèves."],
+  ["calendar", "Emplois du temps", "Créez et consultez les emplois du temps en un seul endroit."],
+] as const;
+
+const spaces = [
+  ["admin", "Administration", "Gérez votre établissement, vos équipes, vos classes et vos rapports."],
+  ["teacher", "Enseignants", "Suivez vos classes, présences, notes et élèves à risque."],
+  ["student", "Élèves", "Consultez notes, emploi du temps, informations et annonces."],
+  ["parent", "Parents", "Suivez la scolarité de votre enfant et échangez avec l'établissement."],
+] as const;
+
 export default async function HomePage() {
   let user = null;
   let dashboardHref = "/auth";
   try {
     const supabase = await createClient();
-    const {
-      data: { user: u },
-    } = await supabase.auth.getUser();
-    user = u;
-    if (u) {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", u.id)
-        .maybeSingle();
+    const { data: { user: currentUser } } = await supabase.auth.getUser();
+    user = currentUser;
+    if (currentUser) {
+      const { data: profile } = await supabase.from("profiles").select("role").eq("id", currentUser.id).maybeSingle();
       dashboardHref = dashboardHomeForRole((profile?.role as UserRole | undefined) ?? "parent");
     }
-  } catch {
-    // Supabase not configured
-  }
+  } catch { /* Supabase peut être indisponible pendant le rendu local. */ }
+
+  const primaryHref = user ? dashboardHref : "/auth";
 
   return (
-    <div className="min-h-screen">
-      {/* ── Hero Section ── */}
-      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#1B3A4B] via-[#1E4D5E] to-[#2A6B7C] text-white">
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-10 left-10 w-40 h-40 rounded-full bg-amber-400 blur-3xl" />
-          <div className="absolute bottom-10 right-20 w-60 h-60 rounded-full bg-amber-300 blur-3xl" />
-        </div>
-        <div className="relative flex flex-col lg:flex-row items-center gap-8 px-8 py-12 lg:py-16 lg:px-16">
-          {/* Left content */}
-          <div className="flex-1 text-center lg:text-left">
-            <h1 className="text-3xl md:text-4xl lg:text-5xl font-extrabold leading-tight mb-4">
-              GÉREZ VOTRE
-              <br />
-              ÉTABLISSEMENT
-              <br />
-              <span className="text-amber-400">EN TOUTE SIMPLICITÉ</span>
-            </h1>
-            <p className="text-sm md:text-base text-slate-200 max-w-md mb-8 mx-auto lg:mx-0 leading-relaxed">
-              Simplifiez les inscriptions, suivez les présences, gérez les notes
-              et communiquez avec les parents — tout au même endroit.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start">
-              <Link
-                href={user ? dashboardHref : "/auth"}
-                className="inline-flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-400 text-slate-900 font-semibold px-6 py-3 rounded-full transition-colors"
-              >
-                {user ? "Mon Espace" : "Commencer"}
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                </svg>
-              </Link>
-              <Link
-                href="#features"
-                className="inline-flex items-center justify-center gap-2 border-2 border-white/30 hover:border-white/60 text-white font-semibold px-6 py-3 rounded-full transition-colors"
-              >
-                Découvrir
-              </Link>
+    <div className="space-y-0">
+      <section className="relative overflow-hidden rounded-[2rem] bg-[#063b91] text-white shadow-2xl shadow-blue-950/15">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_78%_45%,rgba(34,211,238,.45),transparent_25%),radial-gradient(circle_at_15%_85%,rgba(59,130,246,.35),transparent_32%)]" />
+        <div className="absolute -right-24 -top-28 h-80 w-80 rounded-full border-[55px] border-cyan-300/10" />
+        <div className="absolute -bottom-36 left-1/3 h-80 w-80 rounded-full bg-cyan-400/10 blur-3xl" />
+        <div className="relative grid min-h-[590px] items-center gap-8 px-6 py-12 sm:px-10 lg:grid-cols-[.92fr_1.08fr] lg:px-14 lg:py-14">
+          <div className="max-w-xl">
+            <span className="inline-flex rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-bold tracking-wide text-cyan-100">PLATEFORME DE GESTION SCOLAIRE</span>
+            <h1 className="mt-6 text-4xl font-black leading-[1.04] tracking-tight sm:text-5xl lg:text-[4.35rem]">Gérez votre établissement<span className="block text-amber-400">simplement et efficacement.</span></h1>
+            <p className="mt-6 max-w-lg text-base leading-7 text-blue-50/85 sm:text-lg">Schooly centralise les inscriptions, présences, notes, communications et le suivi des élèves dans une seule plateforme.</p>
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+              <Link href={primaryHref} className="btn-primary inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-amber-500 px-6 font-bold text-slate-950 shadow-lg shadow-amber-500/20 hover:bg-amber-400">{user ? "Mon espace" : "Commencer gratuitement"}<ArrowIcon /></Link>
+              <Link href="#fonctionnalites" className="inline-flex min-h-12 items-center justify-center rounded-full border border-white/35 bg-white/5 px-6 font-semibold text-white hover:bg-white/10">Découvrir Schooly</Link>
             </div>
+            <div className="mt-8 flex flex-wrap gap-x-5 gap-y-2 text-xs font-medium text-blue-100/80"><span>✓ Simple à utiliser</span><span>✓ Sécurisé</span><span>✓ Pensé pour les écoles</span></div>
           </div>
-
-          {/* Right illustration */}
-          <div className="flex-1 flex justify-center lg:justify-end">
-            <HeroIllustration />
-          </div>
+          <HeroVisual />
         </div>
-
-        {/* Wavy bottom edge */}
-        <svg className="absolute bottom-0 left-0 w-full h-8 md:h-12" viewBox="0 0 1440 48" fill="none" preserveAspectRatio="none">
-          <path d="M0 48h1440V16c-240 20-480 32-720 32S240 36 0 16v32z" fill="#F0F4F8" />
-        </svg>
+        <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-16 bg-[url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 1440 100%22 preserveAspectRatio=%22none%22%3E%3Cpath d=%22M0 65C240 5 420 5 650 48c250 47 430 47 790-25v77H0Z%22 fill=%22%23ffffff%22/%3E%3C/svg%3E')] bg-cover bg-bottom" />
       </section>
 
-      {/* ── Stats Bar ── */}
-      <section className="bg-[#F0F4F8] py-8">
-        <div className="max-w-5xl mx-auto px-4">
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
-            <StatCard icon="🎓" value="98%" label="Taux de réussite" />
-            <StatCard icon="📚" value="6+" label="Niveaux scolaires" />
-            <StatCard icon="👨‍🏫" value="15:1" label="Ratio élèves/maître" />
-            <StatCard icon="🏆" value="30+" label="Activités extras" />
-            <StatCard icon="👨‍👩‍👧‍👦" value="500+" label="Élèves inscrits" />
-          </div>
-        </div>
-      </section>
+      <section className="relative z-10 -mt-7 px-3 sm:px-6"><div className="mx-auto grid max-w-6xl grid-cols-2 gap-3 rounded-3xl border border-slate-100 bg-white p-3 shadow-xl shadow-slate-900/10 sm:grid-cols-3 lg:grid-cols-5 lg:gap-4 lg:p-4"><StatCard icon="🎓" value="98%" label="Taux de réussite" /><StatCard icon="📚" value="6+" label="Niveaux scolaires" /><StatCard icon="👨‍🏫" value="15:1" label="Ratio élèves/maître" /><StatCard icon="🏆" value="30+" label="Activités extras" /><StatCard icon="👨‍👩‍👧‍👦" value="500+" label="Élèves inscrits" /></div></section>
 
-      {/* ── Types d'établissements ── */}
-      <section id="features" className="bg-[#F0F4F8] py-12 md:py-16">
-        <div className="max-w-5xl mx-auto px-4">
-          <h2 className="text-2xl md:text-3xl font-bold text-slate-800 text-center mb-3">
-            POUR TOUS LES ÉTABLISSEMENTS
-          </h2>
-          <p className="text-sm text-slate-500 text-center mb-10 max-w-lg mx-auto">
-            Schooly s'adapte à votre type d'établissement avec des niveaux et fonctionnalités sur mesure.
-          </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            <SchoolTypeCard
-              type="primaire"
-              color="bg-emerald-500"
-              levels={["Maternelle", "CP1", "CP2", "CE1", "CE2", "CM1", "CM2"]}
-              description="Un accompagnement bienveillant pour les premiers apprentissages, du,cp à la fin du primaire."
-            />
-            <SchoolTypeCard
-              type="college"
-              color="bg-amber-500"
-              levels={["6ème", "5ème", "4ème", "3ème"]}
-              description="Découvrez les matières fondamentales et développez l'esprit critique."
-            />
-            <SchoolTypeCard
-              type="lycee"
-              color="bg-[#1B3A4B]"
-              levels={["Seconde", "Première", "Terminale"]}
-              description="Préparation au baccalauréat avec un suivi personnalisé et des filières diversifiées."
-            />
-            <SchoolTypeCard
-              type="professionnel"
-              color="bg-purple-500"
-              levels={["1ère année", "2ème année", "3ème année"]}
-              description="Formations techniques et professionnelles : BEP, CAP, Bac Pro, BTS et alternance."
-            />
-            <SchoolTypeCard
-              type="islamique"
-              color="bg-teal-600"
-              levels={["Coran", "Arabe", "Fiqh", "Hadith", "Sira"]}
-              description="Enseignement coranique, langue arabe, sciences islamiques et formation religieuse."
-            />
-          </div>
-        </div>
-      </section>
+      <section id="etablissements" className="section-shell"><SectionHeading eyebrow="POUR CHAQUE ÉTABLISSEMENT" title={<>Une solution <span className="text-blue-700">adaptée</span> à votre école</>} description="Schooly s'adapte à votre type d'établissement avec des niveaux et fonctionnalités sur mesure." /><div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">{schoolTypes.map((item, index) => <SchoolTypeCard key={item.type} {...item} featured={index === 0} />)}</div></section>
 
-      {/* ── Campus / Fonctionnalités ── */}
-      <section className="bg-white py-12 md:py-16">
-        <div className="max-w-5xl mx-auto px-4">
-          <h2 className="text-2xl md:text-3xl font-bold text-slate-800 text-center mb-10">
-            NOS ESPACES
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <FacilityCard
-              icon="🎒"
-              title="Rentrée sereine"
-              description="Listes de fournitures partagées et estimation des coûts, sans improvisation."
-            />
-            <FacilityCard
-              icon="💳"
-              title="Paiements & impayés"
-              description="Mobile Money, échéanciers et historique clair des restes à payer."
-            />
-            <FacilityCard
-              icon="💬"
-              title="École ↔ parents"
-              description="Messagerie unique, notes, absences et documents administratifs."
-            />
-          </div>
-        </div>
-      </section>
+      <section className="bg-slate-50 py-20 sm:py-24"><div className="mx-auto grid max-w-6xl items-center gap-12 px-4 sm:px-6 lg:grid-cols-[.82fr_1.18fr] lg:px-8"><div><span className="section-eyebrow">TOUT AU MÊME ENDROIT</span><h2 className="mt-4 text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">Tout ce dont votre établissement a besoin.</h2><p className="mt-5 max-w-lg leading-7 text-slate-600">Schooly réunit les outils indispensables pour simplifier votre gestion scolaire et améliorer la collaboration entre tous les acteurs.</p><Link href="#fonctionnalites" className="mt-7 inline-flex items-center gap-2 rounded-full bg-blue-700 px-5 py-3 font-bold text-white shadow-lg shadow-blue-700/20 hover:bg-blue-800">Découvrir les fonctionnalités<ArrowIcon /></Link></div><DashboardMockup /></div></section>
 
-      {/* ── CTA Section ── */}
-      <section className="bg-gradient-to-r from-[#1B3A4B] to-[#2A6B7C] py-12 md:py-16">
-        <div className="max-w-3xl mx-auto px-4 text-center text-white">
-          <h2 className="text-2xl md:text-3xl font-bold mb-4">
-            Prêt à simplifier votre gestion scolaire ?
-          </h2>
-          <p className="text-slate-200 mb-8 max-w-xl mx-auto">
-            Rejoignez les établissements qui font déjà confiance à Schooly pour
-            gérer leurs inscriptions, présences et communications.
-          </p>
-          <Link
-            href={user ? "/dashboard/admin" : "/auth"}
-            className="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-400 text-slate-900 font-semibold px-8 py-3.5 rounded-full transition-colors"
-          >
-            {user ? "Accéder au tableau de bord" : "Créer mon compte gratuit"}
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
-            </svg>
-          </Link>
-        </div>
-      </section>
+      <section id="fonctionnalites" className="section-shell"><SectionHeading eyebrow="UNE PLATEFORME COMPLÈTE" title={<>Des fonctionnalités pensées pour <span className="text-blue-700">votre quotidien</span></>} description="Moins de tâches dispersées, plus de temps pour l'essentiel : accompagner les élèves." /><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{features.map(([icon, title, description]) => <FeatureCard key={title} icon={icon} title={title} description={description} />)}</div></section>
+
+      <section id="espaces" className="bg-white py-20 sm:py-24"><div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8"><SectionHeading eyebrow="NOS ESPACES SCHOOLY" title={<>Chaque acteur a son <span className="text-blue-700">espace</span></>} description="Une expérience adaptée à l'administration, aux enseignants, aux élèves et aux parents." /><div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">{spaces.map(([role, title, description]) => <SpaceCard key={role} role={role} title={title} description={description} />)}</div></div></section>
+
+      <section className="overflow-hidden bg-[#063b91] py-20 text-white sm:py-24"><div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8"><div className="mx-auto max-w-2xl text-center"><span className="text-xs font-black tracking-[.22em] text-cyan-200">ILS UTILISENT SCHOOLY</span><h2 className="mt-4 text-3xl font-black sm:text-4xl">Une gestion scolaire plus simple au quotidien.</h2><p className="mt-4 text-blue-100/80">Une expérience conçue pour rapprocher l'établissement, les enseignants, les élèves et les parents.</p></div><div className="mt-10 grid gap-5 md:grid-cols-3"><Testimonial quote="Schooly nous aide à centraliser les informations et à mieux suivre nos élèves." name="Direction d'établissement" role="Administration" /><Testimonial quote="Les présences et les notes sont beaucoup plus simples à suivre au quotidien." name="Équipe pédagogique" role="Enseignants" /><Testimonial quote="Les parents disposent enfin d'une vue claire sur la scolarité de leur enfant." name="Communauté scolaire" role="Parents" /></div></div></section>
+
+      <section className="relative overflow-hidden bg-slate-50 py-16 sm:py-20"><div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8"><div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-r from-blue-700 to-cyan-500 px-6 py-12 text-center text-white shadow-2xl shadow-blue-900/15 sm:px-10 lg:flex lg:items-center lg:justify-between lg:text-left"><div className="relative z-10"><p className="text-sm font-bold text-cyan-100">PRÊT À PASSER À L'ÉTAPE SUIVANTE ?</p><h2 className="mt-2 text-3xl font-black sm:text-4xl">Simplifiez la gestion de votre établissement.</h2><p className="mt-3 max-w-2xl text-blue-50/85">Rejoignez les établissements qui veulent une gestion plus claire, plus moderne et mieux connectée.</p></div><Link href={primaryHref} className="relative z-10 mt-7 inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-white px-6 font-bold text-blue-800 shadow-xl lg:mt-0">{user ? "Accéder à mon espace" : "Commencer gratuitement"}<ArrowIcon /></Link><div className="absolute -right-16 -top-24 h-72 w-72 rounded-full border-[45px] border-white/10" /></div></div></section>
     </div>
   );
 }
 
-/* ── Sub-components ── */
-
-function StatCard({ icon, value, label }: { icon: string; value: string; label: string }) {
-  return (
-    <div className="bg-white rounded-2xl p-4 text-center shadow-sm border border-slate-100">
-      <span className="text-2xl block mb-1">{icon}</span>
-      <p className="text-xl md:text-2xl font-extrabold text-slate-800">{value}</p>
-      <p className="text-xs text-slate-500 mt-0.5">{label}</p>
-    </div>
-  );
-}
-
-function SchoolTypeCard({
-  type,
-  color,
-  levels,
-  description,
-}: {
-  type: SchoolType;
-  color: string;
-  levels: string[];
-  description: string;
-}) {
-  return (
-    <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 flex flex-col items-start hover:shadow-md transition-shadow">
-      <div className="flex items-center gap-3 mb-3">
-        <div className={`w-12 h-12 ${color} rounded-xl flex items-center justify-center text-white text-xl`}>
-          {SCHOOL_TYPE_ICONS[type]}
-        </div>
-        <div>
-          <h3 className="font-bold text-slate-800">{SCHOOL_TYPE_LABELS[type]}</h3>
-        </div>
-      </div>
-      <p className="text-sm text-slate-500 leading-relaxed mb-3 flex-1">{description}</p>
-      <div className="flex flex-wrap gap-1.5">
-        {levels.map((level) => (
-          <span
-            key={level}
-            className="text-[11px] font-medium bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md"
-          >
-            {level}
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function FacilityCard({
-  icon,
-  title,
-  description,
-}: {
-  icon: string;
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className="rounded-2xl overflow-hidden shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
-      <div className="h-40 bg-gradient-to-br from-slate-100 to-slate-50 flex items-center justify-center">
-        <span className="text-5xl">{icon}</span>
-      </div>
-      <div className="p-5">
-        <h3 className="font-bold text-slate-800 mb-2">{title}</h3>
-        <p className="text-sm text-slate-500 leading-relaxed">{description}</p>
-      </div>
-    </div>
-  );
-}
-
-function HeroIllustration() {
-  return (
-    <svg width="320" height="280" viewBox="0 0 320 280" fill="none" className="w-full max-w-[320px]">
-      {/* Desk */}
-      <rect x="40" y="180" width="240" height="12" rx="6" fill="#C4956A" opacity="0.6" />
-      <rect x="60" y="192" width="8" height="60" rx="2" fill="#C4956A" opacity="0.4" />
-      <rect x="252" y="192" width="8" height="60" rx="2" fill="#C4956A" opacity="0.4" />
-
-      {/* Laptop */}
-      <rect x="120" y="130" width="80" height="50" rx="4" fill="#E8A44A" opacity="0.9" />
-      <rect x="125" y="135" width="70" height="38" rx="2" fill="white" opacity="0.9" />
-      <rect x="100" y="180" width="120" height="6" rx="3" fill="#D69538" opacity="0.7" />
-
-      {/* Screen content lines */}
-      <rect x="132" y="145" width="40" height="3" rx="1" fill="#1B3A4B" opacity="0.3" />
-      <rect x="132" y="152" width="55" height="3" rx="1" fill="#1B3A4B" opacity="0.2" />
-      <rect x="132" y="159" width="35" height="3" rx="1" fill="#E8A44A" opacity="0.4" />
-
-      {/* Person - Student 1 (left) */}
-      <circle cx="80" cy="110" r="18" fill="#F5D0A9" />
-      <circle cx="80" cy="105" r="12" fill="#3D3D3D" />
-      <rect x="72" y="128" width="16" height="50" rx="4" fill="#E8A44A" />
-      <rect x="64" y="140" width="8" height="30" rx="3" fill="#F5D0A9" />
-      <rect x="88" y="135" width="20" height="6" rx="3" fill="#F5D0A9" />
-
-      {/* Person - Student 2 (center) */}
-      <circle cx="160" cy="90" r="20" fill="#F5D0A9" />
-      <circle cx="160" cy="84" r="14" fill="#1B3A4B" />
-      <rect x="148" y="110" width="24" height="55" rx="5" fill="white" />
-      <rect x="148" y="130" width="24" height="5" rx="1" fill="#E8A44A" opacity="0.5" />
-      <rect x="138" y="118" width="10" height="32" rx="4" fill="#F5D0A9" />
-      <rect x="172" y="118" width="10" height="32" rx="4" fill="#F5D0A9" />
-
-      {/* Person - Student 3 (right) */}
-      <circle cx="240" cy="100" r="18" fill="#F5D0A9" />
-      <circle cx="240" cy="95" r="12" fill="#5C3D2E" />
-      <rect x="232" y="118" width="16" height="50" rx="4" fill="#2A6B7C" />
-      <rect x="224" y="130" width="8" height="30" rx="3" fill="#F5D0A9" />
-      <rect x="248" y="125" width="20" height="6" rx="3" fill="#F5D0A9" />
-
-      {/* Books stack */}
-      <rect x="30" y="165" width="30" height="8" rx="2" fill="#E8A44A" opacity="0.7" />
-      <rect x="32" y="158" width="26" height="8" rx="2" fill="#2A6B7C" opacity="0.6" />
-      <rect x="34" y="151" width="22" height="8" rx="2" fill="#D69538" opacity="0.5" />
-
-      {/* Globe */}
-      <circle cx="280" cy="155" r="18" fill="none" stroke="#2A6B7C" strokeWidth="2" opacity="0.5" />
-      <ellipse cx="280" cy="155" rx="8" ry="18" fill="none" stroke="#2A6B7C" strokeWidth="1.5" opacity="0.3" />
-      <line x1="262" y1="155" x2="298" y2="155" stroke="#2A6B7C" strokeWidth="1.5" opacity="0.3" />
-
-      {/* Decorative dots */}
-      <circle cx="20" cy="80" r="3" fill="#E8A44A" opacity="0.4" />
-      <circle cx="300" cy="70" r="4" fill="#E8A44A" opacity="0.3" />
-      <circle cx="15" cy="200" r="2" fill="#2A6B7C" opacity="0.3" />
-      <circle cx="295" cy="200" r="3" fill="#2A6B7C" opacity="0.2" />
-    </svg>
-  );
-}
+function SectionHeading({ eyebrow, title, description }: { eyebrow: string; title: React.ReactNode; description: string }) { return <div className="mx-auto mb-12 max-w-2xl text-center"><span className="section-eyebrow">{eyebrow}</span><h2 className="mt-4 text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">{title}</h2><p className="mt-4 leading-7 text-slate-600">{description}</p></div>; }
+function StatCard({ icon, value, label }: { icon: string; value: string; label: string }) { return <div className="rounded-2xl border border-slate-100 bg-white px-3 py-4 text-center"><span className="text-2xl">{icon}</span><p className="mt-1 text-2xl font-black text-slate-900">{value}</p><p className="mt-1 text-[11px] font-medium text-slate-500 sm:text-xs">{label}</p></div>; }
+function SchoolTypeCard({ type, accent, levels, description, featured }: { type: SchoolType; accent: string; levels: string[]; description: string; featured?: boolean }) { return <article className={`group rounded-3xl border bg-white p-5 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-xl ${featured ? "border-blue-200 shadow-blue-900/5" : "border-slate-100"}`}><div className={`mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br ${accent} text-xl text-white shadow-lg`}>{SCHOOL_TYPE_ICONS[type]}</div><h3 className="text-lg font-black text-slate-900">{SCHOOL_TYPE_LABELS[type]}</h3><p className="mt-3 min-h-[72px] text-sm leading-6 text-slate-500">{description}</p><div className="mt-4 flex flex-wrap gap-1.5">{levels.map((level) => <span key={level} className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-600">{level}</span>)}</div></article>; }
+function FeatureCard({ icon, title, description }: { icon: string; title: string; description: string }) { return <article className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-lg"><IconBubble name={icon} /><h3 className="mt-5 font-black text-slate-900">{title}</h3><p className="mt-2 text-sm leading-6 text-slate-500">{description}</p></article>; }
+function SpaceCard({ role, title, description }: { role: string; title: string; description: string }) { return <article className="overflow-hidden rounded-3xl border border-slate-100 bg-slate-50 shadow-sm"><div className="relative flex h-36 items-end overflow-hidden bg-gradient-to-br from-blue-700 via-indigo-600 to-cyan-500 p-5"><div className="absolute -right-6 -top-8 h-28 w-28 rounded-full border-[20px] border-white/10" /><div className="relative flex h-14 w-14 items-center justify-center rounded-2xl bg-white/15 text-2xl backdrop-blur">{role === "admin" ? "🏫" : role === "teacher" ? "👨‍🏫" : role === "student" ? "🎓" : "👨‍👩‍👧"}</div></div><div className="p-5"><h3 className="font-black text-slate-900">{title}</h3><p className="mt-2 text-sm leading-6 text-slate-500">{description}</p></div></article>; }
+function Testimonial({ quote, name, role }: { quote: string; name: string; role: string }) { return <article className="rounded-3xl border border-white/10 bg-white p-6 text-slate-800 shadow-xl"><div className="text-2xl text-blue-700">“</div><p className="mt-2 text-sm leading-6">{quote}</p><div className="mt-6 border-t border-slate-100 pt-4"><p className="font-black">{name}</p><p className="text-xs text-slate-500">{role}</p></div></article>; }
+function IconBubble({ name }: { name: string }) { const icons: Record<string, string> = { students: "👥", teachers: "👨‍🏫", grades: "📝", attendance: "✓", messages: "💬", calendar: "📅" }; return <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-xl text-blue-700">{icons[name] ?? "✦"}</div>; }
+function HeroVisual() { const floating = [["📝", "Notes", "left-2 top-20"], ["✓", "Présences", "right-1 top-16"], ["💬", "Messages", "left-0 bottom-20"], ["📅", "Emploi du temps", "right-0 bottom-16"], ["📊", "Statistiques", "right-12 top-1/2"]]; return <div className="relative mx-auto h-[390px] w-full max-w-[590px]"><div className="absolute inset-8 rounded-full bg-cyan-300/20 blur-2xl" /><div className="absolute left-1/2 top-1/2 h-[310px] w-[310px] -translate-x-1/2 -translate-y-1/2 rounded-full border-[18px] border-cyan-200/50 bg-gradient-to-br from-blue-500/70 to-indigo-900/80 shadow-[0_0_80px_rgba(34,211,238,.25)] sm:h-[350px] sm:w-[350px]" /><div className="absolute left-1/2 top-[43%] z-10 flex w-[245px] -translate-x-1/2 -translate-y-1/2 flex-col items-center sm:w-[285px]"><div className="relative flex h-40 w-40 items-center justify-center rounded-full bg-white/95 shadow-2xl sm:h-48 sm:w-48"><div className="text-7xl sm:text-8xl">👨🏾‍💼</div></div><div className="-mt-4 rounded-2xl bg-white px-6 py-4 text-center shadow-2xl"><div className="text-xs font-bold text-slate-400">TABLEAU DE BORD</div><div className="mt-1 text-sm font-black text-slate-900">Schooly</div></div></div><div className="absolute bottom-6 left-1/2 h-8 w-72 -translate-x-1/2 rounded-full bg-blue-950/30 blur-xl" />{floating.map(([emoji, label, position]) => <div key={label} className={`absolute z-20 hidden items-center gap-2 rounded-full border border-white/30 bg-white/90 px-3 py-2 text-xs font-bold text-slate-700 shadow-xl backdrop-blur sm:flex ${position}`}><span className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-50 text-sm">{emoji}</span>{label}</div>)}</div>; }
+function DashboardMockup() { return <div className="relative"><div className="absolute -inset-5 rounded-[2.5rem] bg-blue-600/10 blur-2xl" /><div className="relative overflow-hidden rounded-[1.7rem] border border-slate-200 bg-white shadow-2xl shadow-slate-900/10"><div className="flex h-12 items-center justify-between border-b border-slate-100 px-4"><div className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-red-300" /><span className="h-2.5 w-2.5 rounded-full bg-amber-300" /><span className="h-2.5 w-2.5 rounded-full bg-emerald-300" /></div><div className="h-2 w-28 rounded-full bg-slate-100" /><div className="h-7 w-7 rounded-full bg-blue-100" /></div><div className="grid min-h-[350px] grid-cols-[88px_1fr]"><div className="space-y-3 bg-[#062f75] p-3"><div className="mx-auto h-7 w-7 rounded-lg bg-white/20" />{[1,2,3,4,5,6].map((item) => <div key={item} className={`mx-auto h-8 w-8 rounded-lg ${item === 1 ? "bg-cyan-400/70" : "bg-white/10"}`} />)}</div><div className="bg-slate-50 p-5"><div className="flex items-end justify-between"><div><div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Vue d'ensemble</div><div className="mt-1 text-xl font-black text-slate-900">Bonjour, Administration</div></div><div className="hidden h-8 w-20 rounded-lg bg-blue-100 sm:block" /></div><div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">{[["Élèves","528","👥"],["Classes","24","🏫"],["Présences","92%","✓"],["Paiements","84%","₣"]].map(([label,value,icon]) => <div key={label} className="rounded-2xl bg-white p-3 shadow-sm"><div className="text-xs">{icon}</div><div className="mt-2 text-lg font-black text-slate-900">{value}</div><div className="text-[10px] text-slate-400">{label}</div></div>)}</div><div className="mt-4 grid gap-3 sm:grid-cols-[1.35fr_.65fr]"><div className="rounded-2xl bg-white p-4 shadow-sm"><div className="text-xs font-bold text-slate-500">Évolution des inscriptions</div><div className="mt-5 flex h-32 items-end gap-2">{[38,48,42,62,56,76,70,88,82,96].map((height,index) => <div key={index} className="flex-1 rounded-t-md bg-gradient-to-t from-blue-700 to-cyan-400" style={{height: `${height}%`}} />)}</div></div><div className="rounded-2xl bg-white p-4 shadow-sm"><div className="text-xs font-bold text-slate-500">Répartition</div><div className="mx-auto mt-5 flex h-28 w-28 items-center justify-center rounded-full border-[18px] border-cyan-400 border-r-violet-400 border-b-amber-400"><span className="text-xs font-black text-slate-700">100%</span></div></div></div></div></div></div></div>; }
+function ArrowIcon() { return <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14m-6-6 6 6-6 6" /></svg>; }

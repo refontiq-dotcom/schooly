@@ -2,61 +2,18 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  @apply text-slate-800;
-  background-color: #FBF6EE;
-}
-
-.card {
-  @apply bg-white rounded-2xl border border-slate-200/60 shadow-sm p-5;
-}
-
-.btn-primary {
-  @apply inline-flex items-center justify-center rounded-xl px-5 py-2.5 text-white font-medium transition-all;
-  background-color: #E8A44A;
-}
-
-.btn-primary:hover {
-  background-color: #D69538;
-}
-
-.btn-secondary {
-  @apply inline-flex items-center justify-center rounded-xl border border-slate-300 px-5 py-2.5 text-slate-700 font-medium hover:bg-slate-100 transition-colors;
-}
-
-.badge-success {
-  @apply inline-flex items-center rounded-full bg-emerald-100 text-emerald-700 px-3 py-1 text-xs font-semibold;
-}
-
-.badge-warning {
-  @apply inline-flex items-center rounded-full bg-amber-100 text-amber-700 px-3 py-1 text-xs font-semibold;
-}
-
-.badge-danger {
-  @apply inline-flex items-center rounded-full bg-red-100 text-red-700 px-3 py-1 text-xs font-semibold;
-}
-
-.input {
-  @apply w-full rounded-xl border border-slate-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-amber-400 text-sm min-h-11;
-}
-
-.btn-primary,
-.btn-secondary {
-  cursor: pointer;
-}
-
-.btn-primary:focus-visible,
-.btn-secondary:focus-visible,
-a:focus-visible,
-button:focus-visible {
-  outline: 2px solid #E8A44A;
-  outline-offset: 2px;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  * {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
-}
+:root { --schooly-blue: #063b91; --schooly-cyan: #22d3ee; --schooly-orange: #f59e0b; }
+html { scroll-behavior: smooth; }
+body { @apply antialiased; background: #ffffff; }
+.section-shell { @apply mx-auto max-w-6xl px-4 py-20 sm:px-6 sm:py-24 lg:px-8; }
+.section-eyebrow { @apply inline-flex text-[11px] font-black tracking-[0.2em] text-blue-700; }
+.nav-link { @apply text-sm font-semibold text-slate-600 transition-colors hover:text-blue-700; }
+.nav-link-active { @apply text-blue-700; }
+.nav-outline { @apply inline-flex min-h-10 items-center justify-center rounded-full border border-slate-200 px-4 text-sm font-bold text-slate-700 transition hover:border-blue-200 hover:text-blue-700; }
+.nav-cta { @apply inline-flex min-h-10 items-center justify-center rounded-full bg-blue-700 px-4 text-sm font-bold text-white transition hover:bg-blue-800; }
+.nav-muted { @apply px-2 text-sm font-semibold text-slate-500 transition hover:text-blue-700; }
+.mobile-nav-link { @apply rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50; }
+.mobile-nav-cta { @apply rounded-xl bg-blue-700 px-3 py-2.5 text-center text-sm font-bold text-white; }
+.btn-primary { cursor: pointer; }
+summary::-webkit-details-marker { display: none; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; } }
