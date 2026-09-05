@@ -68,7 +68,7 @@ export default async function ParentLayout({
   }
 
   return (
-    <div className="flex h-screen bg-slate-50">
+    <div className="gemini-dark flex h-screen overflow-hidden">
       <ParentSidebar
         establishments={establishments}
         selectedEstablishmentId={groups[0]?.establishment.id ?? null}

@@ -2,7 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
-:root { --schooly-blue: #063b91; --schooly-cyan: #22d3ee; --schooly-orange: #f59e0b; }
+:root {
+  --schooly-blue: #063b91;
+  --schooly-cyan: #22d3ee;
+  --schooly-orange: #f59e0b;
+}
 html { scroll-behavior: smooth; }
 body { @apply antialiased; background: #ffffff; }
 .section-shell { @apply mx-auto max-w-6xl px-4 py-20 sm:px-6 sm:py-24 lg:px-8; }
@@ -17,3 +21,103 @@ body { @apply antialiased; background: #ffffff; }
 .btn-primary { cursor: pointer; }
 summary::-webkit-details-marker { display: none; }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; } }
+
+/* ── Google Gemini Dark theme ─────────────────────────────────────────── */
+.gemini-dark {
+  background: #131314;
+  color: #e3e3e3;
+}
+.gemini-dark ::selection { background: rgba(168, 199, 250, 0.3); }
+
+/* Scrollbars discrètes façon Gemini */
+.gemini-dark ::-webkit-scrollbar { width: 8px; height: 8px; }
+.gemini-dark ::-webkit-scrollbar-track { background: transparent; }
+.gemini-dark ::-webkit-scrollbar-thumb { background: #2d2f31; border-radius: 999px; }
+.gemini-dark ::-webkit-scrollbar-thumb:hover { background: #3a3d3f; }
+
+/* Gradient de titre façon Gemini */
+.gemini-gradient-text {
+  background-image: linear-gradient(to right, #7cacf8, #a8c7fa, #d3e3fd);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Halo décoratif derrière les titres */
+.gemini-glow::before {
+  content: "";
+  position: absolute;
+  inset: -40% -10% auto -10%;
+  height: 320px;
+  background:
+    radial-gradient(600px 240px at 20% 0%, rgba(124, 172, 248, 0.14), transparent 70%),
+    radial-gradient(500px 220px at 75% 10%, rgba(211, 227, 253, 0.08), transparent 70%);
+  pointer-events: none;
+}
+
+/* Animation de l'icône IA (sparkle pulsé) */
+@keyframes gemini-spark {
+  0%, 100% { opacity: 0.55; transform: scale(0.92); }
+  50% { opacity: 1; transform: scale(1.08); }
+}
+.gemini-sparkle { animation: gemini-spark 2.4s ease-in-out infinite; transform-origin: center; }
+
+/* Apparition douce des cartes */
+@keyframes gemini-fade-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.gemini-fade-up { animation: gemini-fade-up 0.45s ease both; }
+
+/* ── Compatibilité legacy : classes utilitaires héritées du thème clair, ─ */
+/* ── remappées vers les tokens Gemini Dark à l'intérieur de .gemini-dark ─ */
+.gemini-dark .card {
+  @apply rounded-3xl border border-subtle bg-surface;
+}
+.gemini-dark .card p, .gemini-dark .card span, .gemini-dark .card td,
+.gemini-dark .card li, .gemini-dark .card h1, .gemini-dark .card h2,
+.gemini-dark .card h3, .gemini-dark .card label {
+  color: #e3e3e3;
+}
+.gemini-dark .badge-success { @apply rounded-full bg-[#0f3d2e]/60 px-2.5 py-1 text-[11px] font-semibold text-[#6ddba4]; }
+.gemini-dark .badge-warning { @apply rounded-full bg-[#4a3213]/60 px-2.5 py-1 text-[11px] font-semibold text-[#f2c98a]; }
+.gemini-dark .badge-danger { @apply rounded-full bg-[#4a2626]/60 px-2.5 py-1 text-[11px] font-semibold text-[#f28b82]; }
+.gemini-dark .badge-info { @apply rounded-full bg-accent-active px-2.5 py-1 text-[11px] font-semibold text-accent-text; }
+.gemini-dark .badge-muted { @apply rounded-full bg-hover px-2.5 py-1 text-[11px] font-semibold text-muted; }
+.gemini-dark .btn-primary { @apply cursor-pointer rounded-full bg-accent-primary text-sm font-semibold text-[#062e43] transition-all duration-200 hover:brightness-110 active:scale-[0.98]; }
+.gemini-dark .btn-primary:disabled { opacity: 0.5; }
+.gemini-dark .btn-secondary { @apply cursor-pointer rounded-2xl border border-subtle bg-hover text-sm font-medium text-text transition-all duration-200 hover:bg-subtle; }
+.gemini-dark .btn-secondary:disabled { opacity: 0.5; }
+.gemini-dark .input { @apply rounded-2xl border border-subtle bg-hover px-4 py-2.5 text-sm text-text outline-none transition-all duration-200 placeholder:text-muted focus:border-accent-primary/40 w-full; }
+.gemini-dark .input option { background: #1e1f20; color: #e3e3e3; }
+.gemini-dark table { color: #e3e3e3; }
+.gemini-dark .text-navy { color: #e3e3e3; }
+.gemini-dark .text-slate-800, .gemini-dark .text-slate-700, .gemini-dark .text-slate-600 { color: #e3e3e3; }
+.gemini-dark .text-slate-500, .gemini-dark .text-slate-400 { color: #8e918f; }
+.gemini-dark .text-emerald-700, .gemini-dark .text-emerald-600 { color: #6ddba4; }
+.gemini-dark .text-red-700, .gemini-dark .text-red-600 { color: #f28b82; }
+.gemini-dark .text-amber-700, .gemini-dark .text-amber-600 { color: #f2c98a; }
+.gemini-dark .text-blue-700, .gemini-dark .text-blue-600 { color: #a8c7fa; }
+.gemini-dark .card { @apply transition-colors duration-200; }
+.gemini-dark .card.border-red-200, .gemini-dark .card.bg-red-50 { @apply border-[#5f2120]/60 bg-[#2d1a1a]; }
+.gemini-dark .card.border-red-200 p, .gemini-dark .card.bg-red-50 p { color: #f28b82; }
+.gemini-dark .card.border-amber-200, .gemini-dark .card.bg-amber-50 { @apply border-[#5c420e]/60 bg-[#2b2013]; }
+.gemini-dark .card.border-amber-200 p, .gemini-dark .card.bg-amber-50 p { color: #f2c98a; }
+.gemini-dark .card.border-emerald-200, .gemini-dark .card.bg-emerald-50 { @apply border-[#0f3d2e]/60 bg-[#0f3d2e]/30; }
+.gemini-dark .card.border-emerald-200 p, .gemini-dark .card.bg-emerald-50 p { color: #6ddba4; }
+.gemini-dark .border-slate-200, .gemini-dark .border-slate-100 { border-color: #2d2f31; }
+.gemini-dark .border-amber-200, .gemini-dark .border-amber-100 { border-color: rgba(242, 201, 138, 0.25); }
+.gemini-dark .border-red-200 { border-color: rgba(242, 139, 130, 0.25); }
+.gemini-dark .border-emerald-200 { border-color: rgba(109, 219, 164, 0.25); }
+.gemini-dark .bg-slate-50, .gemini-dark .bg-slate-100, .gemini-dark .hover\:bg-slate-50:hover, .gemini-dark .hover\:bg-slate-100:hover { background-color: #282a2c; }
+.gemini-dark .bg-amber-50, .gemini-dark .bg-amber-100 { background-color: rgba(242, 201, 138, 0.12); }
+.gemini-dark .bg-red-50, .gemini-dark .bg-red-100 { background-color: rgba(242, 139, 130, 0.12); }
+.gemini-dark .bg-emerald-50, .gemini-dark .bg-emerald-100 { background-color: rgba(109, 219, 164, 0.12); }
+.gemini-dark .bg-blue-50, .gemini-dark .bg-blue-100 { background-color: rgba(168, 199, 250, 0.12); }
+.gemini-dark .bg-white { background-color: #1e1f20; }
+.gemini-dark .hover\:bg-blue-50:hover, .gemini-dark .hover\:bg-slate-100:hover { background-color: rgba(168, 199, 250, 0.08); }
+.gemini-dark .bg-slate-200, .gemini-dark .bg-slate-300, .gemini-dark .bg-slate-900 { background-color: #282a2c; }
+.gemini-dark .bg-slate-900 { background-color: #a8c7fa; }
+.gemini-dark .text-white { color: #062e43; }
+.gemini-dark aside.bg-white .text-white { color: #e3e3e3; }
+.gemini-dark .bg-gradient-to-br, .gemini-dark .bg-gradient-to-r, .gemini-dark .bg-gradient-to-b { color: #e3e3e3; }

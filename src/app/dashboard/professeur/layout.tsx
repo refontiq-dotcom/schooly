@@ -30,7 +30,7 @@ export default async function ProfesseurLayout({
     : { data: null };
 
   return (
-    <div className="flex h-screen bg-slate-50">
+    <div className="gemini-dark flex h-screen overflow-hidden">
       <ProfSidebar
         fullName={profile?.full_name ?? "Professeur"}
         establishmentName={establishment?.name ?? ""}

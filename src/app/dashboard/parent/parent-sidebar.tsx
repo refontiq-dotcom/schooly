@@ -157,7 +157,7 @@ export default function ParentSidebar({
     <>
       {/* ── Sidebar ── */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 w-[260px] bg-white border-r border-slate-100 flex flex-col transition-transform duration-300 ease-in-out lg:static lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-40 w-[260px] bg-surface border-r border-subtle flex flex-col transition-transform duration-300 ease-in-out lg:static lg:translate-x-0 ${
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -167,13 +167,13 @@ export default function ParentSidebar({
             {logoUrl ? (
               <img src={logoUrl} alt="Schooly" className="w-8 h-8 rounded-lg object-cover" />
             ) : (
-              <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center">
-                <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <div className="w-8 h-8 rounded-lg bg-accent-active flex items-center justify-center">
+                <svg className="w-4 h-4 text-accent-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M4.26 10.147a60.436 60.436 0 00-.491 6.347A48.627 48.627 0 0112 20.904a48.627 48.627 0 018.232-4.41 60.46 60.46 0 00-.491-6.347m-15.482 0a50.57 50.57 0 00-2.658-.813A59.905 59.905 0 0112 3.493a59.902 59.902 0 0110.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.697 50.697 0 0112 13.489a50.702 50.702 0 017.74-3.342M6.75 15a.75.75 0 100-1.5.75.75 0 000 1.5zm0 0v-3.675A55.378 55.378 0 0112 8.443m-7.007 11.55A5.981 5.981 0 006.75 15.75v-1.5" />
                 </svg>
               </div>
             )}
-            <span className="text-lg font-bold text-slate-800 tracking-tight">Schooly</span>
+            <span className="text-lg font-bold text-text tracking-tight">Schooly</span>
           </Link>
         </div>
 
@@ -183,20 +183,20 @@ export default function ParentSidebar({
             <button
               type="button"
               onClick={() => setEstabOpen(!estabOpen)}
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors text-left"
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl bg-hover hover:bg-subtle transition-all duration-200 text-left"
             >
-              <SidebarIcon name="school" className="w-5 h-5 text-slate-500 shrink-0" />
+              <SidebarIcon name="school" className="w-5 h-5 text-muted shrink-0" />
               <div className="flex-1 min-w-0">
                 {selectedGroup && (
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-orange-600 truncate">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-accent-primary truncate">
                     {selectedGroup.name}
                   </p>
                 )}
-                <p className="text-sm font-medium text-slate-800 truncate">
+                <p className="text-sm font-medium text-text truncate">
                   {selectedEstab?.name ?? "Sélectionner"}
                 </p>
                 {selectedEstab && (
-                  <p className="text-xs text-slate-400 truncate">
+                  <p className="text-xs text-muted truncate">
                     {selectedEstab.city} · {selectedEstab.students.length} enfant
                     {selectedEstab.students.length > 1 ? "s" : ""}
                   </p>
@@ -204,34 +204,34 @@ export default function ParentSidebar({
               </div>
               <SidebarIcon
                 name="chevronDown"
-                className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${
+                className={`w-4 h-4 text-muted shrink-0 transition-transform ${
                   estabOpen ? "rotate-180" : ""
                 }`}
               />
             </button>
 
             {estabOpen && (
-              <div className="mt-1 bg-white border border-slate-100 rounded-xl shadow-lg overflow-hidden">
+              <div className="mt-1 bg-surface border border-subtle rounded-2xl shadow-xl shadow-black/30 overflow-hidden">
                 {establishments.map((estab) => (
                   <Link
                     key={estab.id}
                     href={switchEstabHref(estab.id)}
                     onClick={() => setEstabOpen(false)}
-                    className={`flex items-center gap-3 px-3 py-2.5 text-sm transition-colors ${
+                    className={`flex items-center gap-3 px-3 py-2.5 text-sm transition-all duration-200 ${
                       estab.id === selectedEstablishmentId
-                        ? "bg-amber-50 text-amber-800"
-                        : "text-slate-600 hover:bg-slate-50"
+                        ? "bg-accent-active text-accent-text"
+                        : "text-muted hover:bg-hover hover:text-text"
                     }`}
                   >
                     <span className="min-w-0">
                       {groupsByEstab[estab.id] && (
-                        <span className="block text-[10px] font-semibold uppercase tracking-wide text-orange-600 truncate">
+                        <span className="block text-[10px] font-semibold uppercase tracking-wide text-accent-primary truncate">
                           {groupsByEstab[estab.id].name}
                         </span>
                       )}
                       <span className="block truncate">{estab.name}</span>
                     </span>
-                    <span className="text-xs text-slate-400 ml-auto shrink-0">
+                    <span className="text-xs text-muted ml-auto shrink-0">
                       {estab.students.length}
                     </span>
                   </Link>
@@ -244,7 +244,7 @@ export default function ParentSidebar({
         {/* Children tabs (multiple) — large visual cards */}
         {currentChildren.length > 1 && (
           <div className="px-3 mb-2">
-            <p className="px-3 text-xs font-semibold text-slate-400 mb-2 flex items-center gap-1">
+            <p className="px-3 text-xs font-semibold text-muted mb-2 flex items-center gap-1">
               👧 Mes enfants
             </p>
             <div className="space-y-1.5">
@@ -254,19 +254,19 @@ export default function ParentSidebar({
                   <Link
                     key={child.id}
                     href={switchChildHref(child.id)}
-                    className={`flex items-center gap-3 px-3 py-3 rounded-2xl text-sm transition-all min-h-[56px] ${
+                    className={`flex items-center gap-3 px-3 py-3 rounded-3xl text-sm transition-all duration-200 min-h-[56px] ${
                       active
-                        ? "bg-amber-50 text-amber-800 border border-amber-200"
-                        : "text-slate-600 hover:bg-slate-50"
+                        ? "bg-accent-active text-accent-text"
+                        : "text-muted hover:bg-hover hover:text-text"
                     }`}
                   >
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-400 to-orange-400 flex items-center justify-center text-white font-bold text-sm shadow-sm shrink-0">
+                    <div className="w-10 h-10 rounded-full bg-accent-active flex items-center justify-center text-accent-text font-bold text-sm shrink-0">
                       {child.full_name.charAt(0)}
                     </div>
                     <div className="min-w-0">
                       <p className="truncate font-semibold">{child.full_name}</p>
                       {child.level_name && (
-                        <p className="text-xs text-slate-400 truncate">
+                        <p className="text-xs text-muted truncate">
                           {child.level_name}
                         </p>
                       )}
@@ -280,17 +280,17 @@ export default function ParentSidebar({
 
         {/* Single child card */}
         {currentChildren.length === 1 && (
-          <div className="px-4 py-3 mx-3 mb-2 bg-gradient-to-br from-amber-50 to-orange-50 rounded-2xl border border-amber-100">
+          <div className="px-4 py-3 mx-3 mb-2 bg-hover rounded-3xl border border-subtle">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white font-bold text-lg shadow-md">
+              <div className="w-12 h-12 rounded-full bg-accent-active flex items-center justify-center text-accent-text font-bold text-lg">
                 {currentChildren[0].full_name.charAt(0)}
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-bold text-slate-800 truncate">
+                <p className="text-sm font-bold text-text truncate">
                   {currentChildren[0].full_name}
                 </p>
                 {currentChildren[0].level_name && (
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-muted">
                     {currentChildren[0].level_name}
                   </p>
                 )}
@@ -311,10 +311,10 @@ export default function ParentSidebar({
                 key={item.href}
                 href={navHref(item.href)}
                 onClick={() => setMobileOpen(false)}
-                className={`flex items-center gap-3 px-4 py-3.5 rounded-2xl text-sm font-medium transition-all min-h-[52px] ${
+                className={`flex items-center gap-3 px-4 py-3.5 rounded-full text-sm font-medium transition-all duration-200 min-h-[52px] ${
                   active
-                    ? "bg-amber-50 text-amber-800 border border-amber-200 shadow-sm"
-                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-800"
+                    ? "bg-accent-active text-accent-text"
+                    : "text-muted hover:bg-hover hover:text-text"
                 }`}
               >
                 <span className="text-xl shrink-0" aria-hidden="true">{emoji}</span>
@@ -325,11 +325,11 @@ export default function ParentSidebar({
         </nav>
 
         {/* Sign out — large touch target */}
-        <div className="px-3 py-3 border-t border-slate-100">
+        <div className="px-3 py-3 border-t border-subtle">
           <form action={signOut}>
             <button
               type="submit"
-              className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl text-sm font-medium text-slate-500 hover:bg-red-50 hover:text-red-600 transition-colors min-h-[52px]"
+              className="w-full flex items-center gap-3 px-4 py-3.5 rounded-full text-sm font-medium text-muted hover:bg-hover hover:text-text transition-all duration-200 min-h-[52px]"
             >
               <span className="text-xl">🚪</span>
               Déconnexion
@@ -341,7 +341,7 @@ export default function ParentSidebar({
       {/* Mobile overlay */}
       {mobileOpen && (
         <div
-          className="fixed inset-0 z-30 bg-black/30 lg:hidden"
+          className="fixed inset-0 z-30 backdrop-blur-sm bg-black/60 lg:hidden"
           onClick={() => setMobileOpen(false)}
         />
       )}
@@ -349,12 +349,12 @@ export default function ParentSidebar({
       {/* ── Main Content ── */}
       <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
         {/* Top bar */}
-        <header className="sticky top-0 z-20 bg-white/80 backdrop-blur-md border-b border-slate-100 px-6 py-3 flex items-center gap-3">
+        <header className="sticky top-0 z-20 backdrop-blur-xl bg-[#131314]/80 border-b border-subtle px-6 py-3 flex items-center gap-3">
           <button
             type="button"
             onClick={() => setMobileOpen(!mobileOpen)}
             aria-label={mobileOpen ? "Fermer le menu" : "Ouvrir le menu"}
-            className="lg:hidden p-2 rounded-lg hover:bg-slate-100 text-slate-600"
+            className="lg:hidden p-2 rounded-full hover:bg-hover text-muted transition-all duration-200"
           >
             <SidebarIcon name={mobileOpen ? "close" : "menu"} className="w-5 h-5" />
           </button>
@@ -363,7 +363,7 @@ export default function ParentSidebar({
           {establishments.length > 1 && (
             <div className="sm:hidden">
               <select
-                className="text-sm border border-slate-200 rounded-lg px-2 py-1"
+                className="text-sm bg-hover text-text border border-subtle rounded-2xl px-2 py-1 outline-none"
                 defaultValue={selectedEstablishmentId ?? ""}
                 onChange={(e) => {
                   const params = new URLSearchParams(window.location.search);

@@ -50,6 +50,8 @@ export default async function AdminLayoutServer({
       groupName={groupName}
       branches={branches}
       currentBranchId={(establishment as { id: string } | null)?.id ?? null}
+      userName={profile?.full_name ?? "Admin"}
+      userRole={groupName ? `${groupName} · Directeur` : "Directeur"}
     >
       {children}
     </AdminLayoutClient>
