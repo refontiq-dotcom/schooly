@@ -7,11 +7,14 @@ export default async function ParentInscriptionsPage() {
   const { supabase, user } = await getSessionProfile();
   if (!user || !supabase) redirect("/auth?returnTo=/dashboard/parent/inscriptions");
 
-  const { data: applications } = await supabase
+  const { data: applications, error } = await supabase
     .from("enrollment_applications")
-    .select("id,status,modality,student_full_name,completeness_pct,duplicate_risk_score,recommendation_score,recommendation_reason,created_at,requested_level_id")
-    .eq("applicant_id", user.id)
+    .select("id,status,modality,student_full_name,completeness_pct,duplicate_risk_score,recommendation_score,recommendation_reason,created_at,requested_level_id,parent_phone,establishment_id")
     .order("created_at", { ascending: false });
+
+  if (error) {
+    return <div className="card text-sm text-red-600">Impossible de charger vos inscriptions.</div>;
+  }
 
   const levelIds = [...new Set((applications ?? []).map((a) => a.requested_level_id))];
   const { data: levels } = levelIds.length
@@ -20,16 +23,16 @@ export default async function ParentInscriptionsPage() {
   const levelNames = Object.fromEntries((levels ?? []).map((l) => [l.id, l.name]));
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="mx-auto max-w-4xl space-y-6">
       <div>
         <p className="text-sm font-medium text-blue-600">Schooly</p>
         <h1 className="mt-1 text-2xl font-bold text-navy">Mes inscriptions</h1>
-        <p className="mt-1 text-sm text-slate-500">Suivez chaque dossier sans appeler le secrétariat à chaque étape.</p>
+        <p className="mt-1 text-sm text-slate-500">Tous les dossiers associés à votre numéro, même dans des établissements différents.</p>
       </div>
 
       {(applications ?? []).length === 0 ? (
         <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500 shadow-sm">
-          Vous n'avez encore aucun dossier d'inscription.
+          Aucun dossier d'inscription associé à ce numéro.
         </div>
       ) : (
         <div className="space-y-3">
