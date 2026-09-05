@@ -45,7 +45,7 @@ create table if not exists public.enrollment_documents (
   id uuid primary key default gen_random_uuid(),
   enrollment_id uuid not null references public.enrollment_applications(id) on delete cascade,
   document_type text not null,
-  status text not null default 'missing' check (status in ('missing','submitted','validated','rejected')),
+  status text not null default 'missing' check (status in ('missing','provided')),
   file_url text,
   notes text,
   verified_by uuid references public.profiles(id),
@@ -127,7 +127,7 @@ create or replace function public.compute_enrollment_intelligence(p_application_
 returns public.enrollment_applications language plpgsql security definer set search_path=public as $$
 declare
   a public.enrollment_applications; flags text[]:='{}'; risk int:=0; candidate public.sections;
-  req_count int:=0; validated_count int:=0; score int:=0;
+  req_count int:=0; provided_count int:=0; score int:=0;
 begin
   select * into a from public.enrollment_applications where id=p_application_id for update;
   if not found then raise exception 'Dossier d''inscription introuvable'; end if;
@@ -142,8 +142,8 @@ begin
     flags:=array_append(flags,'PHONE_NAME_MISMATCH'); risk:=greatest(risk,65);
   end if;
 
-  select count(*),count(*) filter(where status='validated') into req_count,validated_count from public.enrollment_documents where enrollment_id=a.id;
-  a.completeness_pct:=case when req_count=0 then 100 else round(100.0*validated_count/req_count) end;
+  select count(*),count(*) filter(where status='provided') into req_count,provided_count from public.enrollment_documents where enrollment_id=a.id;
+  a.completeness_pct:=case when req_count=0 then 100 else round(100.0*provided_count/req_count) end;
 
   select s.* into candidate from public.sections s where s.level_id=a.requested_level_id and s.seats_taken<s.capacity order by (s.seats_taken::numeric/nullif(s.capacity,0)) asc,s.name asc limit 1;
   if candidate.id is not null then
