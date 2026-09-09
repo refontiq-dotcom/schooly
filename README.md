@@ -1,105 +1,38 @@
-# Schooly v2
+# SCHOOLY - SaaS de Gestion Scolaire Multi-établissements
 
-SaaS de gestion d'établissements scolaires : classes, élèves, paiements,
-documents, internat et communication avec les parents. Les établissements
-publiés sont exposés à **Trouvetou** (plateforme publique de découverte) via
-une API partenaire. Développé par **Refontiq** (Abidjan, Côte d'Ivoire).
+Ce fichier sert de point d'entrée pour tout développeur ou agent IA rejoignant le projet. Il définit l'architecture, la stack technique et la marche à suivre. **Si vous êtes un agent IA reprenant ce projet, lisez attentivement ce fichier avant de proposer des modifications.**
 
-## Rôles
+## 1. Contexte du projet
+**Schooly** est une plateforme SaaS de gestion scolaire (Côte d'Ivoire / Afrique de l'Ouest) avec pour principes non négociables :
+- **Zero-Training UX** : utilisable sans formation.
+- **Offline-first & Mobile-first** : pour s'adapter aux réalités du terrain (instabilité réseau).
+- **Multi-tenant strict (Base de données RLS)** : sécurité absolue et séparation des données entre les écoles.
+- **Sobriété technique** : pas de stockages lourds.
 
-| Rôle | Accès | Création de compte |
-|---|---|---|
-| `parent` | Suivi de ses enfants | Connexion par téléphone uniquement (numéro présent dans `students.parent_phone`) |
-| `admin` | Configuration complète de l'établissement | Devient admin en créant un établissement ou sur invitation |
-| `professeur`, `secretariat`, `censeur` | Espaces dédiés | Uniquement sur invitation d'un administrateur |
+📄 **Le Cahier des Charges complet se trouve ici :** [`cahier-des-charges-schooly-1.md`](./cahier-des-charges-schooly-1.md) (consultez sa section de suivi pour connaître l'avancement).
 
-Règle absolue : **un parent ne se connecte que si son numéro correspond à un
-enfant inscrit**. Pas d'inscription libre, pas de rôle staff auto-attribué.
+## 2. Architecture du Monorepo
+Ce projet utilise un monorepo (probablement via Turborepo / pnpm workspace) structuré ainsi :
+- `apps/web-admin/` : Le frontend administratif pour la Direction, Secrétariat, Comptabilité, etc. (Next.js App Router).
+- `apps/pwa-parent/` : Le portail PWA pour les parents et élèves (Next.js PWA offline-first).
+- `packages/ui/` : Bibliothèque de composants partagés (basée sur shadcn/ui et Tailwind CSS).
+- `packages/db/` : Dossier contenant la configuration Supabase, le schéma, les migrations SQL, et les tests RLS.
 
-## Stack technique
+## 3. Stack Technique
+- **Frontend** : Next.js (App Router), React, TypeScript strict, Tailwind CSS, shadcn/ui.
+- **Backend & BDD** : Supabase (PostgreSQL, Auth, Realtime). La sécurité repose intégralement sur les règles **RLS (Row Level Security)**.
+- **Tests** : Vitest (unitaires, calculs financiers, RLS) et potentiellement Playwright (E2E).
 
-| Composant | Technologie |
-|---|---|
-| Frontend | Next.js 16 (App Router) / React 19 / Tailwind CSS |
-| Backend & base | Supabase (PostgreSQL, Auth, Storage, RLS) |
-| Proxy (middleware) | `src/proxy.ts` (convention Next.js 16) |
-| Tests unitaires | Vitest (jsdom) |
-| Tests E2E | Playwright |
+## 4. Conventions de développement strictes
+1. **Pas de valeurs en dur** : Tous les tarifs, statuts, et coefficients doivent être gérés dynamiquement via la base de données.
+2. **Priorité aux tests RLS** : Toute nouvelle table doit s'accompagner de ses politiques RLS strictes (faisant référence au `school_id`) et des tests validant l'isolation AVANT de développer l'UI.
+3. **Types financiers** : Les montants financiers (FCFA) doivent toujours être des entiers (BIGINT), **jamais** de flottants.
+4. **Soft-deletes** : Aucune donnée métier sensible n'est supprimée définitivement (`deleted_at`).
+5. **Isolation de la logique multi-écoles** : Toutes les données sont liées par un `school_id`.
 
-## Structure
-
-```
-src/
-├── app/
-│   ├── (public)/auth/          # connexion parent (OTP téléphone)
-│   ├── dashboard/              # accueil dashboard (rôle-aware)
-│   └── page.tsx                # landing
-├── components/                 # composants React
-├── lib/
-│   ├── auth/                   # rôles, permissions par chemin
-│   ├── supabase/               # clients browser / server / admin
-│   └── test/                   # setup vitest
-├── proxy.ts                    # garde auth + rôles sur /dashboard
-└── types/                      # types TypeScript partagés
-supabase/
-├── schema.sql                  # schéma de base (tables, fonctions, RLS)
-├── seed.sql                    # données de démonstration
-└── config.toml                 # config CLI Supabase
-e2e/tests/                      # tests Playwright
-```
-
-## Démarrage rapide
-
-### 1. Environnement
-
-```bash
-cp .env.example .env.local   # renseigner les clés Supabase
-npm install
-```
-
-### 2. Supabase local (optionnel, pour développer)
-
-```bash
-supabase start               # Postgres + Auth sur 127.0.0.1:54321
-psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
-  -f supabase/schema.sql     # schéma de base
-psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
-  -f supabase/seed.sql       # données de démo
-```
-
-Ou avec un projet Supabase hébergé : exécuter `supabase/schema.sql` puis
-`supabase/seed.sql` dans le **SQL Editor**.
-
-### 3. Lancer et vérifier
-
-```bash
-npm run dev                  # http://localhost:3000
-npx tsc --noEmit             # typecheck (bloquant avant toute PR)
-npm run lint                 # ESLint
-npm run test:run             # tests unitaires
-npm run test:e2e             # tests Playwright (nécessite npm run dev)
-```
-
-## Conventions
-
-- **Migrations idempotentes** : `IF NOT EXISTS` / `DROP IF EXISTS` partout.
-- **Sécurité** : RLS activée sur toutes les tables ; les changements de rôle
-  passent uniquement par des fonctions `security definer` ; le trigger
-  `enforce_profiles_guard` bloque toute écriture directe de `role`,
-  `establishment_id` ou `email`.
-- **Anti-survente** : la réservation d'une place passe par
-  `confirm_reservation()` (UPDATE atomique sur `levels.reserved_count`).
-- **Proxy unique** : toute logique de routage/autorisation de requête vit dans
-  `src/proxy.ts` (Next.js 16 a renommé `middleware.ts` en `proxy.ts`).
-
-## Interdits produit (à préserver)
-
-- Ne jamais permettre l'inscription libre d'un parent (email/mot de passe).
-- Ne jamais exposer l'écriture de `published_to_trouvetou` au client.
-- Ne jamais autoriser `/api/trouvetou/*` sans la clé Bearer.
-- Ne jamais permettre à un parent de créer un établissement ni de devenir
-  admin sans passer par une fonction `security definer` vérifiée.
-
-## Licence
-
-Propriété de Refontiq. Usage interne / démonstration client.
+## 5. Comment reprendre le développement (Pour un agent IA / Développeur)
+1. Lisez **obligatoirement** ce `README.md`.
+2. Ouvrez le [`cahier-des-charges-schooly-1.md`](./cahier-des-charges-schooly-1.md) et descendez à la **Section 10 (Roadmap)** pour identifier l'étape en cours marquée d'un `[ ]` (case non cochée).
+3. Observez la **Section 11 (Checklist de démarrage)** pour vérifier que toutes les étapes de fondations sont remplies.
+4. Vérifiez les migrations dans `packages/db/supabase/migrations` pour connaître l'état de la base de données.
+5. Proposez toujours un **plan d'implémentation** avant toute modification de masse.

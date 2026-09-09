@@ -9,14 +9,28 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      "@": resolve(rootDir, "./src"),
+      "@schooly/ui": resolve(rootDir, "packages/ui/src"),
     },
   },
   test: {
-    environment: "jsdom",
-    globals: true,
-    setupFiles: "./src/lib/test/setup.ts",
-    include: ["src/**/*.{test,spec}.{js,ts,jsx,tsx}"],
-    css: true,
+    projects: [
+      {
+        test: {
+          name: "ui",
+          environment: "jsdom",
+          globals: true,
+          include: ["packages/ui/src/**/*.test.{ts,tsx}"],
+          css: true,
+        },
+      },
+      {
+        test: {
+          name: "db",
+          environment: "node",
+          globals: true,
+          include: ["packages/db/tests/**/*.test.ts"],
+        },
+      },
+    ],
   },
 });

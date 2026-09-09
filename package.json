@@ -1,48 +1,29 @@
 {
-  "name": "schooly-v2",
-  "version": "0.1.0",
+  "name": "schooly",
+  "version": "0.2.0",
   "private": true,
-  "description": "Schooly — SaaS de gestion d'établissements scolaires, connecté à Trouvetou. Refontiq (Abidjan, Côte d'Ivoire).",
+  "description": "Schooly — SaaS de gestion scolaire multi-établissements (Côte d'Ivoire / Afrique de l'Ouest). Refontiq.",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
+    "dev:admin": "npm run dev --workspace apps/web-admin",
+    "dev:parent": "npm run dev --workspace apps/pwa-parent",
+    "build": "npm run build --workspace apps/web-admin && npm run build --workspace apps/pwa-parent",
+    "build:admin": "npm run build --workspace apps/web-admin",
+    "build:parent": "npm run build --workspace apps/pwa-parent",
+    "typecheck": "tsc -p packages/ui --noEmit && tsc -p packages/db --noEmit && tsc -p apps/web-admin --noEmit && tsc -p apps/pwa-parent --noEmit",
     "lint": "eslint .",
-    "test": "vitest",
-    "test:run": "vitest run",
-    "test:ui": "vitest --ui",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui",
-    "db:reset": "supabase db reset"
-  },
-  "dependencies": {
-    "@supabase/ssr": "^0.5.1",
-    "@supabase/supabase-js": "^2.45.4",
-    "date-fns": "^3.6.0",
-    "lucide-react": "^0.468.0",
-    "next": "16.3.4",
-    "qrcode": "^1.5.4",
-    "react": "19.0.0",
-    "react-dom": "19.0.0"
-  },
-  "devDependencies": {
-    "@playwright/test": "^1.54.2",
-    "@testing-library/jest-dom": "^7.0.1",
-    "@testing-library/react": "^16.3.3",
-    "@testing-library/user-event": "^14.6.7",
-    "@types/node": "^20.14.11",
-    "@types/qrcode": "^1.5.5",
-    "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0",
-    "@vitejs/plugin-react": "^6.1.1",
-    "autoprefixer": "^10.4.19",
-    "eslint": "^9.9.0",
-    "eslint-config-next": "16.3.4",
-    "jsdom": "^30.0.1",
-    "postcss": "^8.4.40",
-    "supabase": "^2.116.0",
-    "tailwindcss": "^3.4.7",
-    "typescript": "^5.5.4",
-    "vitest": "^4.1.11"
+    "db:start": "cd packages/db && supabase start",
+    "db:stop": "cd packages/db && supabase stop",
+    "db:reset": "cd packages/db && supabase db reset",
+    "db:types": "cd packages/db && supabase gen types typescript --local > src/database.types.ts"
   }
 }

@@ -1,0 +1,17 @@
+project_id = "schooly-v2"
+
+[api]
+port = 55321
+
+[db]
+port = 55332
+
+[studio]
+port = 55333
+
+[inbucket]
+port = 55334
+
+[auth]
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["http://localhost:3001"]

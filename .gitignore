@@ -1,13 +1,13 @@
 # Dependencies
-/node_modules
+node_modules/
 
 # Next.js
-/.next/
-/out/
-next-env.d.ts
+.next/
+out/
+**/next-env.d.ts
 
 # Production
-/build
+build/
 
 # Env
 .env
@@ -18,17 +18,16 @@ next-env.d.ts
 .DS_Store
 *.pem
 npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+*.log
 
 # TypeScript
 *.tsbuildinfo
 
 # Playwright
-/playwright-report/
-/test-results/
+playwright-report/
+test-results/
 
 # Supabase local
-/.supabase/
-/.branches/
-/.temp/
+.supabase/
+.branches/
+.temp/

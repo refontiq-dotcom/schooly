@@ -6,12 +6,12 @@ export default [
   {
     ignores: [
       'node_modules',
-      '.next',
+      '**/.next',
+      '**/next-env.d.ts',
       'coverage',
       'playwright-report',
       'test-results',
-      'supabase/functions',
-      'e2e',
+      'packages/db/supabase',
     ],
   },
 ];
