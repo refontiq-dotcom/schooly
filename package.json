@@ -13,7 +13,7 @@
   "scripts": {
     "dev:admin": "npm run dev --workspace apps/web-admin",
     "dev:parent": "npm run dev --workspace apps/pwa-parent",
-    "build": "npm run build --workspace apps/web-admin && npm run build --workspace apps/pwa-parent && npm run build --workspace packages/billing",
+    "build": "if [ \"$VERCEL\" = \"1\" ]; then cd apps/web-admin && npx next build; else npm run build --workspace apps/web-admin && npm run build --workspace apps/pwa-parent && npm run build --workspace packages/billing; fi",
     "build:admin": "npm run build --workspace apps/web-admin",
     "build:parent": "npm run build --workspace apps/pwa-parent",
     "build:billing": "npm run build --workspace packages/billing",

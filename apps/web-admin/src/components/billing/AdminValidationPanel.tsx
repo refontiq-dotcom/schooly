@@ -6,9 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { formatFCFA, formatDate } from "@refontiq/billing";
+import { formatFCFA, formatDate } from "@/lib/formatters";
 import { Loader2, CheckCircle2, XCircle, Clock, AlertCircle, Check, Ban, Search, CreditCard, Phone, Eye, MoreHorizontal } from "lucide-react";
-import type { SubscriptionPaymentRequest } from "@refontiq/billing";
+import type { SubscriptionPaymentRequest } from "@/types/billing";
 
 interface AdminValidationPanelProps {
   productId: string;

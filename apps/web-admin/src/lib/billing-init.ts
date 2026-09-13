@@ -1,4 +1,4 @@
-import { initBilling } from '@refontiq/billing';
+import { initBilling } from '@/lib/formatters';
 
 export function initBillingClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;

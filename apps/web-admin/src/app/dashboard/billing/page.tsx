@@ -9,7 +9,7 @@ import { PaymentSubmissionFormClient } from "@/components/billing/PaymentSubmiss
 import { AdminValidationPanelClient } from "@/components/billing/AdminValidationPanelClient"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { formatFCFA } from "@refontiq/billing"
+import { formatFCFA } from "@/lib/formatters"
 
 export default async function BillingPage() {
   const ctx = await getBillingContext().catch(() => null)

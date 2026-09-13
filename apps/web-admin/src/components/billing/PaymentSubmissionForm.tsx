@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { CreditCard, Loader2, CheckCircle2, AlertCircle, Phone, HelpCircle, ExternalLink } from "lucide-react";
-import { formatFCFA } from "@refontiq/billing";
+import { formatFCFA } from "@/lib/formatters";
 
 interface PaymentSubmissionFormProps {
   productId: string;
