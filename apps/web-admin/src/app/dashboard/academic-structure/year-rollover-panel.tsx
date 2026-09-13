@@ -14,6 +14,7 @@ import {
   getRolloverPreview,
   executeRollover,
   getRolloverLogs,
+  setEnrollmentDecision,
 } from "./rollover-actions"
 import {
   CalendarDays,
@@ -45,7 +46,15 @@ type RolloverPreview = {
   repeated: number
   excluded: number
   pending: number
-  enrollments: any[]
+  enrollments: Array<{
+    id: string
+    studentName: string
+    className: string
+    gradeLevelId?: string
+    gradeLevelName: string
+    gradeLevelOrder: number
+    decision: string
+  }>
 }
 
 type RolloverResult = {
@@ -57,9 +66,9 @@ type RolloverResult = {
 }
 
 const YEAR_STATUS_CONFIG: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
-  active: { label: "Active", variant: "default" },
+  en_cours: { label: "En cours", variant: "default" },
   planifiee: { label: "Planifiée", variant: "secondary" },
-  terminee: { label: "Terminée", variant: "outline" },
+  cloturee: { label: "Clôturée", variant: "outline" },
 }
 
 const DECISION_LABELS: Record<string, { label: string; color: string; icon: React.ElementType }> = {
@@ -95,8 +104,13 @@ export function YearRolloverPanel() {
 
   useEffect(() => { load() }, [])
 
-  const activeYear = years.find(y => y.status === "active")
+  const activeYear = years.find(y => y.status === "en_cours")
   const plannedYears = years.filter(y => y.status === "planifiee")
+
+  // Pré-sélectionne l'année en cours comme année source dès qu'elle est connue
+  useEffect(() => {
+    if (!selectedOldYear && activeYear) setSelectedOldYear(activeYear.id)
+  }, [activeYear, selectedOldYear])
 
   const handlePreview = async () => {
     if (!selectedOldYear) { setErrorMsg("Sélectionnez l'année source."); return }
@@ -261,11 +275,11 @@ export function YearRolloverPanel() {
                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                   >
                     <option value="">Sélectionner…</option>
-                    {years.filter(y => y.status === "active").map(y => (
-                      <option key={y.id} value={y.id}>{y.label} (Active)</option>
+                    {years.filter(y => y.status === "en_cours").map(y => (
+                      <option key={y.id} value={y.id}>{y.label} (En cours)</option>
                     ))}
-                    {years.filter(y => y.status === "terminee").map(y => (
-                      <option key={y.id} value={y.id}>{y.label} (Terminée)</option>
+                    {years.filter(y => y.status === "cloturee").map(y => (
+                      <option key={y.id} value={y.id}>{y.label} (Clôturée)</option>
                     ))}
                   </select>
                 </div>
@@ -327,7 +341,7 @@ export function YearRolloverPanel() {
                 })}
               </div>
 
-              {/* Liste des élèves */}
+              {/* Liste des élèves — décisions saisissables sans quitter la bascule */}
               <div className="max-h-64 overflow-y-auto rounded-lg border">
                 <table className="w-full text-xs">
                   <thead className="sticky top-0 bg-muted">
@@ -345,15 +359,75 @@ export function YearRolloverPanel() {
                           <td className="py-2 px-3">{e.studentName}</td>
                           <td className="py-2 px-3 text-muted-foreground">{e.className}</td>
                           <td className="py-2 px-3">
-                            <span className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium ${d?.color}`}>
-                              {d?.label ?? e.decision}
-                            </span>
+                            <div className="flex items-center gap-1.5">
+                              <span className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium ${d?.color}`}>
+                                {d?.label ?? e.decision}
+                              </span>
+                              <select
+                                aria-label={`Décision pour ${e.studentName}`}
+                                value={e.decision}
+                                disabled={isPending}
+                                onChange={(ev: React.ChangeEvent<HTMLSelectElement>) => {
+                                  const decision = ev.target.value as "admitted" | "repeated" | "excluded" | "pending"
+                                  startTransition(async () => {
+                                    const res = await setEnrollmentDecision(e.id, selectedOldYear, decision)
+                                    if ("error" in res) { setErrorMsg(res.error ?? "Erreur inconnue"); return }
+                                    const updated = await getRolloverPreview(selectedOldYear)
+                                    if ("error" in updated) { setErrorMsg(updated.error ?? "Erreur inconnue"); return }
+                                    setPreview(updated.data)
+                                  })
+                                }}
+                                className="h-7 rounded-md border border-input bg-background px-1.5 text-xs"
+                              >
+                                <option value="admitted">Admis</option>
+                                <option value="repeated">Redouble</option>
+                                <option value="excluded">Exclu</option>
+                                <option value="pending">En attente</option>
+                              </select>
+                            </div>
                           </td>
                         </tr>
                       )
                     })}
                   </tbody>
                 </table>
+              </div>
+
+              {/* Actions groupées : tout marquer Admis / réinitialiser */}
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={isPending}
+                  onClick={() => {
+                    startTransition(async () => {
+                      const targets = preview.enrollments.filter(e => e.decision !== "admitted")
+                      for (const t of targets) {
+                        const res = await setEnrollmentDecision(t.id, selectedOldYear, "admitted")
+                        if ("error" in res) { setErrorMsg(res.error ?? "Erreur inconnue"); return }
+                      }
+                      const updated = await getRolloverPreview(selectedOldYear)
+                      if ("error" in updated) { setErrorMsg(updated.error ?? "Erreur inconnue"); return }
+                      setPreview(updated.data)
+                    })
+                  }}
+                >
+                  <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Tout marquer « Admis »
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={isPending}
+                  onClick={() => {
+                    startTransition(async () => {
+                      const updated = await getRolloverPreview(selectedOldYear)
+                      if ("error" in updated) { setErrorMsg(updated.error ?? "Erreur inconnue"); return }
+                      setPreview(updated.data)
+                    })
+                  }}
+                >
+                  <RotateCcw className="h-3.5 w-3.5 mr-1" /> Rafraîchir
+                </Button>
               </div>
 
               {preview.pending > 0 && (

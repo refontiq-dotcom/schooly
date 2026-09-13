@@ -66,25 +66,25 @@ export async function createAcademicYear(formData: FormData) {
   return { ok: true }
 }
 
-// ─── Activer une année (passe l'ancienne à "terminee") ───────────────────────
+// ─── Activer une année (clôture l'année "en_cours", active la nouvelle) ──────
 
 export async function activateAcademicYear(yearId: string) {
   const { schoolId } = await getContext()
   const admin = getAdmin()
 
-  // Mettre toutes les autres années à "terminee"
+  // Mettre toutes les autres années à "cloturee"
   const { error: closeErr } = await admin
     .from("academic_years")
-    .update({ status: "terminee" })
+    .update({ status: "cloturee" })
     .eq("school_id", schoolId)
-    .eq("status", "active")
+    .eq("status", "en_cours")
 
   if (closeErr) return { error: closeErr.message }
 
   // Activer la nouvelle
   const { error } = await admin
     .from("academic_years")
-    .update({ status: "active" })
+    .update({ status: "en_cours" })
     .eq("id", yearId)
     .eq("school_id", schoolId)
 
@@ -141,6 +141,50 @@ export async function getRolloverPreview(oldYearId: string) {
   }
 }
 
+// ─── Enregistrer une décision du conseil de classe ─────────────────────────
+// Écrit dans academic_decisions (source de vérité partagée avec le module
+// Pédagogie). Upsert idempotent : une décision par (école, inscription, année).
+
+export async function setEnrollmentDecision(
+  enrollmentId: string,
+  oldYearId: string,
+  decision: "admitted" | "repeated" | "excluded" | "pending",
+) {
+  const { schoolId, userId } = await getContext()
+  const admin = getAdmin()
+
+  if (!["admitted", "repeated", "excluded", "pending"].includes(decision)) {
+    return { error: "Décision invalide." }
+  }
+
+  const { data: enrollment } = await admin
+    .from("enrollments")
+    .select("id")
+    .eq("id", enrollmentId)
+    .eq("school_id", schoolId)
+    .is("deleted_at", null)
+    .single()
+
+  if (!enrollment) return { error: "Inscription introuvable." }
+
+  const { error } = await admin
+    .from("academic_decisions")
+    .upsert(
+      {
+        school_id: schoolId,
+        enrollment_id: enrollmentId,
+        academic_year_id: oldYearId,
+        decision,
+        decided_by: userId,
+        decided_at: new Date().toISOString(),
+      },
+      { onConflict: "school_id, enrollment_id, academic_year_id" },
+    )
+
+  if (error) return { error: error.message }
+  return { ok: true }
+}
+
 // ─── Bascule réelle ───────────────────────────────────────────────────────────
 // Pour chaque élève "admitted" : crée un nouvel enrollment sur la nouvelle année (niveau +1)
 // Pour "repeated" : copie sur le même niveau
@@ -161,6 +205,8 @@ export async function executeRollover(oldYearId: string, newYearId: string) {
   if (!newYear) return { error: "Nouvelle année introuvable." }
 
   // Récupérer tous les enrollments de l'ancienne année avec leurs décisions
+  // (source de vérité : academic_decisions, partagée avec le module Pédagogie
+  // et getRolloverPreview — PAS enrollment_decisions qui n'existe pas).
   const { data: enrollments, error: enrollErr } = await admin
     .from("enrollments")
     .select(`
@@ -173,6 +219,17 @@ export async function executeRollover(oldYearId: string, newYearId: string) {
 
   if (enrollErr) return { error: enrollErr.message }
   if (!enrollments?.length) return { error: "Aucun élève à basculer." }
+
+  // Garde anti-doublon : si des enrollments existent déjà sur la nouvelle année,
+  // on ignore les élèves déjà réinscrits (idempotent — reprise après échec).
+  const { data: alreadyRolled } = await admin
+    .from("enrollments")
+    .select("student_id")
+    .eq("school_id", schoolId)
+    .eq("academic_year_id", newYearId)
+    .is("deleted_at", null)
+
+  const rolledStudentIds = new Set((alreadyRolled || []).map(r => r.student_id))
 
   // Récupérer tous les niveaux de l'école triés par ordre
   const { data: gradeLevels } = await admin
@@ -190,7 +247,10 @@ export async function executeRollover(oldYearId: string, newYearId: string) {
   const newEnrollments: any[] = []
 
   for (const enr of enrollments) {
-    const decision = (enr.academic_decisions as any)?.[0]?.decision ?? "pending"
+    // Déjà réinscrit sur la nouvelle année (rejouée idempotente) → on saute.
+    if (rolledStudentIds.has(enr.student_id)) continue
+
+    const decision = ((enr as any).academic_decisions as any)?.[0]?.decision ?? "pending"
 
     if (decision === "excluded") {
       excluded++
@@ -233,10 +293,16 @@ export async function executeRollover(oldYearId: string, newYearId: string) {
       academic_year_id: newYearId,
       status: "active",
       enrollment_date: new Date().toISOString().slice(0, 10),
+      // Matricule unique par inscription (contrainte school_id + matricule).
+      // Format : <PREFIX>-<ANNEE>-<ALEA> (même convention que createEnrollment).
+      matricule: `${schoolId.slice(0, 4).toUpperCase()}-${new Date().getFullYear()}-${Math.floor(Math.random() * 100000).toString().padStart(5, "0")}`,
     })
   }
 
-  // Insérer les nouveaux enrollments par lots de 50
+  // Insérer les nouveaux enrollments par lots de 50.
+  // Note : onConflict (school_id, matricule) + ignoreDuplicates gère la
+  // reprise après échec partiel (idempotent) ; en cas de collision de
+  // matricule aléatoire, le doublon est ignoré puis compté dans newEnrollments.
   if (newEnrollments.length > 0) {
     for (let i = 0; i < newEnrollments.length; i += 50) {
       const batch = newEnrollments.slice(i, i + 50)
