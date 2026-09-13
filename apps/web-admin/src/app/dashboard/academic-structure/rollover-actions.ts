@@ -206,7 +206,7 @@ export async function executeRollover(oldYearId: string, newYearId: string) {
 
   // Récupérer tous les enrollments de l'ancienne année avec leurs décisions
   // (source de vérité : academic_decisions, partagée avec le module Pédagogie
-  // et getRolloverPreview — PAS enrollment_decisions qui n'existe pas).
+  // et getRolloverPreview — PAS enrollment_decisions).
   const { data: enrollments, error: enrollErr } = await admin
     .from("enrollments")
     .select(`
