@@ -31,41 +31,26 @@ export async function schoolLoginAction(
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// LOGIN PARENT (étape 1) : envoyer le code OTP par email ou SMS
+// LOGIN PARENT (étape 1) : envoyer le code OTP par email
 // ═══════════════════════════════════════════════════════════════════════════
 export async function parentOtpSendAction(
   prevState: LoginResult,
   formData: FormData
 ): Promise<LoginResult> {
-  const contact = formData.get("contact") as string
+  const email = formData.get("email") as string
 
-  if (!contact) {
-    return { error: "Email ou numéro de téléphone requis." }
+  if (!email) {
+    return { error: "Email requis." }
   }
 
   const supabase = await createClient()
 
-  // Détecter si c'est un email ou un téléphone
-  const isEmail = contact.includes("@")
-
-  if (isEmail) {
-    const { error } = await supabase.auth.signInWithOtp({
-      email: contact,
-      options: { shouldCreateUser: false },
-    })
-    if (error) {
-      return { error: "Erreur lors de l'envoi du code. Vérifiez votre email." }
-    }
-  } else {
-    // Téléphone : format international requis (ex: +225070000000)
-    const phone = contact.startsWith("+") ? contact : `+225${contact.replace(/\s/g, "")}`
-    const { error } = await supabase.auth.signInWithOtp({
-      phone,
-      options: { shouldCreateUser: false },
-    })
-    if (error) {
-      return { error: "Erreur lors de l'envoi du SMS. Vérifiez votre numéro." }
-    }
+  const { error } = await supabase.auth.signInWithOtp({
+    email,
+    options: { shouldCreateUser: false },
+  })
+  if (error) {
+    return { error: "Erreur lors de l'envoi du code. Vérifiez votre email." }
   }
 
   return { error: null, success: true }
@@ -78,24 +63,16 @@ export async function parentOtpVerifyAction(
   prevState: LoginResult,
   formData: FormData
 ): Promise<LoginResult> {
-  const contact = formData.get("contact") as string
+  const email = formData.get("email") as string
   const token = formData.get("token") as string
 
-  if (!contact || !token) {
+  if (!email || !token) {
     return { error: "Code de vérification requis." }
   }
 
   const supabase = await createClient()
 
-  const isEmail = contact.includes("@")
-
-  const { error } = isEmail
-    ? await supabase.auth.verifyOtp({ email: contact, token, type: "email" })
-    : await supabase.auth.verifyOtp({
-        phone: contact.startsWith("+") ? contact : `+225${contact.replace(/\s/g, "")}`,
-        token,
-        type: "sms",
-      })
+  const { error } = await supabase.auth.verifyOtp({ email, token, type: "email" })
 
   if (error) {
     return { error: "Code invalide ou expiré. Veuillez réessayer." }
