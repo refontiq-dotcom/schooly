@@ -39,5 +39,6 @@
   "dependencies": {
     "@radix-ui/react-alert-dialog": "^1.1.23",
     "@radix-ui/react-dialog": "^1.1.23"
-  }
+  },
+  "packageManager": "npm@11.6.0"
 }
