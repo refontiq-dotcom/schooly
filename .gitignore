@@ -31,3 +31,6 @@ test-results/
 .supabase/
 .branches/
 .temp/
+
+# Scripts de migration manuels (contiennent des secrets : cles API Trouvetou)
+trouvetou-migrations/

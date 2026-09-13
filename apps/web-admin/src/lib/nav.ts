@@ -1,4 +1,5 @@
 import {
+  Megaphone,
   LayoutDashboard,
   Users,
   GraduationCap,
@@ -15,6 +16,7 @@ import {
   QrCode,
   Scan,
   AlertTriangle,
+  Bus,
 } from "lucide-react"
 
 export type NavItem = {
@@ -28,6 +30,7 @@ export const NAV_BY_ROLE: Record<string, NavItem[]> = {
     { label: "Vue Globale", href: "/dashboard/super-admin", icon: LayoutDashboard },
     { label: "Établissements", href: "/dashboard/super-admin/schools", icon: School },
     { label: "Utilisateurs", href: "/dashboard/super-admin/users", icon: Users },
+    { label: "Facturation", href: "/dashboard/billing", icon: CreditCard },
   ],
   direction: [
     { label: "Tableau de bord", href: "/dashboard/direction", icon: LayoutDashboard },
@@ -36,12 +39,16 @@ export const NAV_BY_ROLE: Record<string, NavItem[]> = {
     { label: "Finance", href: "/dashboard/direction/finance", icon: CreditCard },
     { label: "Moratoires", href: "/dashboard/direction/finance/moratoriums", icon: Clock },
     { label: "Relances", href: "/dashboard/direction/finance/reminders", icon: Bell },
+    { label: "Facturation", href: "/dashboard/billing", icon: CreditCard },
     { label: "Rapports", href: "/dashboard/direction/reports", icon: BookOpen },
+    { label: "Services", href: "/dashboard/services/transport", icon: Bus },
     { label: "Paramètres", href: "/dashboard/direction/settings", icon: Settings },
+    { label: "Trouvetou", href: "/dashboard/admin/trouvetou", icon: Megaphone },
   ],
   compta: [
     { label: "Tableau de bord", href: "/dashboard/direction", icon: LayoutDashboard },
     { label: "Finance", href: "/dashboard/direction/finance", icon: CreditCard },
+    { label: "Services", href: "/dashboard/services/transport", icon: Bus },
     { label: "Rapports", href: "/dashboard/direction/reports", icon: BookOpen },
   ],
   caisse: [

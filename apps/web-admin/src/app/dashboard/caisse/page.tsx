@@ -72,12 +72,9 @@ export default function CaissePage() {
       const { data: { user: authUser } } = await supabase.auth.getUser()
       if (!authUser) return
 
-      const admin = (await import("@supabase/supabase-js")).createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!
-      )
-
-      const { data: roleData } = await admin
+      // Lecture du rattachement via le client navigateur (session utilisateur,
+      // politique RLS usr_read) — jamais de clé service role côté client.
+      const { data: roleData } = await supabase
         .from("user_school_roles")
         .select("school_id")
         .eq("user_id", authUser.id)
@@ -147,14 +144,14 @@ export default function CaissePage() {
         <Card className="border-orange-200 bg-orange-50 dark:border-orange-900 dark:bg-orange-950/20">
           <CardContent className="pt-6">
             <p className="text-sm text-orange-800 dark:text-orange-200">
-              Aucune session de caisse ouverte. Ouvrez une session avant d'effectuer des encaissements.
+              Aucune session de caisse ouverte. Ouvrez une session avant d’effectuer des encaissements.
             </p>
           </CardContent>
         </Card>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Formulaire d'encaissement */}
+        {/* Formulaire d’encaissement */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -217,7 +214,7 @@ export default function CaissePage() {
         <div className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Aujourd'hui</CardTitle>
+              <CardTitle>Aujourd’hui</CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-3xl font-bold">{todayTotal.toLocaleString("fr-FR")} FCFA</p>

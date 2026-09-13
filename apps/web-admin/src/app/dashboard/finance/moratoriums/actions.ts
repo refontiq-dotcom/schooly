@@ -298,7 +298,7 @@ export async function updateFamilyReliabilityScore(schoolId: string, guardianId:
       rejected_moratoriums: rejectedMoratoriums,
       last_updated: new Date().toISOString(),
     }, {
-      onConflict: ["school_id", "guardian_id"]
+      onConflict: "school_id, guardian_id"
     })
 
   if (error) return { error: error.message }

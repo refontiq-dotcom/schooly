@@ -21,16 +21,12 @@ type AcademicYear = {
 }
 
 async function getAcademicYears(schoolId: string) {
-  const { data: { user } } = await (await createClient()).auth.getUser()
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) return []
 
-  const admin = (await import("@supabase/supabase-js")).createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
-
-  const { data } = await admin
+  const { data } = await supabase
     .from("academic_years")
     .select("id, label, status")
     .eq("school_id", schoolId)
@@ -61,14 +57,10 @@ export function AcademicYearSelector({ schoolId }: { schoolId?: string }) {
     setSelectedId(value)
     document.cookie = `active_academic_year_id=${value}; Path=/; Max-Age=31536000`
     
-    // Optionnel : mettre à jour le statut dans la base
-    const admin = (await import("@supabase/supabase-js")).createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
+    const supabase = await createClient()
 
-    await admin.from("academic_years").update({ status: "en_cours" }).eq("id", value)
-    await admin.from("academic_years").update({ status: "planifiee" }).neq("id", value).eq("school_id", schoolId)
+    await supabase.from("academic_years").update({ status: "en_cours" }).eq("id", value)
+    await supabase.from("academic_years").update({ status: "planifiee" }).neq("id", value).eq("school_id", schoolId)
     
     toast.success("Année académique activée")
     setLoading(false)

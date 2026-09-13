@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { Plus, BookOpen, GraduationCap, Users, FileText } from "lucide-react"
+import { Plus, BookOpen, GraduationCap, Users, FileText, RotateCcw } from "lucide-react"
+import { YearRolloverPanel } from "./year-rollover-panel"
 import {
   createAcademicYear,
   createGradeLevel,
@@ -85,12 +86,13 @@ export default function AcademicStructurePage() {
       )}
 
       <Tabs value={tab} onValueChange={setTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="years"><BookOpen className="h-4 w-4 mr-2" />Années</TabsTrigger>
           <TabsTrigger value="levels"><GraduationCap className="h-4 w-4 mr-2" />Niveaux</TabsTrigger>
           <TabsTrigger value="classes"><Users className="h-4 w-4 mr-2" />Classes</TabsTrigger>
           <TabsTrigger value="subjects"><FileText className="h-4 w-4 mr-2" />Matières</TabsTrigger>
           <TabsTrigger value="matrix"><BookOpen className="h-4 w-4 mr-2" />Matrice</TabsTrigger>
+          <TabsTrigger value="rollover"><RotateCcw className="h-4 w-4 mr-2" />Bascule</TabsTrigger>
         </TabsList>
 
         <TabsContent value="years">
@@ -300,6 +302,10 @@ export default function AcademicStructurePage() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="rollover">
+          <YearRolloverPanel />
         </TabsContent>
       </Tabs>
     </div>

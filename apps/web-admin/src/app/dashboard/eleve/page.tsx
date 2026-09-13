@@ -1,0 +1,267 @@
+import Link from "next/link"
+import { createClient } from "@supabase/supabase-js"
+import { BookOpen, GraduationCap, Lock, LogOut } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { getStudentEnrollmentId, lockStudentPortal } from "./actions"
+import { QrUnlockForm } from "./qr-unlock-form"
+
+export const dynamic = "force-dynamic"
+
+function admin() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
+
+type EnrollmentInfo = {
+  id: string
+  class_id: string | null
+  students: { first_name: string; last_name: string } | null
+  classes: { name: string } | null
+  academic_years: { label: string } | null
+  schools: { name: string } | null
+}
+
+export default async function ElevePortalPage() {
+  const enrollmentId = await getStudentEnrollmentId()
+
+  // ————— Non déverrouillé : formulaire code QR —————
+  if (!enrollmentId) {
+    return (
+      <div className="mx-auto max-w-md py-6">
+        <QrUnlockForm />
+        <p className="mt-4 flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
+          <Lock className="h-3 w-3" /> Session valable 8 h, révocable par la vie scolaire.
+        </p>
+      </div>
+    )
+  }
+
+  const db = admin()
+
+  // ————— Vérifie que le QR est toujours actif + infos inscription —————
+  const { data: qrRow } = await db
+    .from("student_qr_codes")
+    .select("id, is_active, enrollment_id")
+    .eq("enrollment_id", enrollmentId)
+    .is("deleted_at", null)
+    .limit(1)
+
+  const qr = (qrRow ?? [])[0]
+  if (!qr || !qr.is_active) {
+    return (
+      <div className="mx-auto max-w-md py-6">
+        <Card>
+          <CardHeader className="text-center">
+            <CardTitle>Accès révoqué</CardTitle>
+            <CardDescription>
+              Votre code d&apos;accès a été désactivé. Contactez la vie scolaire.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form action={lockStudentPortal} className="text-center">
+              <Button variant="outline" type="submit">
+                <LogOut className="h-4 w-4" /> Réinitialiser
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  const { data: enrRows } = await db
+    .from("enrollments")
+    .select(
+      `id, class_id,
+       students ( first_name, last_name ),
+       classes ( name ),
+       academic_years ( label ),
+       schools ( name )`
+    )
+    .eq("id", enrollmentId)
+    .is("deleted_at", null)
+    .limit(1)
+
+  const enrollment = (enrRows ?? [])[0] as unknown as EnrollmentInfo | undefined
+  if (!enrollment) {
+    return (
+      <div className="mx-auto max-w-md py-6">
+        <Card>
+          <CardHeader className="text-center">
+            <CardTitle>Inscription introuvable</CardTitle>
+            <CardDescription>Contactez le secrétariat de votre école.</CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    )
+  }
+
+  // ————— Cahier de texte publié de la classe —————
+  let homeworks: {
+    id: string
+    title: string
+    description: string | null
+    due_date: string
+    subjects: { name: string } | null
+  }[] = []
+  if (enrollment.class_id) {
+    const { data: hws } = await db
+      .from("homeworks")
+      .select("id, title, description, due_date, subjects ( name )")
+      .eq("class_id", enrollment.class_id)
+      .eq("is_published", true)
+      .is("deleted_at", null)
+      .order("due_date", { ascending: true })
+      .limit(20)
+    homeworks = (hws ?? []) as any
+  }
+
+  // ————— Notes + moyenne pondérée /20 —————
+  const { data: gr } = await db
+    .from("grade_entries")
+    .select("id, label, grade_type, value, max_value, weight, comment, subjects ( name )")
+    .eq("enrollment_id", enrollmentId)
+    .is("deleted_at", null)
+    .order("created_at", { ascending: false })
+
+  const grades = (gr ?? []).map((g) => ({
+    id: g.id,
+    label: g.label,
+    value: Number(g.value),
+    maxValue: Number(g.max_value),
+    weight: Number(g.weight),
+    subject: g.subjects?.[0]?.name ?? "—",
+    comment: g.comment,
+  }))
+
+  let weightedSum = 0
+  let totalWeight = 0
+  for (const g of grades) {
+    weightedSum += (g.value / g.maxValue) * 20 * g.weight
+    totalWeight += g.weight
+  }
+  const average = totalWeight > 0 ? weightedSum / totalWeight : null
+
+  const studentName = enrollment.students
+    ? `${enrollment.students.first_name} ${enrollment.students.last_name}`
+    : "Élève"
+
+  const fmtDate = (d: string) =>
+    new Date(d).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })
+
+  return (
+    <div className="space-y-6">
+      {/* En-tête élève */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Bonjour, {studentName}</h1>
+          <p className="text-sm text-muted-foreground">
+            {enrollment.schools?.name ?? "—"} · {enrollment.classes?.name ?? "—"} ·{" "}
+            {enrollment.academic_years?.label ?? "—"}
+          </p>
+        </div>
+        {average !== null && (
+          <Card className="py-3">
+            <CardContent className="flex items-center gap-3 px-4">
+              <GraduationCap className="h-5 w-5 text-primary" />
+              <div>
+                <p className="text-xs text-muted-foreground">Moyenne générale</p>
+                <p className="text-xl font-bold text-primary">{average.toFixed(2)} / 20</p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      {/* Cahier de texte */}
+      <section className="space-y-3">
+        <h2 className="flex items-center gap-2 text-lg font-semibold">
+          <BookOpen className="h-5 w-5 text-primary" /> Cahier de texte
+        </h2>
+        {homeworks.length === 0 ? (
+          <Card>
+            <CardContent className="py-8 text-center text-sm text-muted-foreground">
+              Aucun devoir publié pour votre classe.
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2">
+            {homeworks.map((h) => (
+              <Card key={h.id} className="py-4">
+                <CardContent className="space-y-1 px-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="font-medium">{h.title}</p>
+                    <Badge variant="secondary">{fmtDate(h.due_date)}</Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground">{h.subjects?.name ?? "—"}</p>
+                  {h.description && (
+                    <p className="text-sm text-muted-foreground">{h.description}</p>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* Notes */}
+      <section className="space-y-3">
+        <h2 className="flex items-center gap-2 text-lg font-semibold">
+          <GraduationCap className="h-5 w-5 text-primary" /> Mes notes
+        </h2>
+        {grades.length === 0 ? (
+          <Card>
+            <CardContent className="py-8 text-center text-sm text-muted-foreground">
+              Aucune note saisie pour le moment.
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="py-2">
+            <CardContent className="divide-y px-4 py-0">
+              {grades.map((g) => {
+                const note = (g.value / g.maxValue) * 20
+                return (
+                  <div key={g.id} className="flex items-center justify-between gap-3 py-3">
+                    <div>
+                      <p className="text-sm font-medium">{g.label}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {g.subject} · coef. {g.weight}
+                        {g.comment ? ` · ${g.comment}` : ""}
+                      </p>
+                    </div>
+                    <p
+                      className={`text-sm font-bold ${
+                        note >= 10 ? "text-primary" : "text-destructive"
+                      }`}
+                    >
+                      {g.value.toFixed(2)}/{g.maxValue}
+                    </p>
+                  </div>
+                )
+              })}
+            </CardContent>
+          </Card>
+        )}
+      </section>
+
+      {/* Verrouiller la session */}
+      <form action={lockStudentPortal} className="flex justify-center">
+        <Button variant="ghost" size="sm" type="submit">
+          <LogOut className="h-4 w-4" /> Verrouiller ma session
+        </Button>
+      </form>
+
+      <p className="text-center text-xs text-muted-foreground">
+        <Link href="/dashboard" className="underline">
+          Retour au tableau de bord
+        </Link>
+      </p>
+    </div>
+  )
+}
+
+

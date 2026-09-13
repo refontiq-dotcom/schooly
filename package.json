@@ -13,10 +13,11 @@
   "scripts": {
     "dev:admin": "npm run dev --workspace apps/web-admin",
     "dev:parent": "npm run dev --workspace apps/pwa-parent",
-    "build": "npm run build --workspace apps/web-admin && npm run build --workspace apps/pwa-parent",
+    "build": "npm run build --workspace apps/web-admin && npm run build --workspace apps/pwa-parent && npm run build --workspace packages/billing",
     "build:admin": "npm run build --workspace apps/web-admin",
     "build:parent": "npm run build --workspace apps/pwa-parent",
-    "typecheck": "tsc -p packages/ui --noEmit && tsc -p packages/db --noEmit && tsc -p apps/web-admin --noEmit && tsc -p apps/pwa-parent --noEmit",
+    "build:billing": "npm run build --workspace packages/billing",
+    "typecheck": "tsc -p packages/ui --noEmit && tsc -p packages/db --noEmit && tsc -p apps/web-admin --noEmit && tsc -p apps/pwa-parent --noEmit && tsc -p packages/billing --noEmit",
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -24,6 +25,19 @@
     "db:start": "cd packages/db && supabase start",
     "db:stop": "cd packages/db && supabase stop",
     "db:reset": "cd packages/db && supabase db reset",
-    "db:types": "cd packages/db && supabase gen types typescript --local > src/database.types.ts"
+    "db:types": "cd packages/db && supabase gen types typescript --local > src/database.types.ts",
+    "billing:sync": "node packages/billing/scripts/sync-config.mjs",
+    "billing:metrics": "node packages/billing/scripts/push-metrics.mjs",
+    "trouvetou:sync": "node packages/billing/scripts/sync-trouvetou.mjs"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.1.1",
+    "jsdom": "^30.0.1",
+    "vite": "^8.3.0",
+    "vitest": "^5.0.0"
+  },
+  "dependencies": {
+    "@radix-ui/react-alert-dialog": "^1.1.23",
+    "@radix-ui/react-dialog": "^1.1.23"
   }
 }

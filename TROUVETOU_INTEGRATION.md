@@ -318,6 +318,68 @@ npm run test:run
 npm run build
 ```
 
+## 11. Connecteur écosystème Refontiq (Étape 10) — Schooly → Trouvetou
+
+> Implémenté en mars-période actuelle. Mécanisme aligné sur le connecteur
+> Séjoura → Trouvetou : **push HTTP** depuis le produit vers l'API publique de
+> Trouvetou, avec la clé API du provider (`tv_live_`). Aucun accès direct à la
+> base Supabase de Trouvetou depuis Schooly.
+
+### 11.1 Flux
+
+1. L'admin Schooly publie son école (`published_to_trouvetou = true`) et
+   complète la fiche publique (description, itinéraire, photos 360,
+   `video_url` YouTube, grille tarifaire).
+2. `npm run trouvetou:sync` lit toutes les écoles publiées + leurs niveaux
+   (capacités, prix, places) côté Schooly.
+3. Pour chaque école, le script envoie `POST {TROUVETOU_SYNC_URL}/api/v1/sync/schooly`
+   avec l'en-tête `x-trouvetou-api-key: tv_live_<providerId>.<secret>`.
+4. L'endpoint Trouvetou valide la clé (HMAC/pepper + provider actif) puis
+   exécute le RPC `schooly_sync_school` (upsert école + niveaux + log).
+
+### 11.2 Côté Trouvetou (nouveau)
+
+- Endpoint : `src/app/api/v1/sync/schooly/route.ts`
+  (même mécanisme d'auth que `/api/v1/sync`, payload dédié `{ school, levels }`).
+- Base : SQL du connecteur déjà exécuté manuellement
+  (`trouvetou-migrations/20260913000000_schooly_connector.sql` : tables
+  `schooly_schools`, `schooly_grade_levels`, `schooly_sync_log`, fonction
+  `schooly_sync_school`, RLS lecture publique).
+- Provider : SQL à exécuter une fois côté Trouvetou
+  (`trouvetou-migrations/20260913010000_provider_schooly.sql`) — UPSERT du
+  provider `Schooly` + empreinte HMAC de la clé (`admin.schooly.ci` en webhook).
+
+### 11.3 Variables d'environnement Schooly (`.env.local`)
+
+```env
+TROUVETOU_SYNC_URL=https://trouvetou.vercel.app   # ou URL complète /api/v1/sync/schooly
+TROUVETOU_API_KEY=tv_live_...                     # clé du provider (voir SQL provider)
+TROUVETOU_INSTANCE_URL=https://admin.schooly.ci
+```
+
+### 11.4 Fichiers (Étape 10)
+
+```text
+schooly :
+  packages/billing/scripts/sync-trouvetou.mjs   → script push HTTP (npm run trouvetou:sync)
+  apps/web-admin/src/app/dashboard/admin/trouvetou/page.tsx   → page admin publication
+  apps/web-admin/src/app/api/v1/admin/trouvetou/*             → API internes (publish, profile…)
+  packages/db/supabase/migrations/20260913000000_trouvetou_champs_etendus.sql
+  trouvetou-migrations/20260913000000_schooly_connector.sql  → SQL Trouvetou (exécuté)
+  trouvetou-migrations/20260913010000_provider_schooly.sql   → SQL provider (à exécuter)
+
+trouvetou :
+  src/app/api/v1/sync/schooly/route.ts → endpoint d'ingestion dédié Schooly
+```
+
+### 11.5 Points à terminer
+
+- Exécuter `trouvetou-migrations/20260913010000_provider_schooly.sql` côté
+  Trouvetou (fournit le provider + la clé attendue par Schooly).
+- Vérifier que `TROUVETOU_API_KEY_PEPPER` côté serveur Trouvetou correspond au
+  pepper utilisé dans le SQL provider (partagé avec `src/lib/sync/api-key.ts`).
+- Publier une école de test et `npm run trouvetou:sync`.
+
 La clé locale doit être présente dans `.env.local`, qui ne doit pas être
 commitée. Le dépôt Trouvetou fourni précédemment était inaccessible ; vérifier
 son URL et son contrat avant de modifier l'API partenaire.

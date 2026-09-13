@@ -9,14 +9,14 @@ export function ActionForm({
   children,
   className,
 }: {
-  action: (formData: FormData) => Promise<{ error?: string; data?: any }>
+  action: (formData: FormData) => Promise<{ error?: string; data?: any } | void>
   children: React.ReactNode
   className?: string
 }) {
   const [state, setState] = useState<FormState>({})
 
   async function handleSubmit(formData: FormData) {
-    const result = await action(formData)
+    const result = (await action(formData)) || {}
     if (result.error) {
       setState({ error: result.error })
     } else {

@@ -13,8 +13,9 @@ import {
   Users,
   Clock,
   Plus,
-  Warning,
+  TriangleAlert,
 } from "lucide-react"
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
 import { ActionForm } from "@/components/action-form"
 import { useSupabaseUser } from "@/hooks/use-supabase-user"
 
@@ -139,7 +140,7 @@ export default function DisciplinePage() {
                 <p className="text-3xl font-bold">{incidents.filter(i => i.severity === "grave").length}</p>
                 <p className="text-sm text-muted-foreground">Graves</p>
               </div>
-              <Warning className="h-8 w-8 text-red-500" />
+              <TriangleAlert className="h-8 w-8 text-red-500" />
             </div>
           </CardContent>
         </Card>

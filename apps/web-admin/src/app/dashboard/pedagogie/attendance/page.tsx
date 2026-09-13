@@ -212,7 +212,7 @@ export default function AttendancePage() {
                   {attendance.map(record => ({
                     name: `${record.enrollments?.students?.first_name} ${record.enrollments?.students?.last_name}`,
                     status: record.status,
-                    enrollmentId: record.enrollment_id,
+                    enrollmentId: (record.enrollments as any)?.id ?? "",
                   } as { name: string; status: string; enrollmentId: string })) ? (
                     attendance.map(record => (
                       <div
@@ -258,7 +258,7 @@ export default function AttendancePage() {
                         <Input id="attendanceEnrollmentId" name="enrollmentId" list="studentList" placeholder="ID élève" />
                         <datalist id="studentList">
                           {attendance.map(a => (
-                            <option key={a.id} value={a.enrollment_id} label={`${a.enrollments?.students?.first_name} ${a.enrollments?.students?.last_name}`} />
+                            <option key={a.id} value={(a.enrollments as any)?.id ?? ""} label={`${(a.enrollments as any)?.students?.first_name} ${(a.enrollments as any)?.students?.last_name}`} />
                           ))}
                         </datalist>
                       </div>
@@ -267,8 +267,8 @@ export default function AttendancePage() {
                         <div className="flex gap-1">
                           {["present", "absent", "tardy", "excused"].map(s => (
                             <label key={s} className="flex-1 cursor-pointer">
-                              <input type="radio" name="status" value={s} className="sr-only" />
-                              <Button type="radio" size="sm" variant={s === "present" ? "default" : "outline"} className={s === "present" ? "bg-green-500 hover:bg-green-600" : s === "absent" ? "bg-red-500 hover:bg-red-600" : s === "tardy" ? "bg-orange-500 hover:bg-orange-600" : "bg-blue-500 hover:bg-blue-600"}>
+                              <input type="button" name="status" value={s} className="sr-only" />
+                              <Button type="button" size="sm" variant={s === "present" ? "default" : "outline"} className={s === "present" ? "bg-green-500 hover:bg-green-600" : s === "absent" ? "bg-red-500 hover:bg-red-600" : s === "tardy" ? "bg-orange-500 hover:bg-orange-600" : "bg-blue-500 hover:bg-blue-600"}>
                                 {s === "present" ? "✓" : s === "absent" ? "✗" : s === "tardy" ? "~»" : "!"}
                               </Button>
                             </label>

@@ -44,12 +44,9 @@ export default function CloseCashSessionPage() {
       const { data: { user: authUser } } = await supabase.auth.getUser()
       if (!authUser) return
 
-      const admin = (await import("@supabase/supabase-js")).createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!
-      )
-
-      const { data: roleData } = await admin
+      // Lecture du rattachement via le client navigateur (session utilisateur,
+      // politique RLS usr_read) — jamais de clé service role côté client.
+      const { data: roleData } = await supabase
         .from("user_school_roles")
         .select("school_id")
         .eq("user_id", authUser.id)
@@ -81,7 +78,7 @@ export default function CloseCashSessionPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Clôture de caisse</h1>
           <p className="text-muted-foreground text-sm mt-1">
-            Comptage à l'aveugle et réconciliation de la session
+            Comptage à l’aveugle et réconciliation de la session
           </p>
         </div>
       </div>
@@ -105,7 +102,7 @@ export default function CloseCashSessionPage() {
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Fonds d'ouverture</span>
+                <span className="text-muted-foreground">Fonds d’ouverture</span>
                 <span className="font-mono font-semibold">{session.opening_amount.toLocaleString("fr-FR")} FCFA</span>
               </div>
               <div className="flex justify-between text-sm">
@@ -125,9 +122,9 @@ export default function CloseCashSessionPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Comptage à l'aveugle</CardTitle>
+              <CardTitle>Comptage à l’aveugle</CardTitle>
               <CardDescription>
-                Entrez le montant réel compté dans la caisse (sans regarder l'écran).
+                Entrez le montant réel compté dans la caisse (sans regarder l’écran).
               </CardDescription>
             </CardHeader>
             <CardContent>

@@ -16,20 +16,23 @@ const SelectContext = React.createContext<{
   setOpen: () => {},
 })
 
-function Select({ value, onValueChange, children, disabled, name }: {
-  value: string
-  onValueChange: (value: string) => void
+function Select({ value, onValueChange, children, disabled, name, required, id, defaultValue }: {
+  value?: string
+  onValueChange?: (value: string) => void
   children: React.ReactNode
   disabled?: boolean
   name?: string
+  required?: boolean
+  id?: string
+  defaultValue?: string
 }) {
   const [open, setOpen] = React.useState(false)
 
   return (
-    <SelectContext.Provider value={{ value, onValueChange, open, setOpen }}>
+    <SelectContext.Provider value={{ value: value || defaultValue || "", onValueChange: onValueChange || (() => {}), open, setOpen }}>
       <div className="relative">
         {children}
-        {name && <input type="hidden" name={name} value={value} readOnly />}
+        {name && <input type="hidden" name={name} value={value || defaultValue || ""} readOnly required={required} id={id} />}
       </div>
     </SelectContext.Provider>
   )

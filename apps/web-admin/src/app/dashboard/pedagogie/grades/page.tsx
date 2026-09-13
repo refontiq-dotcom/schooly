@@ -350,7 +350,7 @@ export default function GradesPage() {
                   {enrollments.map(enrollment => {
                     // Filtrer les notes pour cet élève
                     const studentGrades = grades.filter(
-                      g => g.enrollments?.id === enrollment.id
+                      g => (g.enrollments as any)?.id === enrollment.id
                     )
 
                     // Calculer la moyenne pondérée

@@ -42,6 +42,7 @@ export default function RemindersPage() {
   const [reminders, setReminders] = useState<PaymentReminder[]>([])
   const [enrollments, setEnrollments] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
+  const [channel, setChannel] = useState<string>("email")
 
   useEffect(() => {
     if (!user) return
@@ -51,12 +52,9 @@ export default function RemindersPage() {
       const { data: { user: authUser } } = await supabase.auth.getUser()
       if (!authUser) return
 
-      const admin = (await import("@supabase/supabase-js")).createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!
-      )
-
-      const { data: roleData } = await admin
+      // Lecture du rattachement via le client navigateur (session utilisateur,
+      // politique RLS usr_read) — jamais de clé service role côté client.
+      const { data: roleData } = await supabase
         .from("user_school_roles")
         .select("school_id")
         .eq("user_id", authUser.id)
@@ -128,7 +126,7 @@ export default function RemindersPage() {
         </Card>
       </div>
 
-      {/* Formulaire d'envoi */}
+      {/* Formulaire d’envoi */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -161,13 +159,13 @@ export default function RemindersPage() {
                   <SelectItem value="preventive">Préventive (J-5)</SelectItem>
                   <SelectItem value="formal">Formelle (J+1)</SelectItem>
                   <SelectItem value="warning">Avertissement (J+7)</SelectItem>
-                  <SelectItem value="access_restriction">Restriction d'accès</SelectItem>
+                  <SelectItem value="access_restriction">Restriction d’accès</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1">
               <Label htmlFor="channel">Canal</Label>
-              <Select name="channel" required>
+              <Select name="channel" value={channel} onValueChange={setChannel} required>
                 <SelectTrigger>
                   <SelectValue placeholder="Sélectionner" />
                 </SelectTrigger>

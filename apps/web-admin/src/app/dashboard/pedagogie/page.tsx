@@ -435,7 +435,7 @@ export default function PedagogieDashboard() {
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="text-xs text-muted-foreground">
-                          {d.decided_at ? new Date(d.decided_at).toLocaleDateString("fr-FR") : "—"}
+                          {((d as any).decided_at) ? new Date((d as any).decided_at).toLocaleDateString("fr-FR") : "—"}
                         </span>
                       </div>
                     </div>

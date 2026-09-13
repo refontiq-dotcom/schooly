@@ -2,19 +2,11 @@
 
 *SaaS de gestion scolaire multi-établissements — Côte d'Ivoire / Afrique de l'Ouest*
 *Document de référence pour l'agent IA de développement*
-*Version 1.0*
+*Version 1.1 — mis à jour pour cohérence avec l'écosystème Refontiq*
 
-## 0. ⚠️ GUIDE DE REPRISE DE PROJET (Pour Agents IA)
-Si vous êtes une IA rejoignant ce projet en cours, **lisez attentivement ce qui suit avant toute action** :
-1. Lisez le `README.md` à la racine pour comprendre l'architecture.
-2. Descendez à la **Section 10 (Roadmap)** pour trouver la phase en cours (marquée par `[/]` ou la première `[ ]`).
-3. Descendez à la **Section 11 (Checklist de démarrage)** pour vérifier les prérequis techniques terminés (`[x]`).
-4. Ne déviez jamais de l'architecture Multi-tenant RLS (Voir Section 4).
-
----
+> ⚠️ **À lire avant toute reprise de développement** : deux documents transverses ont été créés après la version initiale de ce cahier des charges — `refontiq-architecture-ecosysteme.md` et `refontiq-plan-de-travail-prompts.md`. Ils introduisent des composants partagés à l'échelle de tout l'écosystème Refontiq (pas seulement Schooly), qui remplacent ou complètent certaines sections ci-dessous. Les sections concernées sont annotées. En cas de doute, les documents d'écosystème font foi sur les questions transverses (facturation, identité, alertes internes).
 
 ## Sommaire
-0. Guide de reprise de projet (pour Agents IA)
 1. Vision & positionnement
 2. Principes directeurs non négociables
 3. Stack technique recommandée
@@ -28,7 +20,8 @@ Si vous êtes une IA rejoignant ce projet en cours, **lisez attentivement ce qui
 11. Checklist de démarrage immédiat
 12. Propositions d'amélioration stratégiques
 13. Definition of Done
-14. Glossaire
+14. Facturation SaaS — modèle « 1000 FCFA / élève »
+15. Glossaire
 
 ---
 
@@ -248,52 +241,51 @@ Style de référence : sobre, inspiré des interfaces type « Gemini » — side
 
 > Chaque phase indique Objectif, Livrables et Critère d'acceptation. Respecter l'ordre : chaque phase dépend structurellement de la précédente, sauf mention « piste parallèle ».
 
-- [x] **Phase 0 — Fondations techniques**
+**Phase 0 — Fondations techniques**
 Repo structuré, Next.js + TS strict, Supabase (dev/staging/prod), CI (lint+test+build), design tokens + composants UI de base, Sentry, conventions de nommage.
 *Acceptation* : `pnpm dev` affiche un shell (sidebar + dark mode) vide, CI verte.
 
-- [/] **Phase 1 — Multi-tenant, Auth & RBAC**
+**Phase 1 — Multi-tenant, Auth & RBAC**
 `schools`, `users`, `roles`, RLS de base + **tests RLS écrits avant l'UI**, middleware de routage par rôle, onboarding étapes 1-2.
 *Acceptation* : 2 écoles de test, isolation RLS prouvée par tests automatisés, connexion + redirection par rôle opérationnelle.
 
-- [ ] **Phase 2 — Structure académique & Inscription publique (Self-Serve)**
-Création de la page `/register-school` pour qu'un directeur puisse créer son école et son compte de façon autonome.
+**Phase 2 — Structure académique**
 Années académiques, niveaux, classes, matières, matrice coefficients, sélecteur d'année + bannière contextuelle.
-*Acceptation* : Un directeur s'inscrit seul, configure une structure complète, bascule d'année fonctionnelle.
+*Acceptation* : Direction configure une structure complète, bascule d'année fonctionnelle.
 
-- [ ] **Phase 3 — Élèves, pré-inscriptions, inscriptions**
+**Phase 3 — Élèves, pré-inscriptions, inscriptions**
 Pré-inscription légère + code, Kanban secrétariat, `financial_profiles`, génération matricule/badge, algorithme d'affectation de classe.
 *Acceptation* : parcours bout-en-bout pré-inscription → validation → matricule généré.
 
-- [ ] **Phase 4 — Finance : tarification, caisse, reçus**
+**Phase 4 — Finance : tarification, caisse, reçus**
 Grille tarifaire, encaissement, reçu QR **en PDF/écran** (pas d'impression thermique dans cette version) + page de vérification publique, clôture de caisse, export SYSCOHADA.
 *Acceptation* : caissier encaisse et clôture sans écart non expliqué ; export équilibré ; **tests unitaires sur les calculs financiers en priorité absolue**.
 
-- [ ] **Phase 5 — Relances & moratoires**
+**Phase 5 — Relances & moratoires**
 Outbox de notifications, workflow gradué, scoring de fiabilité, dashboard d'arbitrage (individuel + bulk).
 
-- [ ] **Phase 6 — Pédagogie**
+**Phase 6 — Pédagogie**
 Cahier de texte, saisie de notes isolée par professeur, bulletins PDF.
 
-- [ ] **Phase 7 — Vie scolaire & accès QR**
+**Phase 7 — Vie scolaire & accès QR**
 Appel, discipline, scan QR, anti-passback.
 
-- [ ] **Phase 8 — Portails dédiés**
+**Phase 8 — Portails dédiés**
 PWA Parent (multi-enfants/multi-écoles), portail élève, portail professeur.
 
-- [ ] **Phase 9 — Modules complémentaires** *(piste parallèle possible)*
+**Phase 9 — Modules complémentaires** *(piste parallèle possible)*
 Transport, cantine, internat, bibliothèque, infirmerie, inventaire, anti-vol tenues — activables via `school_features`.
 
-- [ ] **Phase 10 — Intégration Trouvetou**
-API disponibilité, synchronisation quotas.
+**Phase 10 — Intégration Trouvetou**
+API disponibilité, synchronisation quotas. **Mise à jour de cohérence** : utiliser le contrat « Trouvetou Connector » tel que défini dans `refontiq-architecture-ecosysteme.md` §3, incluant les champs étendus `photos_360`, `itineraire` et `grille_tarifaire_publique` (décidés comme standard pour tous les produits Refontiq, pas seulement Schooly).
 
-- [ ] **Phase 11 — Bascule d'année académique**
+**Phase 11 — Bascule d'année académique**
 Clonage structure, promotion automatique, mode multi-années, wizard 3 étapes.
 
-- [ ] **Phase 12 — Hardware & terminaux** *(piste parallèle indépendante, non engagée à ce stade)*
+**Phase 12 — Hardware & terminaux** *(piste parallèle indépendante, non engagée à ce stade)*
 Wrapper Android, mode kiosque, scanner. L'impression thermique ESC/POS reste hors périmètre tant qu'elle n'est pas explicitement redemandée.
 
-- [ ] **Phase 13 — Durcissement & lancement**
+**Phase 13 — Durcissement & lancement**
 Audit sécurité RLS complet, tests de charge (pic de rentrée), sauvegarde/restauration, documentation utilisateur, monitoring.
 
 ---
@@ -302,16 +294,16 @@ Audit sécurité RLS complet, tests de charge (pic de rentrée), sauvegarde/rest
 
 Avant d'écrire la moindre fonctionnalité métier, l'agent doit :
 
-1. - [x] Créer la structure de repo (monorepo : `apps/web-admin`, `apps/pwa-parent`, `packages/ui`, `packages/db`).
-2. - [x] Rédiger un fichier de contexte racine décrivant stack, conventions, structure — pour que chaque session future s'auto-oriente.
-3. - [x] Provisionner le projet Supabase (dev), configurer `.env.example`.
-4. - [x] Écrire la première migration (`schools`, `users`, `roles`) **et** les tests RLS correspondants avant toute UI.
-5. - [x] Construire les tokens de design et 6 à 8 composants de base avant la première page métier réelle.
-6. - [x] Implémenter l'auth + middleware de routage par rôle.
-7. - [x] Créer un jeu de données de démonstration réaliste (une école fictive complète) pour développer contre des données proches du réel.
-8. - [x] Mettre en place les tests automatisés dès la Phase 1 — ne jamais les repousser « à la fin ».
-9. - [x] Documenter chaque domaine au fur et à mesure (un README par module).
-10. - [x] Ne jamais coder en dur un tarif, un statut ou une règle métier — passer systématiquement par une table de configuration.
+1. Créer la structure de repo (monorepo : `apps/web-admin`, `apps/pwa-parent`, `packages/ui`, `packages/db`).
+2. Rédiger un fichier de contexte racine décrivant stack, conventions, structure — pour que chaque session future s'auto-oriente.
+3. Provisionner le projet Supabase (dev), configurer `.env.example`.
+4. Écrire la première migration (`schools`, `users`, `roles`) **et** les tests RLS correspondants avant toute UI.
+5. Construire les tokens de design et 6 à 8 composants de base avant la première page métier réelle.
+6. Implémenter l'auth + middleware de routage par rôle.
+7. Créer un jeu de données de démonstration réaliste (une école fictive complète) pour développer contre des données proches du réel.
+8. Mettre en place les tests automatisés dès la Phase 1 — ne jamais les repousser « à la fin ».
+9. Documenter chaque domaine au fur et à mesure (un README par module).
+10. Ne jamais coder en dur un tarif, un statut ou une règle métier — passer systématiquement par une table de configuration.
 
 ---
 
@@ -342,7 +334,42 @@ Avant d'écrire la moindre fonctionnalité métier, l'agent doit :
 
 ---
 
-## 14. Glossaire rapide
+## 14. Facturation SaaS — modèle « 1000 FCFA / élève »
+
+> ⚠️ **Mise à jour de cohérence** : cette section décrivait à l'origine un mécanisme propre à Schooly. Il a depuis été généralisé en un package partagé `@refontiq/billing` (voir `refontiq-architecture-ecosysteme.md` §6.2), construit à partir d'un pattern déjà éprouvé et en production dans Séjoura. **Si ce package existe déjà au moment où l'agent lit ce document, l'utiliser directement plutôt que de recoder la logique ci-dessous.** S'il n'existe pas encore, construire Schooly selon le schéma décrit ici (compatible avec le futur package) pour rendre la migration triviale plus tard — ne pas bloquer le développement de Schooly en attendant l'extraction du package.
+
+### 14.1 Principe : facturation événementielle, pas calendaire
+Ne pas facturer sur une base fixe (« au 1er septembre, facture pour tous les inscrits ») — cela facturerait des pré-inscriptions jamais confirmées. Déclencher le prélèvement automatiquement à chaque passage d'une inscription au statut `CONFIRMED` : c'est le moment exact où la valeur est délivrée à l'école.
+
+### 14.2 Mécanique technique
+- `platform_fee_ledger` (`enrollment_id`, `school_id`, `amount`, `status`: due/collected/settled, `created_at`) — un enregistrement créé automatiquement à chaque confirmation d'inscription.
+- `platform_invoices` (`school_id`, `period`, `total_students`, `total_due`, `status`) — agrégation trimestrielle (alignée sur les périodes académiques déjà modélisées) pour le reporting et l'audit, pas pour la collecte elle-même.
+
+### 14.3 Injection transparente dans l'échéancier de l'élève
+Le montant n'est pas facturé séparément à l'école : il est ajouté automatiquement par le système comme ligne « Frais de plateforme numérique » dans l'échéancier généré à l'inscription (au même titre que la scolarité ou la cantine), jamais saisi manuellement par le comptable. Le parent la voit comme une ligne normale sur son reçu.
+
+### 14.4 Collecte automatique — recommandation forte : split payment
+Ne pas dépendre d'un reversement manuel de l'école. Choisir un agrégateur Mobile Money supportant le paiement marketplace/sous-marchand (répartition automatique d'une transaction entre plusieurs comptes destinataires) : la part « frais de plateforme » part directement vers le compte Schooly, le reste vers le compte de l'école, dans la même transaction. Résultat : zéro facture à recouvrer, zéro risque d'impayé sur la licence.
+- Repli si l'agrégateur ne supporte pas le split : deux appels de paiement déclenchés ensemble au guichet (transparents pour le caissier), tracés comme deux lignes d'une même transaction logique.
+
+### 14.5 Cas particuliers
+- **Pas de proratisation** : la totalité est due dès la confirmation, quel que soit le moment de l'année — la complexité de la proratisation ne se justifie pas sur un montant aussi faible (principe KISS).
+- **Réinscription** : chaque nouvelle année académique génère une nouvelle inscription `CONFIRMED` → nouveau prélèvement automatique, naturel avec le moteur de bascule d'année (§7.9).
+- **Élèves affectés de l'État** : à trancher entre tarif plat (simplicité) ou réduit (ex. 500 FCFA, cohérent avec des frais annexes déjà plus bas). Recommandation : démarrer plat, ajuster seulement si l'adoption dans les écoles à forte proportion d'affectés le justifie.
+- **Fratries** : le prix est par élève, pas par famille — s'applique naturellement puisqu'il est calculé par inscription.
+
+### 14.6 Non-paiement : dégrader, jamais bloquer les données académiques
+Ne jamais verrouiller notes, bulletins ou registre élève : ce sont les données des enfants, pas un levier de pression légitime. Dégrader plutôt les fonctionnalités périphériques (visibilité Trouvetou suspendue, exports comptables désactivés, nouvelles pré-inscriptions bloquées) via le système `school_features` (§12.7).
+
+### 14.7 Pilotage (Super-Admin)
+Le tableau de bord `/super-admin` expose : élèves actifs facturables par école, MRR équivalent, écoles en retard de reversement, historique de collecte — construit sur `platform_invoices`.
+
+### 14.8 Comptabilité côté école
+Prévoir un compte dédié dans le mapping SYSCOHADA de chaque école (ex. « Frais de plateforme numérique ») pour que cette ligne n'entre pas dans les frais de scolarité de l'établissement lors des exports comptables (§7.5).
+
+---
+
+## 15. Glossaire rapide
 - **RLS** : Row Level Security — sécurité au niveau ligne, Postgres.
 - **DRENA** : Direction Régionale de l'Éducation Nationale (Côte d'Ivoire).
 - **SYSCOHADA** : référentiel comptable en vigueur en zone OHADA.
