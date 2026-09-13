@@ -89,13 +89,13 @@ if (!schools || schools.length === 0) {
 
 let synced = 0;
 for (const school of schools) {
-  // Recuperer les niveaux avec places disponibles
+  // Recuperer les niveaux avec places disponibles.
+  // Schéma Schooly grade_levels : id, school_id, name, level, cycle (pas de capacity en base).
   const { data: levels, error: levelErr } = await schooly
     .from("grade_levels")
-    .select("id, label, capacity, prix_min, prix_max, places_disponibles")
+    .select("id, name")
     .eq("school_id", school.id)
-    .is("deleted_at", null)
-    .order("sort_order", { ascending: true });
+    .is("deleted_at", null);
 
   if (levelErr) {
     console.error(`[trouvetou:sync] Echec lecture niveaux pour ${school.name}: ${levelErr.message}`);
@@ -104,11 +104,11 @@ for (const school of schools) {
 
   const niveaux = (levels || []).map((l) => ({
     id: l.id,
-    label: l.label,
-    capacity: l.capacity || 0,
-    prix_min: l.prix_min ?? null,
-    prix_max: l.prix_max ?? null,
-    places_disponibles: l.places_disponibles ?? Math.max(0, (l.capacity || 0)),
+    label: l.name,
+    capacity: 0,
+    prix_min: null,
+    prix_max: null,
+    places_disponibles: 0,
   }));
 
   const schoolPayload = {
