@@ -1,0 +1,7 @@
+{
+  "framework": "nextjs",
+  "buildCommand": "cd ../.. && npx turbo build --filter=web-admin",
+  "installCommand": "cd ../.. && npm install",
+  "outputDirectory": ".next",
+  "regions": ["cdg1"]
+}
