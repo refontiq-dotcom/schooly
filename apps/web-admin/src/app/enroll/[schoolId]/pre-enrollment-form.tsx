@@ -15,7 +15,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
-import { CheckCircle2, Clock } from "lucide-react"
+import { CheckCircle2, Clock, CreditCard, FileText, Package } from "lucide-react"
 
 type GradeLevel = {
   id: string
@@ -24,11 +24,63 @@ type GradeLevel = {
   cycle: string
 }
 
-export default function PreEnrollmentForm({ schoolId, gradeLevels }: { schoolId: string; gradeLevels: GradeLevel[] }) {
+type ChecklistItem = {
+  id: string
+  nom: string
+  montant_cash: number | null
+  obligatoire: boolean
+  ordre_affichage: number
+}
+
+type RequiredDocument = {
+  id: string
+  nom: string
+  obligatoire: boolean
+  applicable_to_level_id: string | null
+}
+
+type PaymentMethod = {
+  id: string
+  type: "especes" | "mobile_money" | "virement_bancaire" | "cheque"
+  config_details: Record<string, unknown> | null
+}
+
+const PAYMENT_LABELS: Record<PaymentMethod["type"], string> = {
+  especes: "Espèces (au guichet)",
+  mobile_money: "Mobile Money",
+  virement_bancaire: "Virement bancaire",
+  cheque: "Chèque",
+}
+
+export default function PreEnrollmentForm({
+  schoolId,
+  gradeLevels,
+  checklistItems,
+  requiredDocuments,
+  paymentMethods,
+}: {
+  schoolId: string
+  gradeLevels: GradeLevel[]
+  checklistItems: ChecklistItem[]
+  requiredDocuments: RequiredDocument[]
+  paymentMethods: PaymentMethod[]
+}) {
   const [submitted, setSubmitted] = useState(false)
   const [code, setCode] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [selectedGradeLevel, setSelectedGradeLevel] = useState<string>("")
+  const [acceptedChecklist, setAcceptedChecklist] = useState<Record<string, boolean>>({})
+  const [providedDocuments, setProvidedDocuments] = useState<Record<string, boolean>>({})
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>("")
+
+  const applicableDocuments = requiredDocuments.filter(
+    (doc) => !doc.applicable_to_level_id || doc.applicable_to_level_id === selectedGradeLevel
+  )
+
+  const formatFCFA = (amount: number | null) => {
+    if (amount === null) return null
+    return new Intl.NumberFormat("fr-FR").format(amount) + " FCFA"
+  }
 
   async function handleSubmit(formData: FormData) {
     setLoading(true)
@@ -112,6 +164,111 @@ export default function PreEnrollmentForm({ schoolId, gradeLevels }: { schoolId:
               </SelectContent>
             </Select>
           </div>
+
+          {checklistItems.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-sm font-semibold">
+                <Package className="h-4 w-4 text-primary" />
+                Fournitures scolaires
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Liste définie par l'établissement. Les articles cochés seront à fournir lors de la finalisation.
+              </p>
+              <div className="space-y-2">
+                {checklistItems.map((item) => (
+                  <div key={item.id} className="flex items-center justify-between gap-3 rounded-lg border p-3">
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="checkbox"
+                        id={`checklist-${item.id}`}
+                        checked={acceptedChecklist[item.id] || false}
+                        onChange={(e) => setAcceptedChecklist((prev) => ({ ...prev, [item.id]: e.target.checked }))}
+                        disabled={loading}
+                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                      />
+                      <div className="space-y-0.5">
+                        <Label htmlFor={`checklist-${item.id}`} className="text-sm font-normal cursor-pointer">
+                          {item.nom}
+                          {item.obligatoire && <span className="text-destructive ml-1">*</span>}
+                        </Label>
+                        {item.montant_cash !== null && (
+                          <p className="text-xs text-muted-foreground">Valeur indicative : {formatFCFA(item.montant_cash)}</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {applicableDocuments.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-sm font-semibold">
+                <FileText className="h-4 w-4 text-primary" />
+                Pièces à fournir
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Documents demandés par l'établissement pour ce niveau.
+              </p>
+              <div className="space-y-2">
+                {applicableDocuments.map((doc) => (
+                  <div key={doc.id} className="flex items-center justify-between gap-3 rounded-lg border p-3">
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="checkbox"
+                        id={`doc-${doc.id}`}
+                        checked={providedDocuments[doc.id] || false}
+                        onChange={(e) => setProvidedDocuments((prev) => ({ ...prev, [doc.id]: e.target.checked }))}
+                        disabled={loading}
+                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                      />
+                      <Label htmlFor={`doc-${doc.id}`} className="text-sm font-normal cursor-pointer">
+                        {doc.nom}
+                        {doc.obligatoire && <span className="text-destructive ml-1">*</span>}
+                      </Label>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {paymentMethods.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-sm font-semibold">
+                <CreditCard className="h-4 w-4 text-primary" />
+                Moyen de paiement
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Choisissez comment vous régulariserez les frais. Le virement bancaire nécessite une validation manuelle par le secrétariat.
+              </p>
+              <div className="space-y-2">
+                {paymentMethods.map((pm) => (
+                  <label
+                    key={pm.id}
+                    className={`flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${selectedPaymentMethod === pm.id ? "border-primary bg-muted/30" : "hover:bg-muted/20"}`}
+                  >
+                    <input
+                      type="radio"
+                      name="paymentMethodId"
+                      value={pm.id}
+                      checked={selectedPaymentMethod === pm.id}
+                      onChange={() => setSelectedPaymentMethod(pm.id)}
+                      disabled={loading}
+                      className="mt-0.5"
+                    />
+                    <div className="space-y-0.5">
+                      <span className="text-sm font-medium">{PAYMENT_LABELS[pm.type]}</span>
+                      {pm.config_details && typeof pm.config_details === "object" && "instructions" in pm.config_details && (
+                        <p className="text-xs text-muted-foreground">{String(pm.config_details.instructions)}</p>
+                      )}
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
 
           <hr className="border-border" />
 

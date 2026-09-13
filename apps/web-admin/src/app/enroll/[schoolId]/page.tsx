@@ -29,6 +29,26 @@ export default async function EnrollPage({ params }: Props) {
     .eq("school_id", schoolId)
     .order("level", { ascending: true })
 
+  // ── Configurable par établissement : checklist fournitures, documents requis, moyens de paiement ──
+  const { data: checklistItems } = await admin
+    .from("enrollment_checklist_items")
+    .select("id, nom, montant_cash, obligatoire, ordre_affichage")
+    .eq("school_id", schoolId)
+    .is("deleted_at", null)
+    .order("ordre_affichage", { ascending: true })
+
+  const { data: requiredDocuments } = await admin
+    .from("required_documents")
+    .select("id, nom, obligatoire, applicable_to_level_id")
+    .eq("school_id", schoolId)
+    .is("deleted_at", null)
+
+  const { data: paymentMethods } = await admin
+    .from("school_payment_methods")
+    .select("id, type, actif, config_details")
+    .eq("school_id", schoolId)
+    .eq("actif", true)
+
   return (
     <div className="min-h-screen bg-muted/40 py-12 px-4">
       <div className="max-w-2xl mx-auto space-y-8">
@@ -45,7 +65,13 @@ export default async function EnrollPage({ params }: Props) {
           </p>
         </div>
 
-        <PreEnrollmentForm schoolId={schoolId} gradeLevels={gradeLevels || []} />
+        <PreEnrollmentForm
+          schoolId={schoolId}
+          gradeLevels={gradeLevels || []}
+          checklistItems={checklistItems || []}
+          requiredDocuments={requiredDocuments || []}
+          paymentMethods={paymentMethods || []}
+        />
       </div>
     </div>
   )

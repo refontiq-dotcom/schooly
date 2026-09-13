@@ -2,7 +2,7 @@
 
 *SaaS de gestion scolaire multi-établissements — Côte d'Ivoire / Afrique de l'Ouest*
 *Document de référence pour l'agent IA de développement*
-*Version 1.1 — mis à jour pour cohérence avec l'écosystème Refontiq*
+*Version 1.2 — généralisation du parcours d'inscription (configurable par établissement, virement bancaire, rappel MENAET)*
 
 > ⚠️ **À lire avant toute reprise de développement** : deux documents transverses ont été créés après la version initiale de ce cahier des charges — `refontiq-architecture-ecosysteme.md` et `refontiq-plan-de-travail-prompts.md`. Ils introduisent des composants partagés à l'échelle de tout l'écosystème Refontiq (pas seulement Schooly), qui remplacent ou complètent certaines sections ci-dessous. Les sections concernées sont annotées. En cas de doute, les documents d'écosystème font foi sur les questions transverses (facturation, identité, alertes internes).
 
