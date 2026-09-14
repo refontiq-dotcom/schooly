@@ -1,6 +1,18 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "globalDependencies": ["**/.env.*local"],
+  "env": {
+    "NEXT_PUBLIC_SUPABASE_URL": "",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY": "",
+    "SUPABASE_SERVICE_ROLE_KEY": "",
+    "TELEGRAM_BOT_TOKEN": "",
+    "TELEGRAM_CHAT_ID": "",
+    "TELEGRAM_ADMIN_URL": "",
+    "WAVE_MERCHANT_ID": "",
+    "TROUVETOU_API_KEY": "",
+    "METRICS_PUSH_SECRET": "",
+    "CONTROL_CENTER_URL": ""
+  },
   "tasks": {
     "build": {
       "dependsOn": ["^build"],

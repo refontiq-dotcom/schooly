@@ -13,3 +13,14 @@ export function formatDate(dateString: string): string {
     year: "numeric",
   });
 }
+
+// Initialisation billing (compatibilité locale sans @refontiq/billing)
+let billingConfig: { url: string; key: string } | null = null;
+
+export function initBilling(url: string, key: string): void {
+  billingConfig = { url, key };
+}
+
+export function getBillingConfig(): { url: string; key: string } | null {
+  return billingConfig;
+}
