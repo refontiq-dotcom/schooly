@@ -3,6 +3,7 @@ import { createClient as createAdminClient } from "@supabase/supabase-js"
 import { redirect } from "next/navigation"
 import { Sidebar } from "@/components/sidebar"
 import { AcademicYearSelector } from "@/components/academic-year-selector"
+import { OnboardingWizard } from "@/components/onboarding-wizard"
 
 export default async function DashboardLayout({
   children,
@@ -33,16 +34,28 @@ export default async function DashboardLayout({
   const role = roleData?.role_code ?? "direction"
   const schoolId = roleData?.school_id
 
-  // Récupérer le nom de l'école
+    // Récupérer le nom de l'école + état d'onboarding
   let schoolName = "Schooly"
+  let schoolCity: string | null = null
+  let schoolType: string | null = null
+  let isSetupComplete = true
   if (schoolId) {
     const { data: school } = await admin
       .from("schools")
-      .select("name")
+      .select("name, city, school_type, is_setup_complete")
       .eq("id", schoolId)
       .single()
-    if (school) schoolName = school.name
+    if (school) {
+      schoolName = school.name
+      schoolCity = school.city ?? null
+      schoolType = school.school_type ?? null
+      isSetupComplete = school.is_setup_complete ?? true
+    }
   }
+
+  // Le fondateur d'une école non configurée doit passer par le wizard d'onboarding
+  // (déclenché à la première connexion après l'inscription via /register-school).
+  const showOnboarding = role === "direction" && !!schoolId && !isSetupComplete
 
   // Récupérer le nom complet de l'utilisateur
   const { data: profile } = await admin
@@ -66,9 +79,18 @@ export default async function DashboardLayout({
             {schoolName}
           </div>
         </header>
-        <main className="flex-1 overflow-y-auto">
+                <main className="flex-1 overflow-y-auto">
           {children}
         </main>
+
+        {/* Wizard d'onboarding (obligatoire tant que l'école n'est pas configurée) */}
+        {showOnboarding && (
+          <OnboardingWizard
+            schoolName={schoolName}
+            schoolCity={schoolCity}
+            schoolType={schoolType}
+          />
+        )}
       </div>
     </div>
   )

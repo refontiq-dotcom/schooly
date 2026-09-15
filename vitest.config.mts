@@ -31,6 +31,21 @@ export default defineConfig({
           include: ["packages/db/tests/**/*.test.ts"],
         },
       },
+      {
+        // Tests unitaires de l'app admin (server actions, helpers…).
+        // L'alias « @ » reproduit celui de apps/schooly/tsconfig.json.
+        resolve: {
+          alias: {
+            "@": resolve(rootDir, "apps/schooly/src"),
+          },
+        },
+        test: {
+          name: "schooly",
+          environment: "node",
+          globals: true,
+          include: ["apps/schooly/src/**/*.test.{ts,tsx}"],
+        },
+      },
     ],
   },
 });
