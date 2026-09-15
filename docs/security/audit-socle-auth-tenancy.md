@@ -15,7 +15,7 @@
 | Sévérité | Nombre | Résumé |
 |---|---|---|
 | **P0 — critique** | 2 | Fuite de données en production ; tunnels publics totalement cassés |
-| **P1 — majeur** | 4 | Portail élève inaccessible ; aucun contrôle de rôle ; IDOR possible ; PIN en clair |
+| **P1 — majeur** | 4 | Portail élève inaccessible ; aucun contrôle de rôle ; ~~IDOR rollover~~ (requalifié faux positif, verrouillé par tests) ; ~~PIN en clair~~ (colonne morte supprimée) |
 | **P2 — mineur/dette** | 6 | Duplication d'autorisation, appels DB dans le proxy, etc. |
 
 **Le socle n'était pas sûr.** L'authentification et le cloisonnement inter-écoles
@@ -136,22 +136,31 @@ const { data: role } = await supabase.from("user_school_roles")
 if (!role) throw new Error("UNAUTHORIZED")
 ```
 
-### P1-3 · IDOR : consentement d'inscription modifiable hors de son école
+### P1-3 · IDOR rollover — ~~fermer~~ → **requalifié : faux positif** (vérifié après audit)
 
-`academic-structure/rollover-actions.ts → setEnrollmentDecision(enrollmentId, decision)`
-écrit un `enrollment_decision` **sans vérifier que l'inscription appartient à
-l'école du demandeur**, puis **supprime** l'enrollment ciblé (destruction de
-données inter-tenant).
+Re-vérification post-audit (`git show a17fa6b:…/rollover-actions.ts`) :
+`setEnrollmentDecision` chargeait **déjà** l'inscription avec le filtre
+`.eq("school_id", schoolId)` dérivé de la session (`getContext()`) et **ne
+supprime aucun enrollment** — il upserte une `academic_decisions`. L'alerte du
+§2 d'origine (écriture + suppression cross-tenant) était donc infondée : le
+cloisonnement était correct depuis le début.
 
-**Correctif** : charger l'enrollment et comparer `school_id` au rôle avant
-d'écrire (même vérification que `validatePreEnrollment`, qui, lui, est correct).
+**Verrouillage ajouté** : `academic-structure/rollover-actions.test.ts` (9 tests)
+— capture des filtres PostgREST pour exiger le `.eq("school_id", …)`, refus des
+rôles hors liste blanche, invisibilité d'une inscription étrangère (réponse
+identique à « introuvable », zéro écriture), enum des décisions valides.
 
-### P1-4 · Secret : `public.users.pin_hash`
+### P1-4 · Secret : `public.users.pin_hash` — ✅ **résolu (colonne supprimée)**
 
-`pin_hash` est exposé par `/api/debug` et présent dans une table lisible sous RLS.
-Cette colonne sert de code de connexion (élève/parent). À vérifier en base puis :
-- remplacer par `crypt(pin, gen_salt('bf'))` (pgcrypto, déjà disponible) ;
-- imposer un PIN ≥ 6 chiffres et une limitation du nombre d'essais.
+Vérifications avant décision : **0 valeur** en base (aucune ligne ne la
+renseigne) et **aucun code** applicatif ne la lit ni ne l'écrit (recherche dans
+tout le dépôt). La colonne était morte — et son exposition par `/api/debug`
+aurait fui des PIN si un jour elle avait été utilisée en clair.
+
+**Correctif appliqué** : migration `20260915000001_drop_unused_pin_hash.sql`
+(`ALTER TABLE public.users DROP COLUMN IF EXISTS pin_hash`). Si un login par PIN
+est (ré)introduit : `crypt(pin, gen_salt('bf'))` (pgcrypto), PIN ≥ 6 chiffres et
+limitation du nombre de tentatives.
 ---
 
 ## 4. P2 — dette et durcissements
@@ -184,8 +193,10 @@ Cette colonne sert de code de connexion (élève/parent). À vérifier en base p
 1. **P0-1 / P0-2** — ✅ **fait** (route supprimée, règles de routage testées).
 2. **P1-2** — généraliser `requireRole()` : ✅ **Finance fait** (18/18 actions,
    cf. §7) ; puis **Pédagogie + Admissions** (29 actions, impact notes/diplômes).
-3. **P1-1 / P1-3** — débloquer le portail élève ; fermer l'IDOR du rollover.
-4. **P1-4** — hachage des PIN (pgcrypto) + limitation des tentatives.
+3. **P1-1** — débloquer le portail élève (choix produit requis).
+4. **P1-3 / P1-4** — ✅ **clos** : P1-3 requalifié faux positif et verrouillé par
+   9 tests runtime ; P1-4 résolu par suppression de la colonne (migration
+   `20260915000001`).
 5. **P2-1/2/3** — unifier `requireRole()`, source unique des rôles, claims JWT.
 6. Puis **module par module** : `admissions`, `pedagogie`, `finance`, `billing`,
    `vie scolaire (QR)`, `services`, `trouvetou`, `super-admin`, `pwa-parent`.
