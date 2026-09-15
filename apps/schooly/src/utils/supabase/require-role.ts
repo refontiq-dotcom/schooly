@@ -84,7 +84,8 @@ export type RoleQueryResult = {
 
 export type SupabaseUserClient = {
   auth: { getUser: () => Promise<{ data: { user: { id: string } | null } }> }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- TS2589, cf. justification du bloc ci-dessus
+  // `any` assumé : sans schéma DB généré, un type précis déclenche TS2589
+  // (récursion infinie) — cf. justification du bloc ci-dessus.
   from: (table: string) => any
 }
 

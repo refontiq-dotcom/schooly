@@ -24,24 +24,18 @@ import {
   getSubjectsForSchool,
   getEnrollmentsForSchool,
   getAcademicYearsForSchool,
+  type GradeEntryRow,
 } from "../actions"
 import { useSupabaseUser } from "@/hooks/use-supabase-user"
 
-type GradeEntry = {
+// GradeEntryRow importé de ../actions : source unique, fidèle au schéma
+// (label et noms des relations sont nullables en base).
+type GradeEntry = GradeEntryRow
+
+type EnrollmentOption = {
   id: string
-  grade_type: string
-  label: string
-  value: number
-  max_value: number
-  weight: number
-  comment: string | null
-  created_at: string
-  users: { full_name: string } | null
-  enrollments: {
-    students: { first_name: string; last_name: string } | null
-    classes: { name: string } | null
-  } | null
-  subjects: { name: string } | null
+  name: string
+  class: string | null
 }
 
 export default function GradesPage() {
@@ -212,7 +206,7 @@ export default function GradesPage() {
                 </Select>
               </div>
               <div className="space-y-1">
-                <Label htmlFor="gradeType">Type d'évaluation</Label>
+                <Label htmlFor="gradeType">Type d&apos;évaluation</Label>
                 <Select id="gradeType" name="gradeType" required>
                   <option value="devoir">Devoir</option>
                   <option value="controle">Contrôle</option>
@@ -295,7 +289,7 @@ export default function GradesPage() {
                       <p className="text-sm text-muted-foreground">{grade.label}</p>
                       {grade.comment && (
                         <p className="text-sm text-muted-foreground mt-1 italic">
-                          "{grade.comment}"
+                          &quot;{grade.comment}&quot;
                         </p>
                       )}
                     </div>

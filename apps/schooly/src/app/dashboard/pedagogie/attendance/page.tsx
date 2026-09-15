@@ -20,28 +20,14 @@ import {
   getCourseSessions,
   getAttendanceForSession,
   recordAttendance,
+  type CourseSessionRow,
+  type AttendanceRecordRow,
 } from "../actions"
 import { useSupabaseUser } from "@/hooks/use-supabase-user"
 
-type CourseSession = {
-  id: string
-  starts_at: string
-  ends_at: string
-  room: string | null
-  classes: { id: string; name: string } | null
-  subjects: { id: string; name: string } | null
-  users: { full_name: string } | null
-}
-
-type AttendanceRecord = {
-  id: string
-  status: string
-  remark: string | null
-  enrollments: {
-    students: { first_name: string; last_name: string } | null
-    classes: { name: string } | null
-  } | null
-}
+// Types de lignes importés de ../actions (source unique, schéma fidèle).
+type CourseSession = CourseSessionRow
+type AttendanceRecord = AttendanceRecordRow
 
 export default function AttendancePage() {
   const user = useSupabaseUser()
@@ -57,11 +43,21 @@ export default function AttendancePage() {
 
   useEffect(() => {
     if (!selectedSession) return
-    setLoading(true)
+    let active = true
+    // setState dans une micro-tâche : react-hooks/set-state-in-effect interdit
+    // un setState synchrone dans le corps de l'effet (cascading renders).
+    // `active` annule les retards si la session change entre-temps.
+    void Promise.resolve().then(() => {
+      if (active) setLoading(true)
+    })
     getAttendanceForSession(selectedSession).then(res => {
+      if (!active) return
       setLoading(false)
       if (res.data) setAttendance(res.data)
     })
+    return () => {
+      active = false
+    }
   }, [selectedSession])
 
   const formatDateTime = (dateStr: string) => {
@@ -116,7 +112,7 @@ export default function AttendancePage() {
               <Calendar className="h-5 w-5" />
               Sélectionner une session
             </CardTitle>
-            <CardDescription>Choisissez une session de cours pour prendre l'appel.</CardDescription>
+            <CardDescription>Choisissez une session de cours pour prendre l&apos;appel.</CardDescription>
           </CardHeader>
           <CardContent>
             {sessions.length === 0 ? (
@@ -174,7 +170,7 @@ export default function AttendancePage() {
             {!selectedSession ? (
               <div className="text-center py-8 text-muted-foreground">
                 <Users className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                <p className="text-sm">Sélectionnez une session pour commencer l'appel</p>
+                <p className="text-sm">Sélectionnez une session pour commencer l&apos;appel</p>
               </div>
             ) : loading ? (
               <div className="text-center py-8">

@@ -30,41 +30,18 @@ import {
   getSubjectsForSchool,
   getTeachersForSchool,
   getAcademicYearsForSchool,
+  type CourseSessionRow,
+  type HomeworkRow,
+  type AcademicDecisionRow,
 } from "./actions"
 import { useSupabaseUser } from "@/hooks/use-supabase-user"
 
-type CourseSession = {
-  id: string
-  starts_at: string
-  ends_at: string
-  room: string | null
-  classes: { name: string } | null
-  subjects: { name: string } | null
-  users: { full_name: string } | null
-}
-
-type Homework = {
-  id: string
-  title: string
-  description: string | null
-  due_date: string
-  is_published: boolean
-  classes: { name: string } | null
-  subjects: { name: string } | null
-  users: { full_name: string } | null
-}
-
-type AcademicDecision = {
-  id: string
-  decision: string
-  average: number | null
-  observations: string | null
-  enrollments: {
-    students: { first_name: string; last_name: string } | null
-    classes: { name: string } | null
-  } | null
-  academic_years: { label: string } | null
-}
+// Les types de lignes (CourseSessionRow, HomeworkRow, AcademicDecisionRow)
+// sont importés de ./actions : source unique, fidèle au schéma (champs
+// nullables) — les doublons locaux divergeaient à chaque migration.
+type CourseSession = CourseSessionRow
+type Homework = HomeworkRow
+type AcademicDecision = AcademicDecisionRow
 
 export default function PedagogieDashboard() {
   const user = useSupabaseUser()
@@ -141,7 +118,7 @@ export default function PedagogieDashboard() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Espace Pédagogique</h1>
           <p className="text-muted-foreground">
-            Gestion des cours, appels, notes et bulletins pour l'année académique en cours.
+            Gestion des cours, appels, notes et bulletins pour l&apos;année académique en cours.
           </p>
         </div>
         {(user?.role === "professeur" || user?.role === "direction") && (
@@ -156,7 +133,7 @@ export default function PedagogieDashboard() {
               <div>
                 <h3 className="font-semibold text-orange-800 dark:text-orange-200">Aucune année académique en cours</h3>
                 <p className="text-sm text-orange-600 dark:text-orange-300 mt-1">
-                  Créez une année académique et passez-la en "En cours" pour activer la saisie des notes et l'appel.
+                  Créez une année académique et passez-la en &quot;En cours&quot; pour activer la saisie des notes et l&apos;appel.
                 </p>
               </div>
               <Badge variant="outline" className="text-orange-600 border-orange-300">Config requis</Badge>
@@ -374,7 +351,7 @@ export default function PedagogieDashboard() {
                     <Input id="title" name="title" placeholder="Ex: Exercices sur les fractions" required />
                   </div>
                   <div className="space-y-1">
-                    <Label htmlFor="dueDate">Date d'échéance</Label>
+                    <Label htmlFor="dueDate">Date d&apos;échéance</Label>
                     <Input id="dueDate" name="dueDate" type="date" required />
                   </div>
                   <div className="space-y-1 sm:col-span-2">
