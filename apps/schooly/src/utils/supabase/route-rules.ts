@@ -56,6 +56,33 @@ export function isEntryPath(pathname: string): boolean {
 }
 
 /**
+ * Portail élève (audit P1-1) : surface autonome authentifiée par le cookie QR
+ * `schooly_student_enrollment`, revérifié à chaque lecture. Les élèves n'ont pas
+ * de compte Supabase Auth : ce chemin doit donc court-circuiter la garde de
+ * session staff. Placé hors de `/dashboard` car le layout de celui-ci exige une
+ * session — ce qui rendait le portail inutilisable (bug de production).
+ */
+export const STUDENT_PORTAL_PREFIXES = ["/eleve"] as const
+
+/** Vrai si le chemin appartient au portail élève. */
+export function isStudentPortalPath(pathname: string): boolean {
+  return matchesPrefix(pathname, STUDENT_PORTAL_PREFIXES)
+}
+
+/**
+ * Redirections d'URLs legacy (audit P1-1) : l'ancienne URL du portail, encore
+ * présente dans les QR codes imprimés et les favoris, renvoie vers la nouvelle
+ * surface — sous-chemin éventuel conservé.
+ */
+export function legacyRedirectFor(pathname: string): string | null {
+  if (pathname === "/dashboard/eleve") return "/eleve"
+  if (pathname.startsWith("/dashboard/eleve/")) {
+    return "/eleve" + pathname.slice("/dashboard/eleve".length)
+  }
+  return null
+}
+
+/**
  * Destination par défaut d'un rôle après connexion.
  * Source unique de vérité, partagée par le proxy (routage session) et par les
  * Server Actions de connexion — évite les divergences constatées (findings M4 :
@@ -72,7 +99,9 @@ export const ROLE_HOME: Readonly<Record<string, string>> = {
   caisse: "/dashboard/caisse",
   professeur: "/dashboard/pedagogie",
   surveillance: "/dashboard/pedagogie",
-  eleve: "/dashboard/eleve",
+  // Portail élève : surface autonome /eleve (auth par code QR, cf. P1-1) —
+  // volontairement PAS sous /dashboard dont le layout exige une session staff.
+  eleve: "/eleve",
 }
 
 /**

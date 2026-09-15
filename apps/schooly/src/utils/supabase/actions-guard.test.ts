@@ -14,27 +14,31 @@ import { describe, expect, it } from "vitest"
  *
  * Périmètre : les modules effectivement sécurisés. Lorsqu'un nouveau module
  * est audité, l'ajouter à SECURITY_MODULES ; lorsqu'une action publique est
- * légitime, l'ajouter à PUBLIC_ACTIONS avec la justification.
+ * légitime, l'ajouter à PUBLIC_ACTIONS avec la justification. Exception
+ * d'école : le portail élève (P1-1) — son modèle d'auth est le cookie QR,
+ * la garantie y porte sur la manipulation explicite de ce cookie.
  */
 
-const SRC = join(process.cwd(), "apps/schooly/src/app/dashboard")
+// Base des modules surveillés : toute l'arborescence app/ (le portail élève
+// vit hors de dashboard/, cf. audit P1-1).
+const SRC = join(process.cwd(), "apps/schooly/src/app")
 
 /** Modules couverts par la garantie « toute action a une garde ». */
 const SECURITY_MODULES: Array<{
   file: string
   guards: RegExp
-  /** Filtrage par rôle attendu quelque part dans le module (helper local). */
+  /** Invariant attendu quelque part dans le module (helper local). */
   mustContain?: RegExp
 }> = [
   {
-    file: "pedagogie/actions.ts",
+    file: "dashboard/pedagogie/actions.ts",
     guards: /requireSchoolRole\(|teachingGuard\(/,
   },
-  { file: "admissions/actions.ts", guards: /requireSchoolRole\(/ },
-  { file: "finance/actions.ts", guards: /requireSchoolRole\(/ },
-  { file: "finance/moratoriums/actions.ts", guards: /requireSchoolRole\(/ },
+  { file: "dashboard/admissions/actions.ts", guards: /requireSchoolRole\(/ },
+  { file: "dashboard/finance/actions.ts", guards: /requireSchoolRole\(/ },
+  { file: "dashboard/finance/moratoriums/actions.ts", guards: /requireSchoolRole\(/ },
   {
-    file: "direction/onboarding-actions.ts",
+    file: "dashboard/direction/onboarding-actions.ts",
     // Garde locale antérieure au helper central : l'action doit déléguer à
     // resolveSchoolId(), lequel filtre explicitement sur SETUP_ROLES (vérifié
     // par la règle mustContain du module) — équivalent en garantie.
@@ -42,7 +46,17 @@ const SECURITY_MODULES: Array<{
     mustContain: /in\("role_code", SETUP_ROLES\)/,
   },
   // Le rollover utilise son propre helper (contexte + whitelist de rôles).
-  { file: "academic-structure/rollover-actions.ts", guards: /await getContext\(\)/ },
+  { file: "dashboard/academic-structure/rollover-actions.ts", guards: /await getContext\(\)/ },
+  {
+    // Portail élève (audit P1-1) : modèle d'authentification différent — la
+    // session EST le cookie httpOnly posé après validation du code QR (secret
+    // non énumérable), et chaque lecture DB revérifie l'état du code. Garantie
+    // statique : chaque action manipule explicitement ce cookie, et le module
+    // vérifie bien l'état is_active du QR (révocable par la vie scolaire).
+    file: "eleve/actions.ts",
+    guards: /COOKIE_NAME/,
+    mustContain: /is_active/,
+  },
 ]
 
 /**
@@ -96,8 +110,8 @@ describe("Server Actions : chaque action passe par une garde d'autorisation", ()
   )
 
   it("les exceptions publiques existent toujours dans leur module", () => {
-    const admissions = readFileSync(join(SRC, "admissions/actions.ts"), "utf-8")
-    const finance = readFileSync(join(SRC, "finance/actions.ts"), "utf-8")
+    const admissions = readFileSync(join(SRC, "dashboard/admissions/actions.ts"), "utf-8")
+    const finance = readFileSync(join(SRC, "dashboard/finance/actions.ts"), "utf-8")
     expect(admissions).toContain(
       `export async function ${PUBLIC_ACTIONS[0].action}`
     )

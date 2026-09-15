@@ -1,4 +1,3 @@
-import Link from "next/link"
 import { createClient } from "@supabase/supabase-js"
 import { BookOpen, GraduationCap, Lock, LogOut } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
@@ -254,12 +253,6 @@ export default async function ElevePortalPage() {
           <LogOut className="h-4 w-4" /> Verrouiller ma session
         </Button>
       </form>
-
-      <p className="text-center text-xs text-muted-foreground">
-        <Link href="/dashboard" className="underline">
-          Retour au tableau de bord
-        </Link>
-      </p>
     </div>
   )
 }

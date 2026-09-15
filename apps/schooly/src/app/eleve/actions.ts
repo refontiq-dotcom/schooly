@@ -75,13 +75,13 @@ export async function unlockStudentPortal(
     maxAge: MAX_AGE,
   })
 
-  redirect("/dashboard/eleve")
+  redirect("/eleve")
 }
 
 export async function lockStudentPortal(): Promise<void> {
   const store = await cookies()
   store.delete(COOKIE_NAME)
-  redirect("/dashboard/eleve")
+  redirect("/eleve")
 }
 
 export async function getStudentEnrollmentId(): Promise<string | null> {

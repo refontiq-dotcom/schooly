@@ -1,7 +1,13 @@
 import { createServerClient } from "@supabase/ssr"
 import { createClient } from "@supabase/supabase-js"
 import { NextResponse, type NextRequest } from "next/server"
-import { isEntryPath, isPublicPath, roleHome } from "./route-rules"
+import {
+  isEntryPath,
+  isPublicPath,
+  isStudentPortalPath,
+  legacyRedirectFor,
+  roleHome,
+} from "./route-rules"
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -29,11 +35,27 @@ export async function updateSession(request: NextRequest) {
     }
   )
 
+  const path = request.nextUrl.pathname
+
+  // ─── 0. URLs legacy (audit P1-1) ────────────────────────────────────────────
+  // Ancienne URL du portail élève (QR codes déjà imprimés, favoris) → /eleve.
+  const legacy = legacyRedirectFor(path)
+  if (legacy) {
+    const url = request.nextUrl.clone()
+    url.pathname = legacy
+    return NextResponse.redirect(url, 308)
+  }
+
+  // ─── 0bis. Portail élève : pas de session Supabase staff ───────────────────
+  // Auth par code QR (cookie httpOnly revérifié à chaque lecture) : ni exigence
+  // de session, ni appel getUser() consommé pour ce chemin.
+  if (isStudentPortalPath(path)) {
+    return supabaseResponse
+  }
+
   const {
     data: { user },
   } = await supabase.auth.getUser()
-
-  const path = request.nextUrl.pathname
 
   // ─── 1. Tunnels publics + chemins techniques ────────────────────────────────
   // /login, /register-school, /verify/*, /enroll/*, /api/*, /_next/* ne doivent

@@ -5,6 +5,8 @@ import {
   ROLE_HOME,
   isEntryPath,
   isPublicPath,
+  isStudentPortalPath,
+  legacyRedirectFor,
   matchesPrefix,
   roleHome,
 } from "./route-rules"
@@ -122,7 +124,18 @@ describe("roleHome — table de routage par rôle (finding M4)", () => {
   it("n'envoie jamais un rôle vers /login (boucle de connexion)", () => {
     const homes = Object.values(ROLE_HOME)
     expect(homes).not.toContain("/login")
-    expect(homes.every((h) => h.startsWith("/dashboard/"))).toBe(true)
+  })
+
+  it("les rôles staff sont servis sous /dashboard (layout = garde session)", () => {
+    for (const [role, home] of Object.entries(ROLE_HOME)) {
+      if (role === "eleve") continue
+      expect(home.startsWith("/dashboard/")).toBe(true)
+    }
+  })
+
+  it("le portail élève reste HORS de /dashboard (layout staff exige une session)", () => {
+    expect(ROLE_HOME.eleve).toBe("/eleve")
+    expect(ROLE_HOME.eleve.startsWith("/dashboard")).toBe(false)
   })
 })
 
@@ -135,5 +148,30 @@ describe("cohérence des constantes exportées", () => {
     for (const entry of ENTRY_PATH_PREFIXES) {
       expect(isPublicPath(entry)).toBe(true)
     }
+  })
+})
+
+describe("portail élève — surface autonome /eleve (audit P1-1)", () => {
+  it("reconnaît le portail et ses sous-chemins", () => {
+    expect(isStudentPortalPath("/eleve")).toBe(true)
+    expect(isStudentPortalPath("/eleve/notes")).toBe(true)
+  })
+
+  it("ne confond pas le portail avec ses voisins ni avec l'ancienne URL", () => {
+    expect(isStudentPortalPath("/eleves")).toBe(false)
+    expect(isStudentPortalPath("/dashboard/eleve")).toBe(false) // URL legacy
+    expect(isStudentPortalPath("/dashboard")).toBe(false)
+  })
+
+  it("redirige l'ancienne URL (QR imprimés, favoris) en conservant le sous-chemin", () => {
+    expect(legacyRedirectFor("/dashboard/eleve")).toBe("/eleve")
+    expect(legacyRedirectFor("/dashboard/eleve/notes")).toBe("/eleve/notes")
+  })
+
+  it("ne redirige rien d'autre que l'ancienne URL du portail", () => {
+    expect(legacyRedirectFor("/dashboard")).toBeNull()
+    expect(legacyRedirectFor("/dashboard/direction")).toBeNull()
+    expect(legacyRedirectFor("/eleve")).toBeNull()
+    expect(legacyRedirectFor("/dashboard/eleveX")).toBeNull()
   })
 })

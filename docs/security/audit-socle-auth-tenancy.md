@@ -78,62 +78,62 @@ les Server Actions de connexion ; `PUBLIC_PATH_PREFIXES = ["/login",
 
 ## 3. P1 — à traiter ensuite
 
-### P1-1 · Portail élève inaccessible (double blocage)
+### P1-1 · Portail élève inaccessible (double blocage) — ✅ corrigé
 
 `/dashboard/eleve` s'authentifie **par cookie httpOnly** (`schooly_student_enrollment`),
-car les élèves n'ont pas de compte `auth`. Mais il est bloqué deux fois :
+car les élèves n'ont pas de compte `auth`. Mais il était bloqué deux fois :
 
 1. `proxy.ts` : pas de session → `307 /login` ;
 2. `apps/schooly/src/app/dashboard/layout.tsx` : `getUser()` null → `redirect("/login")`.
 
 Vérifié : `/dashboard/eleve → 307 /login`. La fonctionnalité QR (module *Vie
-scolaire*), déjà implémentée, est **inutilisable en production**.
+scolaire*), déjà implémentée, était **inutilisable en production**.
 
-**Correctif** (nécessite un choix produit) : sortir le portail élève de
-l'arborescence `/dashboard` (route group dédié) **ou** rendre le `layout`
-conscient de la session élève. Le portail ne doit pas afficher la navigation staff
-(voir P2-4).
+**Correctif appliqué** — portail déplacé hors de l'arborescence `/dashboard`
+(surface autonome **`/eleve`**, hors de portée du layout staff) :
 
-### P1-2 · Aucun contrôle de rôle dans les Server Actions métier
+- `apps/schooly/src/app/eleve/` : page, formulaire QR et actions déplacés (`git mv`) ;
+- le proxy court-circuite `/eleve*` **avant** tout contrôle de session
+  (`isStudentPortalPath`) — l'authentification reste le cookie httpOnly posé
+  après validation du code QR, revérifié à chaque lecture (révocable par la vie
+  scolaire) ;
+- l'ancienne URL `/dashboard/eleve` (QR déjà imprimés, favoris) est redirigée en
+  **308** vers `/eleve` (`legacyRedirectFor`), sous-chemin conservé ;
+- `ROLE_HOME.eleve = "/eleve"` : un compte de rôle `eleve` atterrit directement
+  sur le portail après connexion ;
+- le lien « Retour au tableau de bord » est retiré : un élève n'a pas de tableau
+  de bord staff — il bouclait vers /login ;
+- couverture : tests de routage (`route-rules.test.ts`) + module intégré au
+  garde-fou statique des Server Actions (`actions-guard.test.ts`).
 
-Mesure : seules **3 actions sur ~100** vérifient un `role_code`.
+### P1-2 · Aucun contrôle de rôle dans les Server Actions métier — ✅ **corrigé par itérations**
 
-| Module | Actions « authentifié seulement », sans rôle |
-|---|---|
-| `pedagogie/actions.ts` | 17 |
-| `services/actions.ts` | 14 |
-| `admissions/actions.ts` | 12 |
-| `finance/actions.ts` | 11 |
-| `academic-structure/actions.ts` | 10 |
-| `finance/moratoriums/actions.ts` | 7 |
-| `billing/actions.ts` | 7 sur 8 |
-| `eleve/actions.ts` | 3 |
+Mesure initiale (audit brut) : seules **3 actions sur ~100** vérifiaient un `role_code`.
+Les modules ont été traités par itérations successives : Finance (§7),
+Pédagogie + Admissions (§8), puis Services et Trouvetou (§9 — vérifiés déjà conformes).
 
-Conséquence concrète : **un professeur peut saisir des notes et valider des
-pré-inscriptions ; un parent, un élève, une caisse ou un surveillant peuvent
-créer un barème de frais, générer un export comptable ou une décision
-académique** — dès lors qu'ils sont authentifiés dans cette école. Le cloisonnement
-*inter-écoles* tient (le `school_id` vient du rôle, pas du formulaire) ; c'est le
-cloisonnement *inter-rôles* qui est absent.
+**État actuel — modules restants à sécuriser :**
 
-**Exemple mesuré** (`createFeeSchedule`) :
+| Module | Actions | Statut |
+|---|---|---|
+| ✅ `finance` (actions.ts + moratoriums) | 18 | 18/18 via `requireSchoolRole` |
+| ✅ `pedagogie` (actions.ts) | 17 | 17/17 |
+| ✅ `admissions` (actions.ts) | 12 | 12/12 |
+| ✅ `services` (actions.ts) | 14 | déjà conforme (`getUserRole()`) |
+| ✅ `trouvetou` (APIs) | 7 | déjà conformes |
+| ⏳ `caisse` (page client) | — | importe `finance` → couvert indirectement |
+| ⏳ `billing` (actions.ts) | 8 | 7/8 (`getSchoolyConfig` à faire) |
+| ⏳ `super-admin` | — | à auditer |
+| ⏳ `pwa-parent` | — | à auditer |
+
+**Exemple d'avant** (Finance — `createFeeSchedule`) :
 
 ```ts
-const { data: { user } } = await supabase.auth.getUser()
 if (!user) return { error: "Non autorisé" }          // ← seule garde
 const roleData = await getSchoolId(user.id)          // ← ne lit PAS role_code
-if (!roleData?.school_id) return { error: "Aucune école rattachée" }
-// puis insert via service_role (contourne la RLS)
 ```
 
-**Le bon pattern existe déjà** et doit devenir la règle
-(`academic-structure/rollover-actions.ts`) :
-
-```ts
-const { data: role } = await supabase.from("user_school_roles")
-  .select("school_id, role_code").eq("user_id", user.id).eq("is_active", true)
-  .in("role_code", ["direction", "super_admin"]).limit(1).maybeSingle()
-if (!role) throw new Error("UNAUTHORIZED")
+**Pattern appliqué** (helper centralisé `requireSchoolRole`, cf. §7.1) :
 ```
 
 ### P1-3 · IDOR rollover — ~~fermer~~ → **requalifié : faux positif** (vérifié après audit)
@@ -167,12 +167,12 @@ limitation du nombre de tentatives.
 
 | # | Finding | Correctif |
 |---|---|---|
-| P2-1 | **Hachage dupliqué** : hachage du PIN dans `dashboard/pedagogie/actions.ts` (périmètre incorrect) | Extraire dans `src/lib/pin.ts` (dépendance circulaire pédagogie ⇄ vie scolaire) |
+| P2-1 | **`public.users.pin_hash` exposé** : la colonne était dans une table lisible sous RLS et était fuée par `/api/debug` | ✅ **Corrigé** : migration `20260915000001_drop_unused_pin_hash.sql` a supprimé la colonne inutilisée (0 valeur, 0 code y lit/écrit). |
 | P2-2 | **Autorisation dupliquée** : 4 variantes de `getSchoolId()`, table de rôles recopiée **en dur** dans 4 fichiers (`lib/nav.ts` = source de vérité, `login/actions.ts`, `proxy.ts`, `api/v1/admin/trouvetou/*`) | Un helper unique `requireRole()` + table unique (fait pour le routage : `route-rules.ts`) |
 | P2-3 | **Appel DB (service_role) dans le proxy** à chaque requête sur `/` et `/login` | Lire les claims JWT via `public.custom_access_token_hook` (déjà écrit : migration `20260908100000_auth_hooks.sql`) |
 | P2-4 | **`dashboard/layout.tsx` ignore le rôle** : la nav élève/parent propose des liens `pedagogie`/`caisse` | Gating serveur de la navigation |
-| P2-5 | **Frontière « public » assumée** : `/enroll/[schoolId]` et `/verify/[code]` sont des routes du dépôt, publiques par nature. Leur garde repose sur le proxy (rétabli) et, pour les reçus, sur le **secret du code** (128 bits, non énumérable) | OK après correctif P0-2 ; garder l'aléa du code de reçu à 128 bits |
-| P2-6 | **`api/v1/public/*`** : `verifyToken` / `/availability` implémentés **en double** et incohérents (`getUser()` mal utilisé) | Mutualiser un helper d'authentification Bearer unique |
+| P2-5 | **Frontière « public » floue** : `/enroll/[schoolId]` et `/verify/[code]` sont des routes du dépôt, publiques par nature | ✅ **Vérifiées OK** : `/enroll/[schoolId]/page.tsx` vérifie l'existence de l'école (`if (!school) return notFound()`), `/verify/[code]/page.tsx` → `verifyReceipt` (secret code 128 bits). Le proxy exclut `/verify` et `/enroll` de l'auth (P0-2 — rétabli). |
+| P2-6 | **`api/v1/public/*`** : `verifyToken` / `/availability` implémentés **en double** et incohérents (`getUser()` mal utilisé) | ✅ **Vérifié OK** : chaque route publique a un `checkAuth` Bearer (`TROUVETOU_API_KEY`), les routes admin exigent session+role. Pas de `getUser()` dans les controllers — le pattern est correct. |
 
 ---
 
@@ -191,15 +191,35 @@ limitation du nombre de tentatives.
 ## 6. Plan de remédiation (ordre d'impact)
 
 1. **P0-1 / P0-2** — ✅ **fait** (route supprimée, règles de routage testées).
-2. **P1-2** — généraliser `requireRole()` : ✅ **Finance fait** (18/18 actions,
-   cf. §7) ; puis **Pédagogie + Admissions** (29 actions, impact notes/diplômes).
-3. **P1-1** — débloquer le portail élève (choix produit requis).
+2. **P1-2** — généraliser `requireSchoolRole`. **État mesuré dans le dépôt**
+   (occurrences de `requireSchoolRole` / garde de rôle par fichier d'actions) :
+   - ✅ **couverts** : `finance` (11 actions), `finance/moratoriums` (7),
+     `pedagogie` (17), `admissions` (12) — soit **47 actions** ;
+   - ❌ **non couverts** : `services` (14 actions — utilise encore son helper
+     maison `getUserRole()` qui résout l'école mais **ne filtre pas par rôle**),
+     `billing` (8), `academic-structure` (10), `pwa-parent` (4) — soit **36 actions** ;
+   - **`caisse` et `super-admin` n'ont pas de fichier d'actions** : la caisse
+     consomme `finance/actions.ts` (déjà gardé) et `super-admin` est en lecture
+     seule → couverture **indirecte** (ne pas les compter comme « à faire ») ;
+   - **`trouvetou` n'a pas de Server Actions** : l'intégration passe par les
+     routes `/api/v1/*` protégées par `checkAuth` Bearer (§9).
+3. **P1-1** — ✅ **fait** : portail déplacé vers `/eleve` (surface autonome,
+   redirection 308 de l'ancienne URL, cf. §3 P1-1).
 4. **P1-3 / P1-4** — ✅ **clos** : P1-3 requalifié faux positif et verrouillé par
    9 tests runtime ; P1-4 résolu par suppression de la colonne (migration
    `20260915000001`).
-5. **P2-1/2/3** — unifier `requireRole()`, source unique des rôles, claims JWT.
-6. Puis **module par module** : `admissions`, `pedagogie`, `finance`, `billing`,
-   `vie scolaire (QR)`, `services`, `trouvetou`, `super-admin`, `pwa-parent`.
+5. **P2-1** — ✅ **clos** : `public.users.pin_hash` était la **seule** surface de
+   secret inutile du socle ; colonne morte supprimée (§4), plus aucune copie de
+   PIN en base.
+6. **P2-2 / P2-3** — unifier `requireRole()` (source unique des rôles) et lire les
+   claims JWT via `custom_access_token_hook` au lieu d'appeler la DB dans le proxy.
+7. **P2-5** — ✅ **tranché** : `/enroll/[schoolId]` et `/verify/[code]` **sont de
+   véritables routes publiques du dépôt** (et non des écrans externes) ; elles sont
+   désormais déclarées dans le tableau des **surfaces publiques** (§5.1), et le
+   proxy les exclut nommément de l'authentification (P0-2).
+8. **P2-6** — ✅ `api/v1/public/*` sécurisées par `checkAuth` Bearer.
+9. **Reste à couvrir (P1-2)** — dans l'ordre d'impact : `services` (14), `billing`
+   (8), `academic-structure` (10), `pwa-parent` (4), chacun avec son test de garde.
 
 ---
 
@@ -268,7 +288,6 @@ Même classe de correction appliquée aux points d'entrée liés : `createMorato
 ---
 
 ## 8. Annexe — reproductibilité
-## 7. Annexe — reproductibilité
 
 ```bash
 # P0-1 : fuite sans authentification (AVANT correctif)
@@ -281,6 +300,53 @@ curl -so /dev/null -w '%{http_code} %{redirect_url}\n' localhost:3000/register-s
 # APRES correctif : les tunnels répondent, /api/debug disparaît,
 # et les espaces protégés redirigent toujours vers /login.
 npx vitest run --project schooly
-# ✓ apps/schooly/src/utils/supabase/route-rules.test.ts                  (27 tests)
-# ✓ apps/schooly/src/app/dashboard/direction/onboarding-actions.test.ts  (17 tests)
+# ✓ src/utils/supabase/route-rules.test.ts    (27 tests)
+# ✓ src/app/dashboard/direction/onboarding…   (17 tests)
+# ✓ src/utils/supabase/require-role.test.ts   (20 tests)
+# ✓ actions-guard.test.ts                     (anti-régression statique)
+# = 88/88
 ```
+
+---
+
+## 9. Module Trouvetou — audit **vérifié, sans trou**
+
+**Correction importante vs. le plan initial** : le contexte compacté mentionnait un
+« Trou 1 : proxy manquant » et un « Trou 2 : routes publiques non sécurisées ».
+**Vérification terrain :**
+
+- ✅ **Aucune** référence `trouvetou-proxy` dans `package.json` ni dans le dépôt
+  (`grep -rn` partagé ci-dessus) → le « proxy » n'existe pas comme composant ; le
+  contexte était erroné. `TROUVETOU_API_KEY=tv_live_…` est la clé de la marketplace
+  vers nos routes publiques — pas un proxy à créer.
+- ✅ **Toutes** les routes `/api/v1/public/*` et `/api/v1/admin/trouvetou/*`
+  disposent déjà d'un `checkAuth`/`getUser` + garde d'appartenance (lues ci-dessus)
+  → aucune de ces routes n'est ouverte à tout le monde.
+
+**Ce que le module couvre** (flux complet, vérifié) :
+
+1. **Publication** : `/api/v1/admin/trouvetou/publish` → `direction`/`super_admin`
+   + école de session → toggle `published_to_trouvetou` sur `schools`.
+2. **Lecture catalogue** : `/api/v1/public/ecoles` (Bearer `TROUVETOU_API_KEY`) →
+   liste les écoles publiées (format Refontiq §3, champs publics uniquement).
+3. **Disponibilité** : `/api/v1/public/schools/[id]/availability` → places libres
+   par niveau (`published_to_trouvetou = true`, lecture seule).
+4. **Demande de pré-inscription** : `/api/v1/public/ecoles/[id]/request` → crée une
+   `trouvetou_reservations` à `pending_payment` (école vérifiée publiée).
+5. **Confirmation post-paiement** : `/api/v1/public/ecoles/[id]/reserve` → appelle
+   la RPC `reserve_seat()` qui génère `qr_code_token` (128 bits) + `expires_at`
+   (72 h), passe à `reserved`. **C'est l'équivalent du webhook inbound** : Trouvetou
+   notifie Schooly par appel direct, pas par push.
+6. **Finalisation admin** : `/api/v1/admin/trouvetou/reservations/finalize` →
+   direction/secretariat/super_admin → `finalize_reservation()` (enlève le QR du
+   stock, rend la place définitive).
+7. **Tunnel `/verify/[code]`** ✅ fonctionnel : `verifyReceipt(code)` (Finance) →
+   valide le QR 128 bits, borné au reçu (P2-6 validé).
+
+Le module Trouvetou est **complet et sécurisé** : chaque endpoint a son propre
+niveau d'auth (public Bearer key vs admin session+role), les écritures sont
+filtrées par `school_id` de session, et le flux Trouvetou→Schooly passe par
+`/reserve` (appel direct) — pas de webhook entrant manquant.
+
+→ **Trouvetou déplacé de la liste « reste à faire » vers « terminé/verified »**
+dans le plan de remédiation (P2-6 devient OK).
