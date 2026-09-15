@@ -40,8 +40,8 @@ export function Sidebar({ role, schoolName, userName }: SidebarProps) {
       <div className="flex items-center justify-between p-4 border-b border-border min-h-[64px]">
         {!collapsed && (
           <div className="flex flex-col min-w-0">
-            <img src="/schooly_logo_vector.svg" alt="Schooly" className="h-8 w-auto" />
-            <span className="text-xs text-muted-foreground truncate">{schoolName}</span>
+            <span className="text-base font-semibold truncate">{schoolName}</span>
+            <img src="/schooly_logo_vector.svg" alt="Schooly" className="h-4 w-auto mt-0.5 opacity-70" />
           </div>
         )}
         {collapsed && (
