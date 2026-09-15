@@ -10,31 +10,24 @@ type ActionResult<T = void> = {
   data?: T
 }
 
-type SchoolRoleResult = { school_id: string | null; error: Error | null }
+import { denial, requireSchoolRole } from "@/utils/supabase/require-role"
 
-async function getSchoolId(userId: string): Promise<SchoolRoleResult> {
-  const admin = createAdminClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
-  const { data, error } = await admin
-    .from("user_school_roles")
-    .select("school_id")
-    .eq("user_id", userId)
-    .eq("is_active", true)
-    .limit(1)
-    .single()
-  
-  return { school_id: data?.school_id ?? null, error }
-}
+/** Rôles habilités à définir la tarification (écriture sensible, argent). */
+const PRICING_ROLES = ["direction", "compta", "super_admin"] as const
+
+/** Rôles habilités à encaisser et gérer la caisse. */
+const CASHIER_ROLES = ["direction", "compta", "caisse", "super_admin"] as const
 
 // ============================================ GRILLE TARIFAIRE =================
 
 export async function getFeeSchedules(schoolId: string) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) return { error: "Non autorisé", data: [] }
+  // Garde cross-tenant : le school_id client est refusé s'il diffère de
+  // l'école de la session (IDOR constaté à l'audit : lecture d'une autre
+  // école possible avec un simple paramètre).
+  const guard = await requireSchoolRole(supabase, { requestedSchoolId: schoolId })
+  if (!guard.ok) return denial(guard.reason, [])
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -49,7 +42,7 @@ export async function getFeeSchedules(schoolId: string) {
       financial_profiles ( name ),
       academic_years ( label )
     `)
-    .eq("school_id", schoolId)
+    .eq("school_id", guard.context.schoolId)
     .order("academic_year_id", { ascending: false })
 
   if (error) return { error: error.message, data: [] }
@@ -58,12 +51,11 @@ export async function getFeeSchedules(schoolId: string) {
 
 export async function createFeeSchedule(formData: FormData): Promise<ActionResult> {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) return { error: "Non autorisé" }
-
-  const roleData = await getSchoolId(user.id)
-  if (!roleData?.school_id) return { error: "Aucune école rattachée" }
+  // Écriture sensible (argent) : direction / compta uniquement.
+  const guard = await requireSchoolRole(supabase, { allowedRoles: [...PRICING_ROLES] })
+  if (!guard.ok) return { error: denial(guard.reason, []).error }
+  const { schoolId } = guard.context
 
   const gradeLevelId = formData.get("gradeLevelId") as string
   const financialProfileId = formData.get("financialProfileId") as string | null
@@ -81,7 +73,7 @@ export async function createFeeSchedule(formData: FormData): Promise<ActionResul
   )
 
   const { error } = await admin.from("fee_schedules").insert({
-    school_id: roleData.school_id,
+    school_id: schoolId,
     grade_level_id: gradeLevelId,
     financial_profile_id: financialProfileId || null,
     amount,
@@ -102,9 +94,9 @@ export async function createFeeSchedule(formData: FormData): Promise<ActionResul
 
 export async function getPayments(schoolId: string) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) return { error: "Non autorisé", data: [] }
+  const guard = await requireSchoolRole(supabase, { requestedSchoolId: schoolId })
+  if (!guard.ok) return denial(guard.reason, [])
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -122,7 +114,7 @@ export async function getPayments(schoolId: string) {
       ),
       users ( full_name )
     `)
-    .eq("school_id", schoolId)
+    .eq("school_id", guard.context.schoolId)
     .order("received_at", { ascending: false })
 
   if (error) return { error: error.message, data: [] }
@@ -131,12 +123,11 @@ export async function getPayments(schoolId: string) {
 
 export async function createPayment(formData: FormData): Promise<ActionResult<{ receiptNumber: string; verificationCode: string }>> {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) return { error: "Non autorisé" }
-
-  const roleData = await getSchoolId(user.id)
-  if (!roleData?.school_id) return { error: "Aucune école rattachée" }
+  // Encaissement : direction / compta / caisse uniquement.
+  const guard = await requireSchoolRole(supabase, { allowedRoles: [...CASHIER_ROLES] })
+  if (!guard.ok) return { error: denial(guard.reason, []).error }
+  const { schoolId, userId } = guard.context
 
   const enrollmentId = formData.get("enrollmentId") as string
   const amount = parseInt(formData.get("amount") as string || "0")
@@ -159,18 +150,18 @@ export async function createPayment(formData: FormData): Promise<ActionResult<{ 
     .eq("id", enrollmentId)
     .single()
 
-  if (!enrollment || enrollment.school_id !== roleData.school_id) {
+  if (!enrollment || enrollment.school_id !== schoolId) {
     return { error: "Inscription introuvable ou accès non autorisé." }
   }
 
   const { data: payment, error: paymentError } = await admin.from("payments").insert({
-    school_id: roleData.school_id,
+    school_id: schoolId,
     enrollment_id: enrollmentId,
     amount,
     payment_method: paymentMethod,
     reference: reference || null,
     cash_session_id: cashSessionId || null,
-    received_by: user.id,
+    received_by: userId,
   }).select("id").single()
 
   if (paymentError) return { error: paymentError.message }
@@ -180,12 +171,12 @@ export async function createPayment(formData: FormData): Promise<ActionResult<{ 
   const qrCodeData = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/verify/${verificationCode}`
 
   const { error: receiptError } = await admin.from("receipts").insert({
-    school_id: roleData.school_id,
+    school_id: schoolId,
     payment_id: payment.id,
     receipt_number: receiptNumber,
     verification_code: verificationCode,
     qr_code_data: qrCodeData,
-    issued_by: user.id,
+    issued_by: userId,
   })
 
   if (receiptError) return { error: receiptError.message }
@@ -200,9 +191,9 @@ export async function createPayment(formData: FormData): Promise<ActionResult<{ 
 
 export async function getOpenCashSession(schoolId: string) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) return { error: "Non autorisé", data: null }
+  const guard = await requireSchoolRole(supabase, { requestedSchoolId: schoolId })
+  if (!guard.ok) return denial(guard.reason, null)
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -221,9 +212,9 @@ export async function getOpenCashSession(schoolId: string) {
 
 export async function getCashSessions(schoolId: string) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) return { error: "Non autorisé", data: [] }
+  const guard = await requireSchoolRole(supabase, { requestedSchoolId: schoolId })
+  if (!guard.ok) return denial(guard.reason, [])
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -246,12 +237,11 @@ export async function getCashSessions(schoolId: string) {
 
 export async function openCashSession(formData: FormData): Promise<ActionResult> {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) return { error: "Non autorisé" }
-
-  const roleData = await getSchoolId(user.id)
-  if (!roleData?.school_id) return { error: "Aucune école rattachée" }
+  // Ouverture de caisse : direction / compta / caisse uniquement.
+  const guard = await requireSchoolRole(supabase, { allowedRoles: [...CASHIER_ROLES] })
+  if (!guard.ok) return { error: denial(guard.reason, []).error }
+  const { schoolId, userId } = guard.context
 
   const openingAmount = parseInt(formData.get("openingAmount") as string || "0")
 
@@ -263,15 +253,15 @@ export async function openCashSession(formData: FormData): Promise<ActionResult>
   const { data: existing } = await admin
     .from("cash_sessions")
     .select("id")
-    .eq("school_id", roleData.school_id)
+    .eq("school_id", schoolId)
     .eq("status", "open")
     .single()
 
   if (existing) return { error: "Une session de caisse est déjà ouverte." }
 
   const { error } = await admin.from("cash_sessions").insert({
-    school_id: roleData.school_id,
-    opened_by: user.id,
+    school_id: schoolId,
+    opened_by: userId,
     opening_amount: openingAmount,
     status: "open",
   })
@@ -284,12 +274,11 @@ export async function openCashSession(formData: FormData): Promise<ActionResult>
 
 export async function closeCashSession(formData: FormData): Promise<ActionResult<{ expected: number; difference: number }>> {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) return { error: "Non autorisé" }
-
-  const roleData = await getSchoolId(user.id)
-  if (!roleData?.school_id) return { error: "Aucune école rattachée" }
+  // Clôture de caisse : direction / compta / caisse uniquement.
+  const guard = await requireSchoolRole(supabase, { allowedRoles: [...CASHIER_ROLES] })
+  if (!guard.ok) return { error: denial(guard.reason, []).error }
+  const { schoolId, userId } = guard.context
 
   const closingAmount = parseInt(formData.get("closingAmount") as string || "0")
 
@@ -301,7 +290,7 @@ export async function closeCashSession(formData: FormData): Promise<ActionResult
   const { data: session } = await admin
     .from("cash_sessions")
     .select("*")
-    .eq("school_id", roleData.school_id)
+    .eq("school_id", schoolId)
     .eq("status", "open")
     .single()
 
@@ -318,7 +307,7 @@ export async function closeCashSession(formData: FormData): Promise<ActionResult
   const difference = closingAmount - expected
 
   const { error } = await admin.from("cash_sessions").update({
-    closed_by: user.id,
+    closed_by: userId,
     closing_amount: closingAmount,
     expected_amount: expected,
     difference,
@@ -336,6 +325,15 @@ export async function closeCashSession(formData: FormData): Promise<ActionResult
 
 // ============================================ VÉRIFICATION PUBLIQUE ==============
 
+/**
+ * EXCEPTION VOLONTAIRE — pas de garde requireSchoolRole ici.
+ * Appelée par le tunnel public `/verify/[code]` (page de vérification d'un reçu
+ * par quiconque possède le lien QR imprimé sur le reçu). L'authentification
+ * casserait ce tunnel. Le secret réside dans le code lui-même : 128 bits
+ * d'aléa (`crypto.randomBytes(16)`), impossible à énumérer. Les données
+ * retournées sont limitées au contenu du reçu (pas de liste ni de balayage).
+ * Cf. docs/security/audit-socle-auth-tenancy.md — module Finance.
+ */
 export async function verifyReceipt(verificationCode: string) {
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -370,11 +368,15 @@ export async function verifyReceipt(verificationCode: string) {
 
 // ============================================ EXPORTS COMPTABLES ================
 
-export async function getAccountingExports(schoolId: string) {
+export async function getAccountingExports(requestedSchoolId: string) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) return { error: "Non autorisé", data: [] }
+  // Lecture des exports comptables : direction / compta uniquement.
+  const guard = await requireSchoolRole(supabase, {
+    allowedRoles: [...PRICING_ROLES],
+    requestedSchoolId,
+  })
+  if (!guard.ok) return { error: denial(guard.reason, []).error, data: [] }
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -387,21 +389,40 @@ export async function getAccountingExports(schoolId: string) {
       *,
       academic_years ( label )
     `)
-    .eq("school_id", schoolId)
+    .eq("school_id", guard.context.schoolId)
     .order("generated_at", { ascending: false })
 
   if (error) return { error: error.message, data: [] }
   return { data: data || [] }
 }
 
+type AccountingPaymentRow = {
+  amount: number
+  payment_method: string | null
+  received_at: string | null
+  enrollments: {
+    matricule: string | null
+    students: { first_name: string; last_name: string } | null
+    guardians: { full_name: string | null } | null
+  } | null
+}
+
+type AccountingExportLine = {
+  date: string | null
+  matricule: string | null
+  eleve: string
+  tuteur: string | null
+  mode: string | null
+  montant: number
+}
+
 export async function generateAccountingExport(formData: FormData): Promise<ActionResult<{ csvContent: string; totalDebit: number; totalCredit: number; lineCount: number }>> {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) return { error: "Non autorisé" }
-
-  const roleData = await getSchoolId(user.id)
-  if (!roleData?.school_id) return { error: "Aucune école rattachée" }
+  // Export comptable (données sensibles) : direction / compta uniquement.
+  const guard = await requireSchoolRole(supabase, { allowedRoles: [...PRICING_ROLES] })
+  if (!guard.ok) return { error: denial(guard.reason, []).error }
+  const { schoolId, userId } = guard.context
 
   const academicYearId = formData.get("academicYearId") as string
   const exportType = formData.get("exportType") as string
@@ -429,27 +450,38 @@ export async function generateAccountingExport(formData: FormData): Promise<Acti
         guardians ( full_name )
       )
     `)
-    .eq("school_id", roleData.school_id)
+    .eq("school_id", schoolId)
     .eq("academic_year_id", academicYearId)
     .gte("received_at", periodStart)
     .lte("received_at", periodEnd)
     .is("deleted_at", null)
 
-  const paymentList = (payments || []) as any[]
+  // L'inférence supabase-js (sans schéma DB généré) décrit les relations
+  // embarquées comme des tableaux ; au runtime PostgREST renvoie bien des
+  // objets pour les relations N:1 (payments→enrollments→students/guardians).
+  // Cast via `unknown` : la sûreté réside dans le mapper normalisé ci-dessous.
+  const paymentList = (payments ?? []) as unknown as AccountingPaymentRow[]
 
   let totalDebit = 0
   let totalCredit = 0
-  const lines: any[] = []
+  const lines: AccountingExportLine[] = []
 
   for (const payment of paymentList) {
     totalDebit += payment.amount
     totalCredit += payment.amount
+    const enrollment = payment.enrollments
+    const eleve = [
+      enrollment?.students?.last_name,
+      enrollment?.students?.first_name,
+    ]
+      .filter(Boolean)
+      .join(" ")
     lines.push({
-      date: payment.received_at,
-      matricule: payment.enrollments?.matricule,
-      eleve: `${payment.enrollments?.students?.last_name} ${payment.enrollments?.students?.first_name}`,
-      tuteur: payment.enrollments?.guardians?.full_name,
-      mode: payment.payment_method,
+      date: payment.received_at ?? null,
+      matricule: enrollment?.matricule ?? null,
+      eleve: eleve || "—",
+      tuteur: enrollment?.guardians?.full_name ?? null,
+      mode: payment.payment_method ?? null,
       montant: payment.amount,
     })
   }
@@ -464,12 +496,12 @@ export async function generateAccountingExport(formData: FormData): Promise<Acti
   }
 
   const { error: exportError } = await admin.from("accounting_exports").insert({
-    school_id: roleData.school_id,
+    school_id: schoolId,
     academic_year_id: academicYearId,
     export_type: exportType,
     period_start: periodStart,
     period_end: periodEnd,
-    generated_by: user.id,
+    generated_by: userId,
   })
 
   if (exportError) return { error: exportError.message }
