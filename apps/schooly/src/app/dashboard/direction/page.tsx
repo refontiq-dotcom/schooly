@@ -1,22 +1,64 @@
-import { createClient } from "@/utils/supabase/server"
+import Link from "next/link"
 import { redirect } from "next/navigation"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Users, CreditCard, GraduationCap, TrendingUp } from "lucide-react"
+import { Users, CreditCard, GraduationCap, TrendingUp, ArrowRight } from "lucide-react"
+import { formatFCFA } from "@/lib/formatters"
+import { getDashboardMetrics, type DashboardMetrics } from "./actions"
+
+const QUICK_LINKS = [
+  { label: "Gérer les inscriptions", href: "/dashboard/direction/admissions" },
+  { label: "Configurer l'année scolaire", href: "/dashboard/academic-structure" },
+  { label: "Suivre les paiements", href: "/dashboard/direction/finance" },
+]
 
 export default async function DirectionDashboard() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect("/login")
+  let metrics: DashboardMetrics
+  try {
+    metrics = await getDashboardMetrics()
+  } catch {
+    redirect("/login")
+  }
 
-  const schoolId = user.app_metadata?.school_id as string | undefined
+  const monthLabel = new Date().toLocaleDateString("fr-FR", {
+    month: "long",
+    year: "numeric",
+  })
 
-  // Compteurs rapides (à remplacer par de vraies requêtes quand les tables existent)
   const stats = [
-    { label: "Élèves inscrits", value: "—", icon: Users, color: "text-primary" },
-    { label: "Encaissé ce mois", value: "—", icon: CreditCard, color: "text-green-600" },
-    { label: "Classes configurées", value: "—", icon: GraduationCap, color: "text-blue-600" },
-    { label: "Taux de recouvrement", value: "—", icon: TrendingUp, color: "text-amber-600" },
+    {
+      label: "Élèves inscrits",
+      value: metrics.activeStudents.toLocaleString("fr-FR"),
+      hint: metrics.academicYearLabel
+        ? `Année ${metrics.academicYearLabel}`
+        : "Aucune année active",
+      icon: Users,
+      color: "text-primary",
+    },
+    {
+      label: "Encaissé ce mois",
+      value: formatFCFA(metrics.collectedThisMonth),
+      hint: monthLabel,
+      icon: CreditCard,
+      color: "text-green-600",
+    },
+    {
+      label: "Classes configurées",
+      value: metrics.configuredClasses.toLocaleString("fr-FR"),
+      hint: "Structure académique",
+      icon: GraduationCap,
+      color: "text-blue-600",
+    },
+    {
+      label: "Taux de recouvrement",
+      value: metrics.recoveryRate === null ? "—" : `${metrics.recoveryRate}%`,
+      hint:
+        metrics.expectedForYear > 0
+          ? `${formatFCFA(metrics.collectedForYear)} sur ${formatFCFA(metrics.expectedForYear)}`
+          : "Aucun frais paramétré",
+      icon: TrendingUp,
+      color: "text-amber-600",
+    },
   ]
 
   return (
@@ -26,12 +68,14 @@ export default async function DirectionDashboard() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Tableau de bord</h1>
           <p className="text-muted-foreground text-sm mt-1">
-            Vue d'ensemble de votre établissement
+            Vue d&apos;ensemble de {metrics.schoolName}
           </p>
         </div>
-        <Badge variant="outline" className="text-primary border-primary">
-          Année académique 2025-2026
-        </Badge>
+        {metrics.academicYearLabel && (
+          <Badge variant="outline" className="text-primary border-primary">
+            Année académique {metrics.academicYearLabel}
+          </Badge>
+        )}
       </div>
 
       {/* Cartes de statistiques */}
@@ -46,25 +90,31 @@ export default async function DirectionDashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold">{stat.value}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Données disponibles dès la Phase 2
-              </p>
+              <p className="text-xs text-muted-foreground mt-1">{stat.hint}</p>
             </CardContent>
           </Card>
         ))}
       </div>
 
-      {/* Placeholder Prochaines actions */}
+      {/* Actions rapides */}
       <Card className="shadow-sm">
         <CardHeader>
-          <CardTitle className="text-base">🚧 Modules en cours de développement</CardTitle>
+          <CardTitle className="text-base">Actions rapides</CardTitle>
+          <CardDescription>Accédez directement aux modules essentiels.</CardDescription>
         </CardHeader>
         <CardContent>
-          <ul className="space-y-2 text-sm text-muted-foreground">
-            <li>📅 <strong>Phase 2</strong> — Structure académique (années, classes, matières)</li>
-            <li>🎓 <strong>Phase 3</strong> — Inscriptions & pré-inscriptions des élèves</li>
-            <li>💰 <strong>Phase 4</strong> — Tarification, caisse & reçus QR</li>
-          </ul>
+          <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3">
+            {QUICK_LINKS.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="inline-flex items-center justify-between gap-2 rounded-lg border border-border px-4 py-2.5 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground"
+              >
+                {link.label}
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            ))}
+          </div>
         </CardContent>
       </Card>
     </div>

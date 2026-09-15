@@ -7,15 +7,11 @@ import {
   BookOpen,
   CalendarDays,
   ShieldCheck,
-  Settings,
   LogOut,
   ChevronLeft,
   School,
   Clock,
   Bell,
-  QrCode,
-  Scan,
-  AlertTriangle,
   Bus,
 } from "lucide-react"
 
@@ -40,16 +36,13 @@ export const NAV_BY_ROLE: Record<string, NavItem[]> = {
     { label: "Moratoires", href: "/dashboard/direction/finance/moratoriums", icon: Clock },
     { label: "Relances", href: "/dashboard/direction/finance/reminders", icon: Bell },
     { label: "Facturation", href: "/dashboard/billing", icon: CreditCard },
-    { label: "Rapports", href: "/dashboard/direction/reports", icon: BookOpen },
     { label: "Services", href: "/dashboard/services/transport", icon: Bus },
-    { label: "Paramètres", href: "/dashboard/direction/settings", icon: Settings },
     { label: "Trouvetou", href: "/dashboard/admin/trouvetou", icon: Megaphone },
   ],
   compta: [
     { label: "Tableau de bord", href: "/dashboard/direction", icon: LayoutDashboard },
     { label: "Finance", href: "/dashboard/direction/finance", icon: CreditCard },
     { label: "Services", href: "/dashboard/services/transport", icon: Bus },
-    { label: "Rapports", href: "/dashboard/direction/reports", icon: BookOpen },
   ],
   caisse: [
     { label: "Encaissement", href: "/dashboard/caisse", icon: CreditCard },
@@ -62,11 +55,8 @@ export const NAV_BY_ROLE: Record<string, NavItem[]> = {
     { label: "Notes", href: "/dashboard/pedagogie/grades", icon: GraduationCap },
   ],
   surveillance: [
-    { label: "Vie scolaire", href: "/dashboard/pedagogie/vie-scolaire", icon: ShieldCheck },
-    { label: "Accès QR", href: "/dashboard/pedagogie/vie-scolaire", icon: QrCode },
-    { label: "Journal d'accès", href: "/dashboard/pedagogie/vie-scolaire", icon: Scan },
-    { label: "Retenues", href: "/dashboard/pedagogie/vie-scolaire", icon: Clock },
-    { label: "Alertes décrochage", href: "/dashboard/pedagogie/vie-scolaire", icon: AlertTriangle },
+    { label: "Discipline & Vie scolaire", href: "/dashboard/pedagogie/discipline", icon: ShieldCheck },
+    { label: "Absences & Appel", href: "/dashboard/pedagogie/attendance", icon: Users },
   ],
 }
 
