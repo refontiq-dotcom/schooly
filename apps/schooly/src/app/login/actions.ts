@@ -3,20 +3,10 @@
 import { createClient } from "@/utils/supabase/server"
 import { createClient as createAdminClient } from "@supabase/supabase-js"
 import { redirect } from "next/navigation"
+import { roleHome } from "@/utils/supabase/route-rules"
 
 type LoginResult = {
   error: string | null
-}
-
-// Mapping rôle → route de destination
-const ROLE_ROUTES: Record<string, string> = {
-  super_admin: "/dashboard/super-admin",
-  direction: "/dashboard/direction",
-  compta: "/dashboard/direction",
-  caisse: "/dashboard/caisse",
-  professeur: "/dashboard/pedagogie",
-  surveillance: "/dashboard/pedagogie",
-  secretariat: "/dashboard/direction",
 }
 
 export async function loginAction(
@@ -71,6 +61,17 @@ export async function loginAction(
     }
   }
 
-  const destination = ROLE_ROUTES[role] ?? "/login"
+  // Table de routage partagée avec le proxy (source unique de vérité).
+  const destination = roleHome(role)
+
+  if (!destination) {
+    // Ne JAMAIS rediriger vers /login ici : l'utilisateur vient de s'authentifier,
+    // cela produirait une boucle de connexion silencieuse.
+    return {
+      error:
+        "Ce compte est valide mais n'a pas d'espace dans l'application d'administration. Utilisez l'application dédiée.",
+    }
+  }
+
   redirect(destination)
 }

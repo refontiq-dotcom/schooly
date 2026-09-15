@@ -1,7 +1,9 @@
 "use server"
 
 import { createClient } from "@/utils/supabase/server"
+import { createClient as createAdminClient } from "@supabase/supabase-js"
 import { redirect } from "next/navigation"
+import { roleHome } from "@/utils/supabase/route-rules"
 
 type LoginResult = { error: string | null; success?: boolean }
 
@@ -21,13 +23,37 @@ export async function schoolLoginAction(
 
   const supabase = await createClient()
 
-  const { error } = await supabase.auth.signInWithPassword({ email, password })
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
   if (error) {
     return { error: "Identifiants incorrects." }
   }
 
-  redirect("/dashboard")
+  // Routage par rôle : `/dashboard` n'existe pas (aucun page.tsx) → 404 pour
+  // tous les utilisateurs. La table de routage est partagée avec le proxy.
+  const admin = createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+
+  const { data: roleData } = await admin
+    .from("user_school_roles")
+    .select("role_code")
+    .eq("user_id", data.user.id)
+    .eq("is_active", true)
+    .order("created_at", { ascending: true })
+    .limit(1)
+
+  const destination = roleHome(roleData?.[0]?.role_code)
+
+  if (!destination) {
+    return {
+      error:
+        "Ce compte n'a pas d'espace dans cette application. Contactez votre établissement.",
+    }
+  }
+
+  redirect(destination)
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
