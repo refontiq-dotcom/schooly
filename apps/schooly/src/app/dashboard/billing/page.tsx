@@ -36,7 +36,7 @@ export default async function BillingPage() {
   // Établissement : voit son résumé + formulaire de versement
   if (!schoolId) redirect("/login")
 
-  const billing = await getSchoolBillingSummary(schoolId)
+  const billing = await getSchoolBillingSummary()
   const myRequests = await getMyPaymentRequests()
   const hasPending = billing.pendingRequests.length > 0
 

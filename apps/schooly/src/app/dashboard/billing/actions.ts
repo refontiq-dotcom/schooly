@@ -64,8 +64,10 @@ export async function getSchoolyConfig() {
 }
 
 // ─── Résumé facturation établissement ────────────────────────────────────
+// (durcissement P1-2 : le schoolId provient du contexte, jamais du client)
 
-export async function getSchoolBillingSummary(schoolId: string) {
+export async function getSchoolBillingSummary() {
+  const { schoolId } = await getBillingContext()
   const admin = getAdmin()
   const config = await getSchoolyConfig()
 
