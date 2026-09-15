@@ -195,9 +195,16 @@ limitation du nombre de tentatives.
    (occurrences de `requireSchoolRole` / garde de rôle par fichier d'actions) :
    - ✅ **couverts** : `finance` (11 actions), `finance/moratoriums` (7),
      `pedagogie` (17), `admissions` (12) — soit **47 actions** ;
-   - ❌ **non couverts** : `services` (14 actions — utilise encore son helper
-     maison `getUserRole()` qui résout l'école mais **ne filtre pas par rôle**),
-     `billing` (8), `academic-structure` (10), `pwa-parent` (4) — soit **36 actions** ;
+   - ✅ **couverts (deuxième itération)** : `billing` (8 — le `schoolId` de
+     `getSchoolBillingSummary` provient désormais de `getBillingContext()`,
+     qui filtre déjà par rôle, IDOR fermé), `services` (14 — le helper maison
+     `getSchoolId()` filtre désormais sur `SERVICE_ADMIN_ROLES`
+     = direction/secretariat/super_admin), `academic-structure` (10 — même
+     pattern, `STRUCTURE_ADMIN_ROLES`) — soit **32 actions** supplémentaires ;
+   - ✅ **pwa-parent** (4) : garde maison `requireGuardian()` dédiée — le profil
+     parent est dérivé de l'email de session (jamais d'id client) et toutes les
+     lectures/écritures sont scopées par ce guardian_id ; spécificité métier
+     assumée (RLS actuel ne couvre que le personnel), **faux positif** ;
    - **`caisse` et `super-admin` n'ont pas de fichier d'actions** : la caisse
      consomme `finance/actions.ts` (déjà gardé) et `super-admin` est en lecture
      seule → couverture **indirecte** (ne pas les compter comme « à faire ») ;
@@ -213,13 +220,19 @@ limitation du nombre de tentatives.
    PIN en base.
 6. **P2-2 / P2-3** — unifier `requireRole()` (source unique des rôles) et lire les
    claims JWT via `custom_access_token_hook` au lieu d'appeler la DB dans le proxy.
+   *Note : les gardes `services`/`academic-structure` ferment le trou P1-2 avec
+   le pattern local existant ; l'unification vers `requireSchoolRole` reste le
+   chantier P2-2.*
 7. **P2-5** — ✅ **tranché** : `/enroll/[schoolId]` et `/verify/[code]` **sont de
    véritables routes publiques du dépôt** (et non des écrans externes) ; elles sont
    désormais déclarées dans le tableau des **surfaces publiques** (§5.1), et le
    proxy les exclut nommément de l'authentification (P0-2).
 8. **P2-6** — ✅ `api/v1/public/*` sécurisées par `checkAuth` Bearer.
-9. **Reste à couvrir (P1-2)** — dans l'ordre d'impact : `services` (14), `billing`
-   (8), `academic-structure` (10), `pwa-parent` (4), chacun avec son test de garde.
+9. **Reste à couvrir (P1-2)** — ✅ **néant** : tous les fichiers d'actions métier
+   portent désormais un filtre de rôle (direct via `requireSchoolRole`, ou via le
+   helper local durci). Les Server Actions restantes sans garde de rôle sont les
+   surfaces par design : `login` et `register-school` (publiques) et `eleve`
+   (auth QR dédiée, cf. P1-1).
 
 ---
 

@@ -19,16 +19,23 @@ async function getSchoolId(userId: string): Promise<SchoolRoleResult> {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
+  // Audit P1-2 : cloisonnement inter-rôles. La structure académique
+  // (années, niveaux, classes, matières, affectations) est un acte de
+  // direction ou de secrétariat — pas une opération enseignante.
   const { data, error } = await admin
     .from("user_school_roles")
     .select("school_id")
     .eq("user_id", userId)
     .eq("is_active", true)
+    .in("role_code", STRUCTURE_ADMIN_ROLES)
     .limit(1)
     .single()
-  
+
   return { school_id: data?.school_id ?? null, error }
 }
+
+/** Rôles habilités à administrer la structure académique (audit P1-2). */
+const STRUCTURE_ADMIN_ROLES = ["direction", "secretariat", "super_admin"] as const
 
 export async function getAcademicYears(): Promise<ActionResult<{ id: string; label: string; status: string }[]>> {
   const supabase = await createClient()
