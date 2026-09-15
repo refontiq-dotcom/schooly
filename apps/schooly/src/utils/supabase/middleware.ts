@@ -34,10 +34,16 @@ export async function updateSession(request: NextRequest) {
 
   const path = request.nextUrl.pathname
 
+  // Routes publiques accessibles sans authentification
+  const publicPaths = ['/login', '/register-school', '/enroll', '/verify']
+  const isPublicPath = publicPaths.some(
+    (publicPath) => path === publicPath || path.startsWith(`${publicPath}/`)
+  )
+
   // Protection stricte : redirection vers /login si non connecté
   if (
     !user &&
-    !path.startsWith('/login') &&
+    !isPublicPath &&
     !path.startsWith('/api') &&
     !path.startsWith('/_next')
   ) {
