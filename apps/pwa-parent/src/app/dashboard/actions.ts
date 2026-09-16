@@ -2,6 +2,7 @@
 
 import { createClient } from "@/utils/supabase/server"
 import { createClient as createAdminClient, type SupabaseClient } from "@supabase/supabase-js"
+import { redirect } from "next/navigation"
 
 // ============================================================================
 // Contexte de sécurité
@@ -572,4 +573,5 @@ export async function requestMoratorium(formData: FormData): Promise<MoratoriumR
 export async function signOut(): Promise<void> {
   const supabase = await createClient()
   await supabase.auth.signOut()
+  redirect("/login")
 }
