@@ -1,4 +1,5 @@
 import { createClient } from "@/utils/supabase/server"
+import { createClient as createAdminClient } from "@supabase/supabase-js"
 import { redirect } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -10,6 +11,23 @@ export default async function DirectionDashboard() {
   if (!user) redirect("/login")
 
   const schoolId = user.app_metadata?.school_id as string | undefined
+
+  // Année académique réellement active pour l'école (et non un label codé en dur).
+  let activeYearLabel: string | null = null
+  if (schoolId) {
+    const admin = createAdminClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+    const { data: activeYear } = await admin
+      .from("academic_years")
+      .select("label")
+      .eq("school_id", schoolId)
+      .eq("status", "en_cours")
+      .is("deleted_at", null)
+      .maybeSingle()
+    activeYearLabel = activeYear?.label ?? null
+  }
 
   // Compteurs rapides (à remplacer par de vraies requêtes quand les tables existent)
   const stats = [
@@ -30,7 +48,7 @@ export default async function DirectionDashboard() {
           </p>
         </div>
         <Badge variant="outline" className="text-primary border-primary">
-          Année académique 2025-2026
+          {activeYearLabel ? `Année académique ${activeYearLabel}` : "Aucune année active"}
         </Badge>
       </div>
 
