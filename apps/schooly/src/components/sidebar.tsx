@@ -32,7 +32,7 @@ export function Sidebar({ role, schoolName, userName }: SidebarProps) {
   return (
     <aside
       className={cn(
-        "flex flex-col h-screen bg-card border-r border-border transition-all duration-300 ease-in-out",
+        "gemini-glass flex flex-col h-screen border-r border-border/60 transition-all duration-300 ease-in-out",
         collapsed ? "w-16" : "w-64"
       )}
     >

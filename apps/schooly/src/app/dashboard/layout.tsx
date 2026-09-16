@@ -4,6 +4,7 @@ import { redirect } from "next/navigation"
 import { Sidebar } from "@/components/sidebar"
 import { AcademicYearSelector } from "@/components/academic-year-selector"
 import { OnboardingWizard } from "@/components/onboarding-wizard"
+import { GeminiBackdrop } from "@/components/gemini"
 
 export default async function DashboardLayout({
   children,
@@ -65,7 +66,10 @@ export default async function DashboardLayout({
     .single()
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div className="relative flex h-screen overflow-hidden">
+      {/* Décor Gemini : les blobs dérivent DERRIÈRE la sidebar et le contenu. */}
+      <GeminiBackdrop />
+      <div className="relative z-10 flex flex-1 overflow-hidden">
       <Sidebar
         role={role}
         schoolName={schoolName}
@@ -73,7 +77,7 @@ export default async function DashboardLayout({
       />
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Bannière supérieure avec sélecteur d'année académique */}
-        <header className="h-14 border-b border-border bg-card/50 flex items-center justify-between px-6 shrink-0">
+        <header className="h-14 border-b border-border bg-background/60 backdrop-blur-md flex items-center justify-between px-6 shrink-0">
           <AcademicYearSelector schoolId={schoolId} />
           <div className="text-xs text-muted-foreground">
             {schoolName}
@@ -91,6 +95,7 @@ export default async function DashboardLayout({
             schoolType={schoolType}
           />
         )}
+      </div>
       </div>
     </div>
   )
