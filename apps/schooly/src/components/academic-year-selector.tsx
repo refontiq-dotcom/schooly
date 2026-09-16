@@ -1,93 +1,198 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { createClient } from "@/utils/supabase/browser"
+import { useCallback, useEffect, useRef, useState } from "react"
+import { useRouter } from "next/navigation"
+import { CalendarIcon, Plus, Loader2 } from "lucide-react"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
 } from "@/components/ui/select"
-import { Badge } from "@/components/ui/badge"
-import { CalendarIcon } from "lucide-react"
-import { toast } from "sonner"
+import { getAcademicYears, createAcademicYear } from "@/app/dashboard/academic-structure/actions"
+import { activateAcademicYear } from "@/app/dashboard/academic-structure/rollover-actions"
 
 type AcademicYear = {
   id: string
   label: string
+  start_date: string
+  end_date: string
   status: string
 }
 
-async function getAcademicYears(schoolId: string) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+const COOKIE_NAME = "active_academic_year_id"
+const COOKIE_MAX_AGE = 60 * 60 * 24 * 365
 
-  if (!user) return []
-
-  const { data } = await supabase
-    .from("academic_years")
-    .select("id, label, status")
-    .eq("school_id", schoolId)
-    .order("start_date", { ascending: false })
-
-  return data || []
+/**
+ * Calcule la fenêtre de l'année scolaire : Septembre N → Juillet N+1.
+ * Retourne les bornes ISO et le label « AAAA-AAAA ».
+ */
+export function computeAcademicWindow(now: Date = new Date()) {
+  const startYear = now.getUTCMonth() >= 8 ? now.getUTCFullYear() : now.getUTCFullYear() - 1
+  const pad = (n: number) => String(n).padStart(2, "0")
+  return {
+    label: `${startYear}-${startYear + 1}`,
+    start_date: `${startYear}-09-01`,
+    end_date: `${startYear + 1}-07-15`,
+  }
 }
 
-export function AcademicYearSelector({ schoolId }: { schoolId?: string }) {
+export function AcademicYearSelector({ schoolId }: { schoolId?: string | null }) {
+  const router = useRouter()
   const [years, setYears] = useState<AcademicYear[]>([])
   const [selectedId, setSelectedId] = useState<string>("")
   const [loading, setLoading] = useState(false)
+  const [creating, setCreating] = useState(false)
+  const fetchedSchoolId = useRef<string | null>(null)
+
+  const load = useCallback(async () => {
+    const res = await getAcademicYears()
+    if (res.error || !res.data) return []
+    setYears(res.data as AcademicYear[])
+    return res.data as AcademicYear[]
+  }, [])
 
   useEffect(() => {
-    if (!schoolId) return
-    getAcademicYears(schoolId).then(data => {
-      setYears(data)
-      const current = data.find(y => y.status === "en_cours")
-      if (current) {
-        setSelectedId(current.id)
-        document.cookie = `active_academic_year_id=${current.id}; Path=/; Max-Age=31536000`
-      }
-    })
-  }, [schoolId])
-
-  async function handleChange(value: string) {
+    if (!schoolId || fetchedSchoolId.current === schoolId) return
+    fetchedSchoolId.current = schoolId
     setLoading(true)
-    setSelectedId(value)
-    document.cookie = `active_academic_year_id=${value}; Path=/; Max-Age=31536000`
-    
-    const supabase = await createClient()
+    load()
+      .then((data) => {
+        const active = data.find((y) => y.status === "en_cours")
+        const stored = document.cookie
+          .split("; ")
+          .find((c) => c.startsWith(`${COOKIE_NAME}=`))
+          ?.split("=")[1]
+        const remembered = data.find((y) => y.id === stored)
+        setSelectedId(remembered?.id ?? active?.id ?? "")
+      })
+      .finally(() => setLoading(false))
+  }, [schoolId, load])
 
-    await supabase.from("academic_years").update({ status: "en_cours" }).eq("id", value)
-    await supabase.from("academic_years").update({ status: "planifiee" }).neq("id", value).eq("school_id", schoolId)
-    
-    toast.success("Année académique activée")
-    setLoading(false)
+  const persistCookie = (yearId: string) => {
+    document.cookie = `${COOKIE_NAME}=${yearId}; Path=/; Max-Age=${COOKIE_MAX_AGE}; SameSite=Lax`
   }
 
+  async function handleChange(yearId: string) {
+    if (yearId === selectedId) return
+    setSelectedId(yearId)
+    setLoading(true)
+    try {
+      const res = await activateAcademicYear(yearId)
+      if (res?.error) {
+        toast.error(res.error)
+        await load()
+        return
+      }
+      persistCookie(yearId)
+      toast.success("Année académique activée")
+      router.refresh()
+    } catch {
+      toast.error("Action réservée à la direction")
+      await load()
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  /** Crée automatiquement l'année scolaire courante (Sept N → Juil N+1) puis l'active. */
+  async function handleCreateCurrent() {
+    const win = computeAcademicWindow()
+    setCreating(true)
+    try {
+      const fd = new FormData()
+      fd.set("label", win.label)
+      fd.set("startDate", win.start_date)
+      fd.set("endDate", win.end_date)
+      fd.set("status", "planifiee")
+      const res = await createAcademicYear(fd)
+      if (res?.error) {
+        // Année déjà existante (ex: créée via Structure académique) → on l'active simplement.
+        const data = await load()
+        const existing = data.find((y) => y.label === win.label)
+        if (!existing) {
+          toast.error(res.error)
+          return
+        }
+        await handleChange(existing.id)
+      } else {
+        const data = await load()
+        const created = data.find((y) => y.label === win.label)
+        if (created) await handleChange(created.id)
+      }
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  const activeYear = years.find((y) => y.id === selectedId)
+
   if (!schoolId) return null
+
+  // Aucune année en base : proposition intelligente de création de l'année courante.
+  if (years.length === 0) {
+    if (loading) {
+      return (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Chargement…
+        </div>
+      )
+    }
+    return (
+      <Button
+        variant="outline"
+        size="sm"
+        className="h-8 gap-2"
+        disabled={creating}
+        onClick={handleCreateCurrent}
+      >
+        {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+        Créer {computeAcademicWindow().label}
+      </Button>
+    )
+  }
 
   return (
     <div className="flex items-center gap-3">
       <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-      <Select value={selectedId} onValueChange={handleChange} disabled={loading || years.length === 0}>
+      <Select
+        value={selectedId}
+        onValueChange={handleChange}
+        disabled={loading || creating}
+      >
         <SelectTrigger className="w-[220px] h-8 text-sm">
-          <SelectValue placeholder="Année académique" />
+          {/* Le SelectValue maison rend la valeur brute (uuid) : on affiche le label. */}
+          <span className={selectedId ? "" : "text-muted-foreground"}>
+            {activeYear?.label ?? "Année académique"}
+          </span>
         </SelectTrigger>
         <SelectContent>
-          {years.map(year => (
+          {years.map((year) => (
             <SelectItem key={year.id} value={year.id}>
               <div className="flex items-center gap-2">
                 <span>{year.label}</span>
                 {year.status === "en_cours" && (
-                  <Badge variant="default" className="h-4 text-[10px] px-1">Active</Badge>
+                  <span className="text-[10px] px-1 rounded bg-primary text-primary-foreground">Active</span>
+                )}
+                {year.status === "cloturee" && (
+                  <span className="text-[10px] px-1 rounded border text-muted-foreground">Clôturée</span>
+                )}
+                {year.status === "planifiee" && (
+                  <span className="text-[10px] px-1 rounded bg-secondary text-secondary-foreground">Planifiée</span>
                 )}
               </div>
             </SelectItem>
           ))}
         </SelectContent>
       </Select>
+      {activeYear && (
+        <span className="text-xs text-muted-foreground hidden md:inline">
+          {activeYear.start_date ? `${activeYear.start_date.slice(8, 10)}/${activeYear.start_date.slice(5, 7)}/${activeYear.start_date.slice(0, 4)} → ${activeYear.end_date.slice(8, 10)}/${activeYear.end_date.slice(5, 7)}/${activeYear.end_date.slice(0, 4)}` : ""}
+        </span>
+      )}
     </div>
   )
 }

@@ -28,7 +28,7 @@ async function getSchoolId(supabase: SupabaseUserClient): Promise<SchoolRoleResu
   return { school_id: guard.context.schoolId, error: null }
 }
 
-export async function getAcademicYears(): Promise<ActionResult<{ id: string; label: string; status: string }[]>> {
+export async function getAcademicYears(): Promise<ActionResult<{ id: string; label: string; status: string; start_date: string; end_date: string }[]>> {
   const supabase = await createClient()
   const roleData = await getSchoolId(supabase)
   if (!roleData?.school_id) return { error: "Aucune école rattachée" }
@@ -40,7 +40,7 @@ export async function getAcademicYears(): Promise<ActionResult<{ id: string; lab
 
   const { data, error } = await admin
     .from("academic_years")
-    .select("id, label, status")
+    .select("id, label, status, start_date, end_date")
     .eq("school_id", roleData.school_id)
     .order("start_date", { ascending: false })
 
