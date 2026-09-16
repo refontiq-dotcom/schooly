@@ -1,6 +1,7 @@
 "use server"
 
 import { createClient } from "@/utils/supabase/server"
+import { ADMISSIONS_ROLES, FINANCIAL_PROFILE_ROLES } from "@/utils/supabase/roles"
 import { createClient as createAdminClient } from "@supabase/supabase-js"
 import { revalidatePath } from "next/cache"
 import crypto from "crypto"
@@ -23,14 +24,6 @@ export type ActionResult<T = void> = {
   error?: string
   data?: T
 }
-
-// Écritures d'admission (créer un élève/tuteur/inscription, valider une
-// pré-inscription) : actes de direction et de secrétariat.
-const ADMISSIONS_ROLES = ["direction", "secretariat", "super_admin"] as const
-
-// Profils financiers (grilles de paiement familiales) : acte de direction
-// ou de la compta, comme le barème tarifaire.
-const FINANCIAL_PROFILE_ROLES = ["direction", "compta", "super_admin"] as const
 
 function generateCode(length = 6) {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"

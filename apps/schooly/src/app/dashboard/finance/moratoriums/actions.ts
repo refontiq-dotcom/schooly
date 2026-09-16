@@ -1,6 +1,7 @@
 "use server"
 
 import { createClient } from "@/utils/supabase/server"
+import { MORATORIUM_ROLES, REMINDER_ROLES } from "@/utils/supabase/roles"
 import { createClient as createAdminClient } from "@supabase/supabase-js"
 import { revalidatePath } from "next/cache"
 
@@ -10,12 +11,6 @@ type ActionResult<T = void> = {
   error?: string
   data?: T
 }
-
-/** Moratoires, relances et scoring : fonctions financières sensibles. */
-const MORATORIUM_ROLES = ["direction", "compta", "super_admin"] as const
-
-/** Relances de paiement : secrétariat inclus (envoi opérationnel). */
-const REMINDER_ROLES = ["direction", "compta", "secretariat", "super_admin"] as const
 
 // ============================================ MORATOIRES ======================
 

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { TROUVETOU_ADMIN_ROLES } from "@/utils/supabase/roles"
 import { createClient } from "@/utils/supabase/server"
 import { createClient as createAdminClient } from "@supabase/supabase-js"
 
@@ -18,7 +19,7 @@ export async function POST(request: Request) {
       .select("school_id, role_code")
       .eq("user_id", user.id)
       .eq("is_active", true)
-      .in("role_code", ["direction", "super_admin"])
+      .in("role_code", [...TROUVETOU_ADMIN_ROLES])
       .maybeSingle()
 
     if (!role) return NextResponse.json({ error: "Non autorise" }, { status: 403 })

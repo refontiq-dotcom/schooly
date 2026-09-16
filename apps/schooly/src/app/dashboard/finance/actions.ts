@@ -1,6 +1,7 @@
 "use server"
 
 import { createClient } from "@/utils/supabase/server"
+import { CASHIER_ROLES, PRICING_ROLES } from "@/utils/supabase/roles"
 import { createClient as createAdminClient } from "@supabase/supabase-js"
 import { revalidatePath } from "next/cache"
 import crypto from "crypto"
@@ -11,12 +12,6 @@ type ActionResult<T = void> = {
 }
 
 import { denial, requireSchoolRole } from "@/utils/supabase/require-role"
-
-/** Rôles habilités à définir la tarification (écriture sensible, argent). */
-const PRICING_ROLES = ["direction", "compta", "super_admin"] as const
-
-/** Rôles habilités à encaisser et gérer la caisse. */
-const CASHIER_ROLES = ["direction", "compta", "caisse", "super_admin"] as const
 
 // ============================================ GRILLE TARIFAIRE =================
 

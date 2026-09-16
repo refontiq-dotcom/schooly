@@ -1,6 +1,7 @@
 "use server"
 
 import { createClient } from "@/utils/supabase/server"
+import { ROLLOVER_ROLES } from "@/utils/supabase/roles"
 import { createClient as createAdminClient } from "@supabase/supabase-js"
 import { alertRolloverCompleted } from "@/lib/telegram"
 
@@ -20,7 +21,7 @@ async function getContext() {
     .select("school_id, role_code")
     .eq("user_id", user.id)
     .eq("is_active", true)
-    .in("role_code", ["direction", "super_admin"])
+    .in("role_code", [...ROLLOVER_ROLES])
     .limit(1)
     .maybeSingle()
 

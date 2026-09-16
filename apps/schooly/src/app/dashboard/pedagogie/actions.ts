@@ -1,6 +1,7 @@
 "use server"
 
 import { createClient } from "@/utils/supabase/server"
+import { DECISION_ROLES, REF_ROLES, TEACHING_ROLES } from "@/utils/supabase/roles"
 import { createClient as createAdminClient } from "@supabase/supabase-js"
 import { revalidatePath } from "next/cache"
 import {
@@ -24,15 +25,6 @@ export type ActionResult<T = void> = {
   data?: T
   success?: boolean
 }
-
-// Écritures pédagogiques : le professeur est l'acteur principal ; la direction
-// conserve un droit d'administration (supervision, remplacement d'un enseignant).
-const TEACHING_ROLES = ["professeur", "direction", "super_admin"] as const
-// Décisions académiques : passage, redoublement, exclusion → acte de direction.
-const DECISION_ROLES = ["direction", "super_admin"] as const
-// Lectures du référentiel pédagogique (classes, matières, inscriptions, années,
-// moyennes) : la vie scolaire (surveillance) suit aussi les élèves.
-const REF_ROLES = [...TEACHING_ROLES, "surveillance"] as const
 
 /**
  * Embed PostgREST d'une relation many-to-one : l'API renvoie un **objet**

@@ -1,6 +1,7 @@
 "use server"
 
 import { createClient } from "@/utils/supabase/server"
+import { FINANCE_CONTEXT_ROLES } from "@/utils/supabase/roles"
 import { createClient as createAdminClient } from "@supabase/supabase-js"
 import { revalidatePath } from "next/cache"
 
@@ -25,7 +26,7 @@ export async function getBillingContext() {
     .select("school_id, role_code")
     .eq("user_id", user.id)
     .eq("is_active", true)
-    .in("role_code", ["direction", "secretariat", "compta", "caisse", "super_admin"])
+    .in("role_code", [...FINANCE_CONTEXT_ROLES])
     .limit(1)
     .maybeSingle()
 

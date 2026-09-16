@@ -168,8 +168,8 @@ limitation du nombre de tentatives.
 | # | Finding | Correctif |
 |---|---|---|
 | P2-1 | **`public.users.pin_hash` exposé** : la colonne était dans une table lisible sous RLS et était fuée par `/api/debug` | ✅ **Corrigé** : migration `20260915000001_drop_unused_pin_hash.sql` a supprimé la colonne inutilisée (0 valeur, 0 code y lit/écrit). |
-| P2-2 | **Autorisation dupliquée** : 4 variantes de `getSchoolId()`, table de rôles recopiée **en dur** dans 4 fichiers (`lib/nav.ts` = source de vérité, `login/actions.ts`, `proxy.ts`, `api/v1/admin/trouvetou/*`) | Un helper unique `requireRole()` + table unique (fait pour le routage : `route-rules.ts`) |
-| P2-3 | **Appel DB (service_role) dans le proxy** à chaque requête sur `/` et `/login` | Lire les claims JWT via `public.custom_access_token_hook` (déjà écrit : migration `20260908100000_auth_hooks.sql`) |
+| P2-2 | **Autorisation dupliquée** : 4 variantes de `getSchoolId()`, table de rôles recopiée **en dur** dans 4 fichiers (`lib/nav.ts` = source de vérité, `login/actions.ts`, `proxy.ts`, `api/v1/admin/trouvetou/*`) | Un helper unique `requireRole()` + table unique (fait pour le routage : `route-rules.ts`) — ✅ **fait** : `utils/supabase/roles.ts` + garde partagée `requireSchoolRole` partout |
+| P2-3 | **Appel DB (service_role) dans le proxy** à chaque requête sur `/` et `/login` | Lire les claims JWT via `public.custom_access_token_hook` (déjà écrit : migration `20260908100000_auth_hooks.sql`) — ✅ **fait** : middleware claims-first + repli base, migration `20260916000001` |
 | P2-4 | **`dashboard/layout.tsx` ignore le rôle** : la nav élève/parent propose des liens `pedagogie`/`caisse` | Gating serveur de la navigation |
 | P2-5 | **Frontière « public » floue** : `/enroll/[schoolId]` et `/verify/[code]` sont des routes du dépôt, publiques par nature | ✅ **Vérifiées OK** : `/enroll/[schoolId]/page.tsx` vérifie l'existence de l'école (`if (!school) return notFound()`), `/verify/[code]/page.tsx` → `verifyReceipt` (secret code 128 bits). Le proxy exclut `/verify` et `/enroll` de l'auth (P0-2 — rétabli). |
 | P2-6 | **`api/v1/public/*`** : `verifyToken` / `/availability` implémentés **en double** et incohérents (`getUser()` mal utilisé) | ✅ **Vérifié OK** : chaque route publique a un `checkAuth` Bearer (`TROUVETOU_API_KEY`), les routes admin exigent session+role. Pas de `getUser()` dans les controllers — le pattern est correct. |
@@ -218,11 +218,17 @@ limitation du nombre de tentatives.
 5. **P2-1** — ✅ **clos** : `public.users.pin_hash` était la **seule** surface de
    secret inutile du socle ; colonne morte supprimée (§4), plus aucune copie de
    PIN en base.
-6. **P2-2 / P2-3** — unifier `requireRole()` (source unique des rôles) et lire les
-   claims JWT via `custom_access_token_hook` au lieu d'appeler la DB dans le proxy.
-   *Note : les gardes `services`/`academic-structure` ferment le trou P1-2 avec
-   le pattern local existant ; l'unification vers `requireSchoolRole` reste le
-   chantier P2-2.*
+6. **P2-2 / P2-3** — ✅ **clos** :
+   - **P2-2** : `utils/supabase/roles.ts` est la **source unique** des listes de
+     rôles (finance, caisse, moratoires, relances, pédagogie, admissions,
+     services, structure académique, rollover, trouvetou, billing) — valeurs
+     inchangées ; `services` et `academic-structure` sont passés au socle
+     partagé `requireSchoolRole` (10 sites d'appel migrés) ;
+   - **P2-3** : le middleware lit d'abord `app_metadata.role` du JWT (hook
+     `custom_access_token_hook`, migration `20260916000001` — tri déterministe
+     `created_at asc`), avec **repli base** conservé : rollout progressif,
+     sans risque tant que le hook n'est pas enregistré dans le dashboard
+     Supabase (Authentication → Hooks → Custom Access Token).
 7. **P2-5** — ✅ **tranché** : `/enroll/[schoolId]` et `/verify/[code]` **sont de
    véritables routes publiques du dépôt** (et non des écrans externes) ; elles sont
    désormais déclarées dans le tableau des **surfaces publiques** (§5.1), et le

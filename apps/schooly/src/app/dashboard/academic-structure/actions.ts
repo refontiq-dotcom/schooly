@@ -4,6 +4,11 @@ import { createClient } from "@/utils/supabase/server"
 import { createClient as createAdminClient } from "@supabase/supabase-js"
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
+import {
+  requireSchoolRole,
+  type SupabaseUserClient,
+} from "@/utils/supabase/require-role"
+import { STRUCTURE_ADMIN_ROLES } from "@/utils/supabase/roles"
 
 export type ActionResult<T = void> = {
   error?: string
@@ -14,36 +19,18 @@ export type { SchoolRoleResult }
 
 type SchoolRoleResult = { school_id: string | null; error: Error | null }
 
-async function getSchoolId(userId: string): Promise<SchoolRoleResult> {
-  const admin = createAdminClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
-  // Audit P1-2 : cloisonnement inter-rôles. La structure académique
-  // (années, niveaux, classes, matières, affectations) est un acte de
-  // direction ou de secrétariat — pas une opération enseignante.
-  const { data, error } = await admin
-    .from("user_school_roles")
-    .select("school_id")
-    .eq("user_id", userId)
-    .eq("is_active", true)
-    .in("role_code", STRUCTURE_ADMIN_ROLES)
-    .limit(1)
-    .single()
-
-  return { school_id: data?.school_id ?? null, error }
+async function getSchoolId(supabase: SupabaseUserClient): Promise<SchoolRoleResult> {
+  // Audit P2-2 : garde partagée requireSchoolRole + source unique des rôles.
+  // La structure académique (années, niveaux, classes, matières, affectations)
+  // est un acte de direction ou de secrétariat — pas une opération enseignante.
+  const guard = await requireSchoolRole(supabase, { allowedRoles: [...STRUCTURE_ADMIN_ROLES] })
+  if (!guard.ok) return { school_id: null, error: new Error(guard.reason) }
+  return { school_id: guard.context.schoolId, error: null }
 }
-
-/** Rôles habilités à administrer la structure académique (audit P1-2). */
-const STRUCTURE_ADMIN_ROLES = ["direction", "secretariat", "super_admin"] as const
 
 export async function getAcademicYears(): Promise<ActionResult<{ id: string; label: string; status: string }[]>> {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) return { error: "Non autorisé" }
-
-  const roleData = await getSchoolId(user.id)
+  const roleData = await getSchoolId(supabase)
   if (!roleData?.school_id) return { error: "Aucune école rattachée" }
 
   const admin = createAdminClient(
@@ -63,11 +50,7 @@ export async function getAcademicYears(): Promise<ActionResult<{ id: string; lab
 
 export async function createAcademicYear(formData: FormData): Promise<ActionResult> {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) return { error: "Non autorisé" }
-
-  const roleData = await getSchoolId(user.id)
+  const roleData = await getSchoolId(supabase)
   if (!roleData?.school_id) return { error: "Aucune école rattachée" }
 
   const label = formData.get("label") as string
@@ -100,11 +83,7 @@ export async function createAcademicYear(formData: FormData): Promise<ActionResu
 
 export async function getGradeLevels() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) return { error: "Non autorisé", data: [] }
-
-  const roleData = await getSchoolId(user.id)
+  const roleData = await getSchoolId(supabase)
   if (!roleData?.school_id) return { error: "Aucune école rattachée", data: [] }
 
   const admin = createAdminClient(
@@ -124,11 +103,7 @@ export async function getGradeLevels() {
 
 export async function createGradeLevel(formData: FormData): Promise<ActionResult> {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) return { error: "Non autorisé" }
-
-  const roleData = await getSchoolId(user.id)
+  const roleData = await getSchoolId(supabase)
   if (!roleData?.school_id) return { error: "Aucune école rattachée" }
 
   const name = formData.get("name") as string
@@ -159,11 +134,7 @@ export async function createGradeLevel(formData: FormData): Promise<ActionResult
 
 export async function getClasses() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) return { error: "Non autorisé", data: [] }
-
-  const roleData = await getSchoolId(user.id)
+  const roleData = await getSchoolId(supabase)
   if (!roleData?.school_id) return { error: "Aucune école rattachée", data: [] }
 
   const admin = createAdminClient(
@@ -187,11 +158,7 @@ export async function getClasses() {
 
 export async function createClass(formData: FormData): Promise<ActionResult> {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) return { error: "Non autorisé" }
-
-  const roleData = await getSchoolId(user.id)
+  const roleData = await getSchoolId(supabase)
   if (!roleData?.school_id) return { error: "Aucune école rattachée" }
 
   const gradeLevelId = formData.get("gradeLevelId") as string
@@ -224,11 +191,7 @@ export async function createClass(formData: FormData): Promise<ActionResult> {
 
 export async function getSubjects() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) return { error: "Non autorisé", data: [] }
-
-  const roleData = await getSchoolId(user.id)
+  const roleData = await getSchoolId(supabase)
   if (!roleData?.school_id) return { error: "Aucune école rattachée", data: [] }
 
   const admin = createAdminClient(
@@ -248,11 +211,7 @@ export async function getSubjects() {
 
 export async function createSubject(formData: FormData): Promise<ActionResult> {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) return { error: "Non autorisé" }
-
-  const roleData = await getSchoolId(user.id)
+  const roleData = await getSchoolId(supabase)
   if (!roleData?.school_id) return { error: "Aucune école rattachée" }
 
   const name = formData.get("name") as string
@@ -283,11 +242,7 @@ export async function createSubject(formData: FormData): Promise<ActionResult> {
 
 export async function getClassSubjectAssignments() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) return { error: "Non autorisé", data: [] }
-
-  const roleData = await getSchoolId(user.id)
+  const roleData = await getSchoolId(supabase)
   if (!roleData?.school_id) return { error: "Aucune école rattachée", data: [] }
 
   const admin = createAdminClient(
@@ -312,11 +267,7 @@ export async function getClassSubjectAssignments() {
 
 export async function createClassSubjectAssignment(formData: FormData): Promise<ActionResult> {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) return { error: "Non autorisé" }
-
-  const roleData = await getSchoolId(user.id)
+  const roleData = await getSchoolId(supabase)
   if (!roleData?.school_id) return { error: "Aucune école rattachée" }
 
   const classId = formData.get("classId") as string

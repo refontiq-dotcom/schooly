@@ -68,7 +68,7 @@ export async function updateSession(request: NextRequest) {
       return supabaseResponse
     }
 
-    const destination = await resolveHomePath(user.id)
+    const destination = await resolveHomePath(supabase, user.id)
 
     // Rôle sans tableau de bord dans cette app (ex. `parent` → PWA dédiée) :
     // on laisse la page d'entrée s'afficher au lieu de boucler sur /login.
@@ -92,17 +92,39 @@ export async function updateSession(request: NextRequest) {
 }
 
 /**
- * Tableau de bord de l'utilisateur, résolu en base (et non via le hook JWT :
- * fonctionne sur tous les plans Supabase, Free inclus).
+ * Tableau de bord de l'utilisateur.
  *
- * `role_code` est trié par ancienneté d'attribution : un utilisateur porteur de
- * plusieurs rôles (ex. direction + caisse) obtient un routage *déterministe*.
+ * 1. **Claims du JWT** (audit P2-3) : le hook `custom_access_token_hook`
+ *    injecte `app_metadata.role` à chaque émission/refresh du token — la
+ *    lecture est locale (décodage des cookies), zéro appel SQL par requête.
+ * 2. **Repli base** : si les claims sont absents (hook pas encore enregistré
+ *    côté dashboard Supabase, ou token émis avant activation), on résout en
+ *    base comme avant — rollout progressif, aucun retour arrière requis.
  *
- * NB dette technique connue : ceci fait un appel HTTP supplémentaire par requête
- * sur les écrans d'entrée. À remplacer par la lecture des claims du JWT
- * (public.custom_access_token_hook, migration 20260908100000_auth_hooks.sql).
+ * Le repli trie par ancienneté d'attribution (`created_at` asc) : un
+ * utilisateur porteur de plusieurs rôles (ex. direction + caisse) obtient un
+ * routage *déterministe*. Le hook (migration 20260916000001) reprend ce tri.
  */
-async function resolveHomePath(userId: string): Promise<string | null> {
+type ClaimsClient = {
+  auth: {
+    getSession: () => Promise<{
+      data: { session: { user: { app_metadata?: Record<string, string> } } | null }
+    }>
+  }
+}
+
+async function resolveHomePath(
+  supabase: ClaimsClient,
+  userId: string
+): Promise<string | null> {
+  // 1. Claims JWT (P2-3) : `role` injecté par le hook dans app_metadata.
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+  const claimRole = session?.user?.app_metadata?.role
+  if (claimRole) return roleHome(claimRole)
+
+  // 2. Repli : résolution en base (service_role), comportement historique.
   const adminClient = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,

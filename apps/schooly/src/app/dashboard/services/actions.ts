@@ -1,31 +1,19 @@
 "use server"
 
 import { createClient } from "@/utils/supabase/server"
+import { requireSchoolRole } from "@/utils/supabase/require-role"
+import { SERVICE_ADMIN_ROLES } from "@/utils/supabase/roles"
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 async function getSchoolId() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error("NOT_AUTHENTICATED")
-  // Audit P1-2 : cloisonnement inter-rôles. La gestion des modules
-  // complémentaires (transport, cantine, internat) est un acte de direction
-  // ou de secrétariat — un professeur ou un surveillant ne doit pas pouvoir
-  // créer une ligne de bus ou une chambre d'internat.
-  const { data } = await supabase
-    .from("user_school_roles")
-    .select("school_id")
-    .eq("user_id", user.id)
-    .eq("is_active", true)
-    .in("role_code", SERVICE_ADMIN_ROLES)
-    .limit(1)
-    .maybeSingle()
-  if (!data) throw new Error("NO_SCHOOL")
-  return { supabase, schoolId: data.school_id }
+  // Audit P1-2 + P2-2 : la garde passe par le socle partagé (requireSchoolRole)
+  // et la liste des rôles vient de la source unique (utils/supabase/roles.ts).
+  const guard = await requireSchoolRole(supabase, { allowedRoles: [...SERVICE_ADMIN_ROLES] })
+  if (!guard.ok) throw new Error(guard.reason)
+  return { supabase, schoolId: guard.context.schoolId }
 }
-
-/** Rôles habilités à administrer les modules complémentaires (audit P1-2). */
-const SERVICE_ADMIN_ROLES = ["direction", "secretariat", "super_admin"] as const
 
 /**
  * Vérifie si un module complémentaire est activé pour l'école.
