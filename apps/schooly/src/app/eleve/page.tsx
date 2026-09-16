@@ -5,8 +5,20 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { getStudentEnrollmentId, lockStudentPortal } from "./actions"
 import { QrUnlockForm } from "./qr-unlock-form"
+import { FadeIn, GeminiBackdrop, GradientText } from "@/components/gemini"
+import type { ReactNode } from "react"
 
 export const dynamic = "force-dynamic"
+
+/** Conteneur du portail : décor Gemini + contenu centré par-dessus. */
+function PortalShell({ children }: { children: ReactNode }) {
+  return (
+    <div className="relative flex min-h-screen items-center justify-center px-4 py-10">
+      <GeminiBackdrop />
+      <div className="relative z-10 w-full max-w-2xl">{children}</div>
+    </div>
+  )
+}
 
 function admin() {
   return createClient(
@@ -30,12 +42,16 @@ export default async function ElevePortalPage() {
   // ————— Non déverrouillé : formulaire code QR —————
   if (!enrollmentId) {
     return (
-      <div className="mx-auto max-w-md py-6">
-        <QrUnlockForm />
-        <p className="mt-4 flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
-          <Lock className="h-3 w-3" /> Session valable 8 h, révocable par la vie scolaire.
-        </p>
-      </div>
+      <PortalShell>
+        <FadeIn>
+          <div className="mx-auto max-w-md">
+            <QrUnlockForm />
+            <p className="mt-4 flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
+              <Lock className="h-3 w-3" /> Session valable 8 h, révocable par la vie scolaire.
+            </p>
+          </div>
+        </FadeIn>
+      </PortalShell>
     )
   }
 
@@ -52,23 +68,27 @@ export default async function ElevePortalPage() {
   const qr = (qrRow ?? [])[0]
   if (!qr || !qr.is_active) {
     return (
-      <div className="mx-auto max-w-md py-6">
-        <Card>
-          <CardHeader className="text-center">
-            <CardTitle>Accès révoqué</CardTitle>
-            <CardDescription>
-              Votre code d&apos;accès a été désactivé. Contactez la vie scolaire.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form action={lockStudentPortal} className="text-center">
-              <Button variant="outline" type="submit">
-                <LogOut className="h-4 w-4" /> Réinitialiser
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-      </div>
+      <PortalShell>
+        <FadeIn>
+          <div className="mx-auto max-w-md">
+            <Card>
+              <CardHeader className="text-center">
+                <CardTitle>Accès révoqué</CardTitle>
+                <CardDescription>
+                  Votre code d&apos;accès a été désactivé. Contactez la vie scolaire.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form action={lockStudentPortal} className="text-center">
+                  <Button variant="outline" type="submit">
+                    <LogOut className="h-4 w-4" /> Réinitialiser
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+          </div>
+        </FadeIn>
+      </PortalShell>
     )
   }
 
@@ -88,14 +108,18 @@ export default async function ElevePortalPage() {
   const enrollment = (enrRows ?? [])[0] as unknown as EnrollmentInfo | undefined
   if (!enrollment) {
     return (
-      <div className="mx-auto max-w-md py-6">
-        <Card>
-          <CardHeader className="text-center">
-            <CardTitle>Inscription introuvable</CardTitle>
-            <CardDescription>Contactez le secrétariat de votre école.</CardDescription>
-          </CardHeader>
-        </Card>
-      </div>
+      <PortalShell>
+        <FadeIn>
+          <div className="mx-auto max-w-md">
+            <Card>
+              <CardHeader className="text-center">
+                <CardTitle>Inscription introuvable</CardTitle>
+                <CardDescription>Contactez le secrétariat de votre école.</CardDescription>
+              </CardHeader>
+            </Card>
+          </div>
+        </FadeIn>
+      </PortalShell>
     )
   }
 
@@ -153,29 +177,36 @@ export default async function ElevePortalPage() {
     new Date(d).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })
 
   return (
-    <div className="space-y-6">
+    <div className="relative min-h-screen">
+      <GeminiBackdrop />
+      <div className="relative z-10 mx-auto max-w-3xl space-y-6 px-4 py-8">
       {/* En-tête élève */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Bonjour, {studentName}</h1>
-          <p className="text-sm text-muted-foreground">
-            {enrollment.schools?.name ?? "—"} · {enrollment.classes?.name ?? "—"} ·{" "}
-            {enrollment.academic_years?.label ?? "—"}
-          </p>
+      <FadeIn>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">
+              Bonjour, <GradientText>{studentName}</GradientText>
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              {enrollment.schools?.name ?? "—"} · {enrollment.classes?.name ?? "—"} ·{" "}
+              {enrollment.academic_years?.label ?? "—"}
+            </p>
+          </div>
+          {average !== null && (
+            <Card className="py-3">
+              <CardContent className="flex items-center gap-3 px-4">
+                <GraduationCap className="h-5 w-5 text-primary" />
+                <div>
+                  <p className="text-xs text-muted-foreground">Moyenne générale</p>
+                  <p className="text-xl font-bold text-primary">{average.toFixed(2)} / 20</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
-        {average !== null && (
-          <Card className="py-3">
-            <CardContent className="flex items-center gap-3 px-4">
-              <GraduationCap className="h-5 w-5 text-primary" />
-              <div>
-                <p className="text-xs text-muted-foreground">Moyenne générale</p>
-                <p className="text-xl font-bold text-primary">{average.toFixed(2)} / 20</p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-      </div>
+      </FadeIn>
 
+      <FadeIn delay={0.15} className="space-y-6">
       {/* Cahier de texte */}
       <section className="space-y-3">
         <h2 className="flex items-center gap-2 text-lg font-semibold">
@@ -253,6 +284,8 @@ export default async function ElevePortalPage() {
           <LogOut className="h-4 w-4" /> Verrouiller ma session
         </Button>
       </form>
+      </FadeIn>
+      </div>
     </div>
   )
 }

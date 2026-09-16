@@ -130,3 +130,146 @@
     @apply font-sans;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Thème « façon Gemini » — décor animé & typographie dégradée
+   (page d'accueil / + portail élève /eleve — cf. src/components/gemini.tsx)
+   Dérive des blobs en CSS pur (GPU) : framer-motion ne s'applique qu'aux
+   entrées d'éléments, pas au fond continu.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+@layer components {
+  .gemini-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+    pointer-events: none;
+    background:
+      radial-gradient(ellipse 80% 60% at 50% -10%, oklch(0.96 0.03 165 / 0.9), transparent 60%),
+      radial-gradient(ellipse 60% 50% at 90% 110%, oklch(0.96 0.03 280 / 0.8), transparent 60%),
+      var(--background);
+  }
+
+  .gemini-blob {
+    position: absolute;
+    border-radius: 9999px;
+    filter: blur(90px);
+    opacity: 0.5;
+    will-change: transform;
+  }
+
+  .gemini-blob--emerald {
+    width: 42vw;
+    height: 42vw;
+    min-width: 320px;
+    min-height: 320px;
+    top: -12%;
+    left: -8%;
+    background: radial-gradient(circle at 30% 30%, oklch(0.85 0.09 160 / 0.8), transparent 70%);
+    animation: gemini-drift 26s ease-in-out infinite alternate;
+  }
+
+  .gemini-blob--sky {
+    width: 36vw;
+    height: 36vw;
+    min-width: 280px;
+    min-height: 280px;
+    top: 30%;
+    right: -12%;
+    background: radial-gradient(circle at 60% 40%, oklch(0.88 0.07 220 / 0.8), transparent 70%);
+    animation: gemini-drift 32s ease-in-out infinite alternate-reverse;
+  }
+
+  .gemini-blob--violet {
+    width: 30vw;
+    height: 30vw;
+    min-width: 240px;
+    min-height: 240px;
+    bottom: -14%;
+    left: 25%;
+    background: radial-gradient(circle at 50% 50%, oklch(0.9 0.07 300 / 0.7), transparent 70%);
+    animation: gemini-drift 38s ease-in-out infinite alternate;
+  }
+
+  /* Titre à dégradé animé (balayage lent type Gemini) */
+  .gemini-text-gradient {
+    background-image: linear-gradient(
+      100deg,
+      oklch(0.55 0.14 160) 0%,
+      oklch(0.65 0.12 200) 30%,
+      oklch(0.6 0.14 280) 55%,
+      oklch(0.65 0.12 200) 75%,
+      oklch(0.55 0.14 160) 100%
+    );
+    background-size: 220% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: gemini-shimmer 7s ease-in-out infinite;
+  }
+
+  /* Carte « verre » posée sur le décor */
+  .gemini-glass {
+    background: oklch(1 0 0 / 0.72);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid oklch(1 0 0 / 0.65);
+    box-shadow: 0 8px 32px oklch(0.3 0.05 250 / 0.1);
+  }
+
+  .dark .gemini-backdrop {
+    background:
+      radial-gradient(ellipse 80% 60% at 50% -10%, oklch(0.3 0.04 165 / 0.55), transparent 60%),
+      radial-gradient(ellipse 60% 50% at 90% 110%, oklch(0.3 0.05 280 / 0.5), transparent 60%),
+      var(--background);
+  }
+
+  .dark .gemini-blob {
+    opacity: 0.25;
+  }
+
+  .dark .gemini-text-gradient {
+    background-image: linear-gradient(
+      100deg,
+      oklch(0.8 0.1 160) 0%,
+      oklch(0.85 0.09 200) 30%,
+      oklch(0.8 0.1 280) 55%,
+      oklch(0.85 0.09 200) 75%,
+      oklch(0.8 0.1 160) 100%
+    );
+  }
+
+  .dark .gemini-glass {
+    background: oklch(0.2 0.02 250 / 0.65);
+    border-color: oklch(1 0 0 / 0.08);
+    box-shadow: 0 8px 32px oklch(0 0 0 / 0.35);
+  }
+}
+
+@keyframes gemini-drift {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(6vw, 4vh, 0) scale(1.12);
+  }
+}
+
+@keyframes gemini-shimmer {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+/* Accessibilité : fond figé + titre statique si l'OS exige moins d'animations */
+@media (prefers-reduced-motion: reduce) {
+  .gemini-blob,
+  .gemini-text-gradient {
+    animation: none;
+  }
+}

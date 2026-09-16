@@ -2,10 +2,8 @@
 
 import { useState } from "react"
 import { useActionState } from "react"
-import { School, Users, ArrowRight, Mail, Lock, Phone } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import { motion, AnimatePresence } from "framer-motion"
+import { School, Users } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import {
   schoolLoginAction,
@@ -13,6 +11,7 @@ import {
   parentOtpVerifyAction,
 } from "./login/unified-actions"
 import { SchoolLoginForm, ParentLoginForm } from "./login-form-components"
+import { FadeIn, GeminiBackdrop, GradientText } from "@/components/gemini"
 
 type Tab = "school" | "parent"
 
@@ -34,48 +33,88 @@ export default function Home() {
   )
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 dark:to-slate-800 flex flex-col items-center justify-center p-4">
-      <div className="w-full max-w-md space-y-6">
+    <div className="relative min-h-screen flex flex-col items-center justify-center p-4">
+      <GeminiBackdrop />
+
+      <div className="relative z-10 w-full max-w-md space-y-6">
+        {/* ————— En-tête : logo + titre dégradé animé ————— */}
         <div className="text-center space-y-3">
-          <div className="flex justify-center">
-            <div className="w-16 h-16 bg-[#1E3A8A] rounded-2xl flex items-center justify-center shadow-lg">
-              <span className="text-white text-2xl font-bold">S</span>
+          <FadeIn>
+            <div className="flex justify-center">
+              <div className="w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg bg-gradient-to-br from-primary to-emerald-600 shadow-primary/25">
+                <span className="text-white text-2xl font-bold">S</span>
+              </div>
             </div>
+          </FadeIn>
+          <FadeIn delay={0.08}>
+            <h1 className="text-4xl font-bold tracking-tight">
+              <GradientText>Schooly</GradientText>
+            </h1>
+          </FadeIn>
+          <FadeIn delay={0.16}>
+            <p className="text-muted-foreground text-sm">
+              La plateforme de gestion scolaire pour l&apos;Afrique de l&apos;Ouest
+            </p>
+          </FadeIn>
+        </div>
+
+        {/* ————— Onglets : pilule glissante (layoutId) ————— */}
+        <FadeIn delay={0.22}>
+          <div className="flex rounded-2xl gemini-glass p-1.5">
+            {(
+              [
+                { id: "school", label: "École", Icon: School },
+                { id: "parent", label: "Parent", Icon: Users },
+              ] as const
+            ).map(({ id, label, Icon }) => (
+              <button
+                key={id}
+                onClick={() => setTab(id)}
+                className={`relative flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                  tab === id ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {tab === id && (
+                  <motion.span
+                    layoutId="login-tab-pill"
+                    className="absolute inset-0 rounded-xl bg-primary shadow-md shadow-primary/25"
+                    transition={{ type: "spring", stiffness: 380, damping: 32 }}
+                  />
+                )}
+                <Icon className="relative z-10 w-4 h-4" />
+                <span className="relative z-10">{label}</span>
+              </button>
+            ))}
           </div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
-            Schooly
-          </h1>
-          <p className="text-slate-500 dark:text-slate-400 text-sm">
-            La plateforme de gestion scolaire pour l&apos;Afrique de l&apos;Ouest
-          </p>
-        </div>
+        </FadeIn>
 
-        <div className="flex rounded-xl bg-white dark:bg-slate-800 p-1 shadow-sm border border-slate-200 dark:border-slate-700">
-          <button
-            onClick={() => setTab("school")}
-            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all ${tab === "school" ? "bg-[#1E3A8A] text-white shadow-md" : "text-slate-500 hover:text-slate-700"}`}
+        {/* ————— Formulaire actif : transition croisée ————— */}
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={tab === "school" ? "school" : parentStep}
+            initial={{ opacity: 0, y: 10, scale: 0.99 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -8, scale: 0.99 }}
+            transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
           >
-            <School className="w-4 h-4" />
-            École
-          </button>
-          <button
-            onClick={() => setTab("parent")}
-            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all ${tab === "parent" ? "bg-[#1E3A8A] text-white shadow-md" : "text-slate-500 hover:text-slate-700"}`}
-          >
-            <Users className="w-4 h-4" />
-            Parent
-          </button>
-        </div>
+            {tab === "school" && (
+              <SchoolLoginForm state={schoolState} action={schoolFormAction} pending={schoolPending} />
+            )}
+            {tab === "parent" && (
+              <ParentLoginForm step={parentStep} setStep={setParentStep} contact={parentContact} setContact={setParentContact} sendState={parentSendState} sendAction={parentSendFormAction} sendPending={parentSendPending} verifyState={parentVerifyState} verifyAction={parentVerifyFormAction} verifyPending={parentVerifyPending} />
+            )}
+          </motion.div>
+        </AnimatePresence>
 
-        {tab === "school" && <SchoolLoginForm state={schoolState} action={schoolFormAction} pending={schoolPending} />}
-        {tab === "parent" && <ParentLoginForm step={parentStep} setStep={setParentStep} contact={parentContact} setContact={setParentContact} sendState={parentSendState} sendAction={parentSendFormAction} sendPending={parentSendPending} verifyState={parentVerifyState} verifyAction={parentVerifyFormAction} verifyPending={parentVerifyPending} />}
-
-        <div className="text-center pt-4">
-          <Badge variant="outline" className="text-xs">
-            © {new Date().getFullYear()} Refontiq
-          </Badge>
-        </div>
+        <FadeIn delay={0.3}>
+          <div className="text-center pt-2">
+            <Badge variant="outline" className="text-xs gemini-glass border-0">
+              © {new Date().getFullYear()} Refontiq
+            </Badge>
+          </div>
+        </FadeIn>
       </div>
     </div>
   )
 }
+
