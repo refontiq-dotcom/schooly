@@ -7,8 +7,8 @@
 1. Allez sur [vercel.com/new](https://vercel.com/new)
 2. Importez le dépôt GitHub `refontiq-dotcom/schooly`
 3. **Framework Preset** : Next.js
-4. **Root Directory** : `apps/web-admin` ← important !
-5. **Build Command** : `cd ../.. && npx turbo build --filter=web-admin`
+4. **Root Directory** : `apps/schooly` ← important !
+5. **Build Command** : `npm run build`
 6. **Install Command** : `cd ../.. && npm install`
 7. **Output Directory** : `.next`
 
@@ -57,7 +57,7 @@ Si vous installez la CLI Vercel localement (`npm i -g vercel`) :
 vercel login
 
 # Lier le projet
-cd apps/web-admin
+cd apps/schooly
 vercel link
 
 # Ajouter une variable
