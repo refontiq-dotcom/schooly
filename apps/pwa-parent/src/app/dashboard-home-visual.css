@@ -229,6 +229,16 @@
   }
 }
 
+@media (min-width: 601px) and (max-width: 900px) {
+  .dashboard-content > section:has(.grid.grid-cols-3) > :last-child {
+    box-shadow:0 8px 18px rgba(0,0,0,.065);
+  }
+
+  .dashboard-light .dashboard-content > section:has(.grid.grid-cols-3) > :last-child {
+    box-shadow:0 8px 18px rgba(72,50,94,.04);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .dashboard-content > section:has(.grid.grid-cols-3)::before,
   .dashboard-content > section:has(.grid.grid-cols-3) > *,
