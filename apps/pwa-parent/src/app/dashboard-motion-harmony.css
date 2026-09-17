@@ -1,0 +1,68 @@
+/* Shared active-tab motion rhythm: icon, indicator and content use one timing/curve. */
+:root {
+  --dashboard-active-duration: 480ms;
+  --dashboard-active-ease: cubic-bezier(.22,1,.36,1);
+  --dashboard-active-exit-duration: 180ms;
+  --dashboard-active-exit-ease: cubic-bezier(.4,0,1,1);
+}
+
+/* Content: normalize the existing active fade to the shared timing and easing. */
+.dashboard-page-transition-content > * {
+  animation-duration: var(--dashboard-active-duration) !important;
+  animation-timing-function: var(--dashboard-active-ease) !important;
+}
+.dashboard-page-transition.is-exiting .dashboard-page-transition-content > * {
+  animation-duration: var(--dashboard-active-exit-duration) !important;
+  animation-timing-function: var(--dashboard-active-exit-ease) !important;
+}
+
+/* Active icon: same 480ms entrance and 180ms exit rhythm. */
+.dashboard-nav-item.is-active svg {
+  animation-duration: var(--dashboard-active-duration) !important;
+  animation-timing-function: var(--dashboard-active-ease) !important;
+}
+
+/* Active indicator: exactly the same timing and acceleration curve as the icon. */
+.dashboard-nav-item.is-active::after,
+.schooly-dashboard-shell.dashboard-nav-transition-forward .dashboard-nav-item.is-active::after,
+.schooly-dashboard-shell.dashboard-nav-transition-backward .dashboard-nav-item.is-active::after {
+  animation-duration: var(--dashboard-active-duration) !important;
+  animation-timing-function: var(--dashboard-active-ease) !important;
+}
+.schooly-dashboard-shell.dashboard-nav-transition-forward .dashboard-nav-item:not(.is-active)::after,
+.schooly-dashboard-shell.dashboard-nav-transition-backward .dashboard-nav-item:not(.is-active)::after {
+  animation-duration: var(--dashboard-active-exit-duration) !important;
+  animation-timing-function: var(--dashboard-active-exit-ease) !important;
+}
+
+/* The active label follows the same rhythm, keeping the whole nav item visually locked. */
+.dashboard-nav-item.is-active .dashboard-nav-label,
+.schooly-dashboard-shell.dashboard-nav-transition-forward .dashboard-nav-item.is-active .dashboard-nav-label,
+.schooly-dashboard-shell.dashboard-nav-transition-backward .dashboard-nav-item.is-active .dashboard-nav-label {
+  animation-duration: var(--dashboard-active-duration) !important;
+  animation-timing-function: var(--dashboard-active-ease) !important;
+}
+.schooly-dashboard-shell.dashboard-nav-transition-forward .dashboard-nav-item:not(.is-active) .dashboard-nav-label,
+.schooly-dashboard-shell.dashboard-nav-transition-backward .dashboard-nav-item:not(.is-active) .dashboard-nav-label {
+  animation-duration: var(--dashboard-active-exit-duration) !important;
+  animation-timing-function: var(--dashboard-active-exit-ease) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-page-transition-content > *,
+  .dashboard-page-transition.is-exiting .dashboard-page-transition-content > *,
+  .dashboard-nav-item.is-active svg,
+  .dashboard-nav-item.is-active::after,
+  .schooly-dashboard-shell.dashboard-nav-transition-forward .dashboard-nav-item.is-active::after,
+  .schooly-dashboard-shell.dashboard-nav-transition-backward .dashboard-nav-item.is-active::after,
+  .schooly-dashboard-shell.dashboard-nav-transition-forward .dashboard-nav-item:not(.is-active)::after,
+  .schooly-dashboard-shell.dashboard-nav-transition-backward .dashboard-nav-item:not(.is-active)::after,
+  .dashboard-nav-item.is-active .dashboard-nav-label,
+  .schooly-dashboard-shell.dashboard-nav-transition-forward .dashboard-nav-item.is-active .dashboard-nav-label,
+  .schooly-dashboard-shell.dashboard-nav-transition-backward .dashboard-nav-item.is-active .dashboard-nav-label,
+  .schooly-dashboard-shell.dashboard-nav-transition-forward .dashboard-nav-item:not(.is-active) .dashboard-nav-label,
+  .schooly-dashboard-shell.dashboard-nav-transition-backward .dashboard-nav-item:not(.is-active) .dashboard-nav-label {
+    animation-duration: .01ms !important;
+    animation-timing-function: linear !important;
+  }
+}
