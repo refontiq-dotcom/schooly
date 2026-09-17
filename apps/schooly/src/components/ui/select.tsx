@@ -4,19 +4,31 @@ import * as React from "react"
 import { cn } from "@/lib/utils"
 import { ChevronDown } from "lucide-react"
 
+function childText(node: React.ReactNode): string {
+  if (node == null || typeof node === "boolean") return ""
+  if (typeof node === "string" || typeof node === "number") return String(node)
+  if (Array.isArray(node)) return node.map(childText).join("")
+  if (React.isValidElement(node)) {
+    return childText((node.props as { children?: React.ReactNode }).children)
+  }
+  return ""
+}
+
 const SelectContext = React.createContext<{
   value: string
-  onValueChange: (value: string) => void
+  label: string
+  onValueChange: (value: string, label?: string) => void
   open: boolean
   setOpen: (open: boolean) => void
 }>({
   value: "",
+  label: "",
   onValueChange: () => {},
   open: false,
   setOpen: () => {},
 })
 
-function Select({ value, onValueChange, children, disabled, name, required, id, defaultValue }: {
+function Select({ value, onValueChange, children, disabled, name, required, id, defaultValue, displayLabel }: {
   value?: string
   onValueChange?: (value: string) => void
   children: React.ReactNode
@@ -25,14 +37,28 @@ function Select({ value, onValueChange, children, disabled, name, required, id, 
   required?: boolean
   id?: string
   defaultValue?: string
+  displayLabel?: string
 }) {
   const [open, setOpen] = React.useState(false)
+  const [itemLabel, setItemLabel] = React.useState("")
+
+  React.useEffect(() => {
+    if (!value) setItemLabel("")
+  }, [value])
+
+  const handleChange = (next: string, label?: string) => {
+    if (label) setItemLabel(label)
+    onValueChange?.(next)
+  }
+
+  const currentValue = value || defaultValue || ""
+  const label = displayLabel || itemLabel
 
   return (
-    <SelectContext.Provider value={{ value: value || defaultValue || "", onValueChange: onValueChange || (() => {}), open, setOpen }}>
+    <SelectContext.Provider value={{ value: currentValue, label, onValueChange: handleChange, open, setOpen }}>
       <div className="relative">
         {children}
-        {name && <input type="hidden" name={name} value={value || defaultValue || ""} readOnly required={required} id={id} />}
+        {name && <input type="hidden" name={name} value={currentValue} readOnly required={required} id={id} disabled={disabled} />}
       </div>
     </SelectContext.Provider>
   )
@@ -63,7 +89,8 @@ function SelectTrigger({ children, className, disabled }: {
 
 function SelectValue({ placeholder }: { placeholder: string }) {
   const ctx = React.useContext(SelectContext)
-  return <span className={!ctx.value ? "text-muted-foreground" : ""}>{ctx.value ? ctx.value : placeholder}</span>
+  const shown = ctx.label || ""
+  return <span className={!shown ? "text-muted-foreground" : ""}>{shown || placeholder}</span>
 }
 
 function SelectContent({ children, className }: { children: React.ReactNode; className?: string }) {
@@ -93,12 +120,12 @@ function SelectItem({ value, children, className }: {
   return (
     <div
       className={cn(
-        "relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none hover:bg-accent hover:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+        "relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none hover:bg-accent hover:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
         ctx.value === value && "bg-accent text-accent-foreground",
         className
       )}
       onClick={() => {
-        ctx.onValueChange(value)
+        ctx.onValueChange(value, childText(children))
         ctx.setOpen(false)
       }}
     >

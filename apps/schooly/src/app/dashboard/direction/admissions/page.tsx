@@ -4,8 +4,6 @@ import { useState, useEffect } from "react"
 import { createClient } from "@/utils/supabase/browser"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import {
   Tabs,
@@ -14,26 +12,16 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { ActionForm } from "@/components/action-form"
-import {
   getPreEnrollments,
-  validatePreEnrollment,
   getStudents,
-  createStudent,
   getGuardians,
-  createGuardian,
   getEnrollments,
-  createEnrollment,
-  getFinancialProfiles,
 } from "@/app/dashboard/admissions/actions"
-import { toast } from "sonner"
-import { CheckCircle2, Clock, XCircle, UserPlus, GraduationCap, Users, FileText } from "lucide-react"
+import { Clock, GraduationCap, Users, FileText, Wallet } from "lucide-react"
+import {
+  CounterEnrollmentModal,
+  type CounterPrefill,
+} from "./counter-enrollment-modal"
 
 type PreEnrollment = {
   id: string
@@ -43,6 +31,12 @@ type PreEnrollment = {
   code: string
   status: string
   expires_at: string
+  grade_level_id?: string | null
+  guardian_phone?: string
+  guardian_name?: string | null
+  birth_certificate_number?: string | null
+  payment_method?: string | null
+  payment_reference?: string | null
   grade_levels?: { name: string }
 }
 
@@ -77,24 +71,18 @@ type Enrollment = {
   academic_years: { label: string }
 }
 
-type FinancialProfile = {
-  id: string
-  name: string
-  description: string | null
-}
-
 export default function AdmissionsPage() {
   const [schoolId, setSchoolId] = useState<string>("")
   const [preEnrollments, setPreEnrollments] = useState<PreEnrollment[]>([])
   const [students, setStudents] = useState<Student[]>([])
   const [guardians, setGuardians] = useState<Guardian[]>([])
   const [enrollments, setEnrollments] = useState<Enrollment[]>([])
-  const [financialProfiles, setFinancialProfiles] = useState<FinancialProfile[]>([])
   const [gradeLevels, setGradeLevels] = useState<any[]>([])
   const [classes, setClasses] = useState<any[]>([])
-  const [academicYears, setAcademicYears] = useState<any[]>([])
   const [tab, setTab] = useState("pre-enrollments")
   const [loading, setLoading] = useState(false)
+  const [modalOpen, setModalOpen] = useState(false)
+  const [modalPrefill, setModalPrefill] = useState<CounterPrefill | null>(null)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -120,14 +108,12 @@ export default function AdmissionsPage() {
       }
       setSchoolId(roleData.school_id)
 
-      const [preRes, stuRes, guardRes, enrollRes, fpRes, gl, ay, cls] = await Promise.all([
+      const [preRes, stuRes, guardRes, enrollRes, gl, cls] = await Promise.all([
         getPreEnrollments(roleData.school_id),
         getStudents(roleData.school_id),
         getGuardians(roleData.school_id),
         getEnrollments(roleData.school_id),
-        getFinancialProfiles(roleData.school_id),
         supabase.from("grade_levels").select("*").eq("school_id", roleData.school_id).order("level"),
-        supabase.from("academic_years").select("*").eq("school_id", roleData.school_id).order("start_date", { ascending: false }),
         supabase.from("classes").select("*, grade_levels(name)").eq("school_id", roleData.school_id).order("name"),
       ])
 
@@ -135,9 +121,7 @@ export default function AdmissionsPage() {
       if (stuRes.data) setStudents(stuRes.data)
       if (guardRes.data) setGuardians(guardRes.data)
       if (enrollRes.data) setEnrollments(enrollRes.data)
-      if (fpRes.data) setFinancialProfiles(fpRes.data)
       if (gl.data) setGradeLevels(gl.data)
-      if (ay.data) setAcademicYears(ay.data)
       if (cls.data) setClasses(cls.data)
 
       setLoading(false)
@@ -145,64 +129,23 @@ export default function AdmissionsPage() {
     fetchData()
   }, [])
 
-  async function handleValidate(formData: FormData) {
-    const result = await validatePreEnrollment(formData)
-    if (result.error) {
-      toast.error(result.error)
-    } else {
-      toast.success("Élève inscrit avec succès ! Matricule : " + result.data?.matricule)
-      if (schoolId) {
-        const [preRes, enrollRes] = await Promise.all([
-          getPreEnrollments(schoolId),
-          getEnrollments(schoolId),
-        ])
-        if (preRes.data) setPreEnrollments(preRes.data)
-        if (enrollRes.data) setEnrollments(enrollRes.data)
-      }
-    }
-    return result
+  async function refreshLists() {
+    if (!schoolId) return
+    const [preRes, stuRes, guardRes, enrollRes] = await Promise.all([
+      getPreEnrollments(schoolId),
+      getStudents(schoolId),
+      getGuardians(schoolId),
+      getEnrollments(schoolId),
+    ])
+    if (preRes.data) setPreEnrollments(preRes.data)
+    if (stuRes.data) setStudents(stuRes.data)
+    if (guardRes.data) setGuardians(guardRes.data)
+    if (enrollRes.data) setEnrollments(enrollRes.data)
   }
 
-  async function handleCreateStudent(formData: FormData) {
-    const result = await createStudent(formData)
-    if (result.error) {
-      toast.error(result.error)
-    } else {
-      toast.success("Élève créé !")
-      if (schoolId) {
-        const res = await getStudents(schoolId)
-        if (res.data) setStudents(res.data)
-      }
-    }
-    return result
-  }
-
-  async function handleCreateGuardian(formData: FormData) {
-    const result = await createGuardian(formData)
-    if (result.error) {
-      toast.error(result.error)
-    } else {
-      toast.success("Tuteur créé !")
-      if (schoolId) {
-        const res = await getGuardians(schoolId)
-        if (res.data) setGuardians(res.data)
-      }
-    }
-    return result
-  }
-
-  async function handleCreateEnrollment(formData: FormData) {
-    const result = await createEnrollment(formData)
-    if (result.error) {
-      toast.error(result.error)
-    } else {
-      toast.success("Inscription créée ! Matricule : " + result.data?.matricule)
-      if (schoolId) {
-        const res = await getEnrollments(schoolId)
-        if (res.data) setEnrollments(res.data)
-      }
-    }
-    return result
+  function openCounter(prefill?: CounterPrefill) {
+    setModalPrefill(prefill ?? null)
+    setModalOpen(true)
   }
 
   const pendingPreEnrollments = preEnrollments.filter(
@@ -215,6 +158,18 @@ export default function AdmissionsPage() {
 
   return (
     <div className="space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Admissions</h1>
+          <p className="text-sm text-muted-foreground">
+            Pre-inscriptions, validation au guichet et encaissement.
+          </p>
+        </div>
+        <Button type="button" className="min-h-11 gap-2" onClick={() => openCounter()}>
+          <Wallet className="h-4 w-4" />
+          Inscrire au guichet
+        </Button>
+      </div>
       <Tabs value={tab} onValueChange={setTab} className="space-y-6">
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="pre-enrollments" className="gap-2">
@@ -262,12 +217,27 @@ export default function AdmissionsPage() {
                       </div>
                     </div>
                     {pre.status === "pending" && !isExpired && (
-                      <ActionForm action={handleValidate}>
-                        <input type="hidden" name="preEnrollmentId" value={pre.id} />
-                        <Button size="sm">
-                          <CheckCircle2 className="w-4 h-4" /> Valider
-                        </Button>
-                      </ActionForm>
+                      <Button
+                        type="button"
+                        size="lg"
+                        className="min-h-11 gap-2"
+                        onClick={() =>
+                          openCounter({
+                            preEnrollmentId: pre.id,
+                            firstName: pre.first_name,
+                            lastName: pre.last_name,
+                            dateOfBirth: pre.date_of_birth,
+                            gradeLevelId: pre.grade_level_id ?? undefined,
+                            guardianPhone: pre.guardian_phone,
+                            guardianName: pre.guardian_name ?? undefined,
+                            birthCertificateNumber: pre.birth_certificate_number ?? undefined,
+                            paymentMethod: pre.payment_method,
+                            paymentReference: pre.payment_reference,
+                          })
+                        }
+                      >
+                        <Wallet className="w-4 h-4" /> Inscrire et encaisser
+                      </Button>
                     )}
                   </div>
                   )
@@ -359,6 +329,15 @@ export default function AdmissionsPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <CounterEnrollmentModal
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+        gradeLevels={gradeLevels}
+        classes={classes}
+        prefill={modalPrefill}
+        onCompleted={refreshLists}
+      />
     </div>
   )
 }

@@ -9,6 +9,15 @@ import {
   denial,
   requireSchoolRole,
 } from "@/utils/supabase/require-role"
+import { alertEnrollmentConfirmed } from "@/lib/telegram"
+import {
+  generateEnrollmentMatricule,
+  isPaymentMethod,
+  mapSchoolPaymentType,
+  parseIdList,
+  pickFeeAmount,
+  type PaymentMethod,
+} from "./enrollment-utils"
 
 /**
  * Module Admissions — pré-inscriptions, tuteurs, élèves, inscriptions, profils.
@@ -34,24 +43,34 @@ function generateCode(length = 6) {
   return code
 }
 
+function adminClient() {
+  return createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
+
 // ============================================ PRÉ-INSCRIPTIONS (PUBLIC) =====
 
 export async function createPreEnrollment(formData: FormData): Promise<ActionResult<{ code: string }>> {
   const schoolId = formData.get("schoolId") as string
-  const firstName = formData.get("firstName") as string
-  const lastName = formData.get("lastName") as string
+  const firstName = (formData.get("firstName") as string)?.trim()
+  const lastName = (formData.get("lastName") as string)?.trim()
   const dateOfBirth = formData.get("dateOfBirth") as string
   const gradeLevelId = formData.get("gradeLevelId") as string
-  const guardianPhone = formData.get("guardianPhone") as string
+  const guardianPhone = (formData.get("guardianPhone") as string)?.trim()
+  const guardianName = ((formData.get("guardianName") as string) || "").trim() || null
+  const birthCertificateNumber = ((formData.get("birthCertificateNumber") as string) || "").trim() || null
+  const paymentMethodId = (formData.get("paymentMethodId") as string) || null
+  const paymentReference = ((formData.get("paymentReference") as string) || "").trim() || null
+  const acceptedChecklist = parseIdList(formData.get("acceptedChecklist") as string | null)
+  const providedDocuments = parseIdList(formData.get("providedDocuments") as string | null)
 
   if (!schoolId || !firstName || !lastName || !dateOfBirth || !guardianPhone || !gradeLevelId) {
     return { error: "Tous les champs sont requis." }
   }
 
-  const admin = createAdminClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
+  const admin = adminClient()
 
   // Tunnel public : le schoolId vient de l'URL. Vérifier que l'école existe
   // (et n'est pas supprimée) avant d'écrire — sinon spam possible sur des
@@ -91,6 +110,20 @@ export async function createPreEnrollment(formData: FormData): Promise<ActionRes
     attempts++
   }
 
+  let paymentMethod: PaymentMethod | null = null
+  if (paymentMethodId) {
+    const { data: method } = await admin
+      .from("school_payment_methods")
+      .select("id, type")
+      .eq("id", paymentMethodId)
+      .eq("school_id", schoolId)
+      .eq("actif", true)
+      .is("deleted_at", null)
+      .maybeSingle()
+    paymentMethod = mapSchoolPaymentType(method?.type ?? null)
+    if (!paymentMethod) return { error: "Moyen de paiement introuvable pour cet etablissement." }
+  }
+
   const expiresAt = new Date()
   expiresAt.setHours(expiresAt.getHours() + 72)
 
@@ -101,6 +134,12 @@ export async function createPreEnrollment(formData: FormData): Promise<ActionRes
     date_of_birth: dateOfBirth,
     grade_level_id: gradeLevelId,
     guardian_phone: guardianPhone,
+    guardian_name: guardianName,
+    birth_certificate_number: birthCertificateNumber,
+    payment_method: paymentMethod,
+    payment_reference: paymentReference,
+    accepted_checklist: acceptedChecklist,
+    provided_documents: providedDocuments,
     code,
     status: "pending",
     expires_at: expiresAt.toISOString(),
@@ -168,41 +207,202 @@ export async function getPreEnrollmentByCode(schoolId: string, code: string) {
   return data
 }
 
-export async function validatePreEnrollment(formData: FormData): Promise<ActionResult<{ matricule: string }>> {
-  const supabase = await createClient()
+type EnrollmentQuote = {
+  amount: number
+  academicYearId: string
+  academicYearLabel: string | null
+}
 
-  // Acte d'admission : direction/secretariat uniquement.
+export type CounterEnrollmentResult = {
+  matricule: string
+  receiptNumber?: string
+  verificationCode?: string
+  qrCode: string
+  amountCollected: number
+}
+
+type AdminClient = ReturnType<typeof adminClient>
+
+async function getCurrentAcademicYear(schoolId: string) {
+  const admin = adminClient()
+  const { data } = await admin
+    .from("academic_years")
+    .select("id, label")
+    .eq("school_id", schoolId)
+    .eq("status", "en_cours")
+    .maybeSingle()
+  return data
+}
+
+async function quoteEnrollmentFees(
+  admin: AdminClient,
+  schoolId: string,
+  gradeLevelId: string,
+  academicYearId: string,
+  financialProfileId?: string | null
+): Promise<number> {
+  const { data } = await admin
+    .from("fee_schedules")
+    .select("grade_level_id, academic_year_id, financial_profile_id, amount")
+    .eq("school_id", schoolId)
+    .eq("academic_year_id", academicYearId)
+    .is("deleted_at", null)
+
+  return pickFeeAmount(data ?? [], gradeLevelId, academicYearId, financialProfileId)
+}
+
+async function ensureGuardian(
+  admin: AdminClient,
+  phone: string,
+  fullName: string
+): Promise<{ id: string } | { error: string }> {
+  const { data: existing } = await admin
+    .from("guardians")
+    .select("id")
+    .eq("phone", phone)
+    .maybeSingle()
+
+  if (existing?.id) return { id: existing.id }
+
+  const { data: created, error } = await admin
+    .from("guardians")
+    .insert({ phone, full_name: fullName })
+    .select("id")
+    .single()
+
+  if (error) return { error: error.message }
+  return { id: created.id }
+}
+
+async function issueQrCode(
+  admin: AdminClient,
+  schoolId: string,
+  enrollmentId: string
+): Promise<string> {
+  const qrCode = crypto.randomBytes(16).toString("hex")
+  const { error } = await admin.from("student_qr_codes").insert({
+    school_id: schoolId,
+    enrollment_id: enrollmentId,
+    qr_code: qrCode,
+    is_active: true,
+  })
+  if (error && error.code !== "23505") {
+    console.error("[admissions] QR insert failed:", error.message)
+  }
+  return qrCode
+}
+
+async function collectPayment(opts: {
+  admin: AdminClient
+  schoolId: string
+  userId: string
+  enrollmentId: string
+  amount: number
+  paymentMethod: PaymentMethod
+  reference: string | null
+}): Promise<ActionResult<{ receiptNumber: string; verificationCode: string }>> {
+  const { data: payment, error: paymentError } = await opts.admin
+    .from("payments")
+    .insert({
+      school_id: opts.schoolId,
+      enrollment_id: opts.enrollmentId,
+      amount: opts.amount,
+      payment_method: opts.paymentMethod,
+      reference: opts.reference,
+      received_by: opts.userId,
+    })
+    .select("id")
+    .single()
+
+  if (paymentError) return { error: paymentError.message }
+
+  const verificationCode = crypto.randomBytes(16).toString("hex").toUpperCase()
+  const receiptNumber = `R-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`
+  const qrCodeData = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/verify/${verificationCode}`
+
+  const { error: receiptError } = await opts.admin.from("receipts").insert({
+    school_id: opts.schoolId,
+    payment_id: payment.id,
+    receipt_number: receiptNumber,
+    verification_code: verificationCode,
+    qr_code_data: qrCodeData,
+    issued_by: opts.userId,
+  })
+
+  if (receiptError) return { error: receiptError.message }
+  return { data: { receiptNumber, verificationCode } }
+}
+
+async function notifyEnrollment(schoolId: string, studentName: string, amount: number) {
+  const admin = adminClient()
+  const { data: school } = await admin.from("schools").select("name").eq("id", schoolId).maybeSingle()
+  await alertEnrollmentConfirmed({
+    schoolName: school?.name ?? "Etablissement",
+    studentName,
+    amount,
+  })
+}
+
+export async function getEnrollmentQuote(gradeLevelId: string): Promise<ActionResult<EnrollmentQuote>> {
+  const supabase = await createClient()
+  const guard = await requireSchoolRole(supabase, { allowedRoles: [...ADMISSIONS_ROLES] })
+  if (!guard.ok) return { error: denial(guard.reason, null).error }
+  if (!gradeLevelId) return { error: "Niveau scolaire requis." }
+
+  const admin = adminClient()
+  const { data: gradeLevel } = await admin
+    .from("grade_levels")
+    .select("id")
+    .eq("id", gradeLevelId)
+    .eq("school_id", guard.context.schoolId)
+    .is("deleted_at", null)
+    .maybeSingle()
+
+  if (!gradeLevel) return { error: "Niveau scolaire introuvable pour cet etablissement." }
+
+  const academicYear = await getCurrentAcademicYear(guard.context.schoolId)
+  if (!academicYear?.id) {
+    return { error: "Aucune annee academique en cours." }
+  }
+
+  const amount = await quoteEnrollmentFees(admin, guard.context.schoolId, gradeLevelId, academicYear.id)
+  return {
+    data: {
+      amount,
+      academicYearId: academicYear.id,
+      academicYearLabel: academicYear.label ?? null,
+    },
+  }
+}
+
+export async function validatePreEnrollment(
+  formData: FormData
+): Promise<ActionResult<CounterEnrollmentResult>> {
+  const supabase = await createClient()
   const guard = await requireSchoolRole(supabase, { allowedRoles: [...ADMISSIONS_ROLES] })
   if (!guard.ok) return { error: denial(guard.reason, null).error }
 
   const preEnrollmentId = (formData.get("preEnrollmentId") || formData.get("id")) as string
+  if (!preEnrollmentId) return { error: "Pre-inscription introuvable." }
 
-  if (!preEnrollmentId) {
-    return { error: "Pré-inscription introuvable." }
-  }
+  const collectNow = formData.get("collectPayment") === "1"
+  const amountRaw = parseInt((formData.get("amount") as string) || "0", 10)
+  const paymentMethodRaw = (formData.get("paymentMethod") as string) || ""
+  const paymentReference = ((formData.get("paymentReference") as string) || "").trim() || null
+  const classId = ((formData.get("classId") as string) || "").trim() || null
 
-  const admin = createAdminClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
-
+  const admin = adminClient()
   const { data: preEnrollment } = await admin
     .from("pre_enrollments")
     .select("*")
     .eq("id", preEnrollmentId)
-    .single()
+    .maybeSingle()
 
-  if (!preEnrollment) return { error: "Pré-inscription introuvable." }
-  if (preEnrollment.status !== "pending") return { error: "Cette pré-inscription a déjà été traitée." }
-  if (new Date(preEnrollment.expires_at) < new Date()) return { error: "Cette pré-inscription a expiré." }
-
-  if (guard.context.schoolId !== preEnrollment.school_id) {
-    return { error: "Accès non autorisé." }
-  }
-
-  if (!preEnrollment.grade_level_id) {
-    return { error: "Niveau scolaire manquant sur la pré-inscription." }
-  }
+  if (!preEnrollment) return { error: "Pre-inscription introuvable." }
+  if (preEnrollment.status !== "pending") return { error: "Cette pre-inscription a deja ete traitee." }
+  if (new Date(preEnrollment.expires_at) < new Date()) return { error: "Cette pre-inscription a expire." }
+  if (guard.context.schoolId !== preEnrollment.school_id) return { error: "Acces non autorise." }
+  if (!preEnrollment.grade_level_id) return { error: "Niveau scolaire manquant sur la pre-inscription." }
 
   const { data: gradeLevel } = await admin
     .from("grade_levels")
@@ -210,19 +410,30 @@ export async function validatePreEnrollment(formData: FormData): Promise<ActionR
     .eq("id", preEnrollment.grade_level_id)
     .eq("school_id", preEnrollment.school_id)
     .is("deleted_at", null)
-    .single()
+    .maybeSingle()
 
-  if (!gradeLevel) {
-    return { error: "Niveau scolaire introuvable pour cet établissement." }
-  }
+  if (!gradeLevel) return { error: "Niveau scolaire introuvable pour cet etablissement." }
 
   const academicYear = await getCurrentAcademicYear(preEnrollment.school_id)
   if (!academicYear?.id) {
-    return { error: "Aucune année académique en cours. Impossible de valider l'inscription." }
+    return { error: "Aucune annee academique en cours. Impossible de valider l'inscription." }
+  }
+
+  let paymentMethod: PaymentMethod | null = null
+  if (collectNow) {
+    if (!isPaymentMethod(paymentMethodRaw)) return { error: "Mode de paiement invalide." }
+    if (!Number.isInteger(amountRaw) || amountRaw <= 0) {
+      return { error: "Le montant encaisse doit etre un entier positif (FCFA)." }
+    }
+    paymentMethod = paymentMethodRaw
   }
 
   const studentId = crypto.randomUUID()
-  const matricule = `${preEnrollment.school_id.slice(0, 4).toUpperCase()}-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 10000)).padStart(4, '0')}`
+  const matricule = generateEnrollmentMatricule(preEnrollment.school_id)
+  const guardianName =
+    ((formData.get("guardianName") as string) || "").trim() ||
+    (preEnrollment.guardian_name as string | null)?.trim() ||
+    `Tuteur de ${preEnrollment.last_name} ${preEnrollment.first_name}`
 
   const { error: studentError } = await admin.from("students").insert({
     id: studentId,
@@ -230,66 +441,204 @@ export async function validatePreEnrollment(formData: FormData): Promise<ActionR
     first_name: preEnrollment.first_name,
     last_name: preEnrollment.last_name,
     date_of_birth: preEnrollment.date_of_birth,
+    birth_certificate_number: preEnrollment.birth_certificate_number || null,
     status: "active",
   })
-
   if (studentError) return { error: studentError.message }
 
-  const { data: existingGuardian } = await admin
-    .from("guardians")
-    .select("id")
-    .eq("phone", preEnrollment.guardian_phone)
-    .maybeSingle()
-
-  let guardianId = existingGuardian?.id
-
-  if (!guardianId) {
-    const { data: newGuardian, error: guardianError } = await admin
-      .from("guardians")
-      .insert({
-        phone: preEnrollment.guardian_phone,
-        full_name: `${preEnrollment.last_name} ${preEnrollment.first_name} (tuteur)`,
-      })
-      .select("id")
-      .single()
-
-    if (guardianError) return { error: guardianError.message }
-    guardianId = newGuardian.id
+  const guardian = await ensureGuardian(admin, preEnrollment.guardian_phone, guardianName)
+  if ("error" in guardian) {
+    await admin.from("students").update({ deleted_at: new Date().toISOString() }).eq("id", studentId)
+    return { error: guardian.error }
   }
 
-  const { error: enrollmentError } = await admin.from("enrollments").insert({
-    school_id: preEnrollment.school_id,
-    student_id: studentId,
-    guardian_id: guardianId,
-    grade_level_id: preEnrollment.grade_level_id,
-    academic_year_id: academicYear.id,
-    status: "confirmed",
-    matricule,
-  })
+  const { data: enrollment, error: enrollmentError } = await admin
+    .from("enrollments")
+    .insert({
+      school_id: preEnrollment.school_id,
+      student_id: studentId,
+      guardian_id: guardian.id,
+      grade_level_id: preEnrollment.grade_level_id,
+      class_id: classId,
+      academic_year_id: academicYear.id,
+      status: "confirmed",
+      matricule,
+    })
+    .select("id")
+    .single()
 
-  if (enrollmentError) return { error: enrollmentError.message }
+  if (enrollmentError || !enrollment) {
+    await admin.from("students").update({ deleted_at: new Date().toISOString() }).eq("id", studentId)
+    return { error: enrollmentError?.message ?? "Impossible de creer l'inscription." }
+  }
+
+  const qrCode = await issueQrCode(admin, preEnrollment.school_id, enrollment.id)
+
+  let receipt: { receiptNumber: string; verificationCode: string } | undefined
+  if (collectNow && paymentMethod) {
+    const paid = await collectPayment({
+      admin,
+      schoolId: preEnrollment.school_id,
+      userId: guard.context.userId,
+      enrollmentId: enrollment.id,
+      amount: amountRaw,
+      paymentMethod,
+      reference: paymentReference || preEnrollment.payment_reference || null,
+    })
+    if (paid.error) {
+      await admin.from("pre_enrollments").update({
+        status: "validated",
+        validated_at: new Date().toISOString(),
+      }).eq("id", preEnrollmentId)
+      revalidatePath("/dashboard/direction/admissions")
+      return {
+        error: `Inscription creee (matricule ${matricule}) mais encaissement refuse : ${paid.error}`,
+      }
+    }
+    receipt = paid.data
+  }
 
   await admin
     .from("pre_enrollments")
     .update({ status: "validated", validated_at: new Date().toISOString() })
     .eq("id", preEnrollmentId)
 
+  const studentName = `${preEnrollment.last_name} ${preEnrollment.first_name}`
+  await notifyEnrollment(preEnrollment.school_id, studentName, collectNow ? amountRaw : 0)
+
   revalidatePath("/dashboard/direction/admissions")
-  return { data: { matricule } }
+  revalidatePath("/dashboard/caisse")
+  return {
+    data: {
+      matricule,
+      qrCode,
+      amountCollected: collectNow ? amountRaw : 0,
+      receiptNumber: receipt?.receiptNumber,
+      verificationCode: receipt?.verificationCode,
+    },
+  }
 }
 
-async function getCurrentAcademicYear(schoolId: string) {
-  const admin = createAdminClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
-  const { data } = await admin
-    .from("academic_years")
+export async function completeCounterEnrollment(
+  formData: FormData
+): Promise<ActionResult<CounterEnrollmentResult>> {
+  const supabase = await createClient()
+  const guard = await requireSchoolRole(supabase, { allowedRoles: [...ADMISSIONS_ROLES] })
+  if (!guard.ok) return { error: denial(guard.reason, null).error }
+
+  const firstName = ((formData.get("firstName") as string) || "").trim()
+  const lastName = ((formData.get("lastName") as string) || "").trim()
+  const dateOfBirth = formData.get("dateOfBirth") as string
+  const gradeLevelId = formData.get("gradeLevelId") as string
+  const classId = ((formData.get("classId") as string) || "").trim() || null
+  const guardianPhone = ((formData.get("guardianPhone") as string) || "").trim()
+  const guardianName = ((formData.get("guardianName") as string) || "").trim()
+  const birthCertificateNumber = ((formData.get("birthCertificateNumber") as string) || "").trim() || null
+  const amountRaw = parseInt((formData.get("amount") as string) || "0", 10)
+  const paymentMethodRaw = (formData.get("paymentMethod") as string) || ""
+  const paymentReference = ((formData.get("paymentReference") as string) || "").trim() || null
+  const collectNow = formData.get("collectPayment") !== "0"
+
+  if (!firstName || !lastName || !dateOfBirth || !gradeLevelId || !guardianPhone || !guardianName) {
+    return { error: "Identite eleve, tuteur et niveau sont requis." }
+  }
+  if (collectNow) {
+    if (!isPaymentMethod(paymentMethodRaw)) return { error: "Mode de paiement invalide." }
+    if (!Number.isInteger(amountRaw) || amountRaw <= 0) {
+      return { error: "Le montant encaisse doit etre un entier positif (FCFA)." }
+    }
+  }
+
+  const admin = adminClient()
+  const { data: gradeLevel } = await admin
+    .from("grade_levels")
     .select("id")
-    .eq("school_id", schoolId)
-    .eq("status", "en_cours")
+    .eq("id", gradeLevelId)
+    .eq("school_id", guard.context.schoolId)
+    .is("deleted_at", null)
+    .maybeSingle()
+  if (!gradeLevel) return { error: "Niveau scolaire introuvable pour cet etablissement." }
+
+  const academicYear = await getCurrentAcademicYear(guard.context.schoolId)
+  if (!academicYear?.id) {
+    return { error: "Aucune annee academique en cours. Impossible de valider l'inscription." }
+  }
+
+  const studentId = crypto.randomUUID()
+  const matricule = generateEnrollmentMatricule(guard.context.schoolId)
+
+  const { error: studentError } = await admin.from("students").insert({
+    id: studentId,
+    school_id: guard.context.schoolId,
+    first_name: firstName,
+    last_name: lastName,
+    date_of_birth: dateOfBirth,
+    birth_certificate_number: birthCertificateNumber,
+    status: "active",
+  })
+  if (studentError) return { error: studentError.message }
+
+  const guardian = await ensureGuardian(admin, guardianPhone, guardianName)
+  if ("error" in guardian) {
+    await admin.from("students").update({ deleted_at: new Date().toISOString() }).eq("id", studentId)
+    return { error: guardian.error }
+  }
+
+  const { data: enrollment, error: enrollmentError } = await admin
+    .from("enrollments")
+    .insert({
+      school_id: guard.context.schoolId,
+      student_id: studentId,
+      guardian_id: guardian.id,
+      grade_level_id: gradeLevelId,
+      class_id: classId,
+      academic_year_id: academicYear.id,
+      status: "confirmed",
+      matricule,
+    })
+    .select("id")
     .single()
-  return data
+
+  if (enrollmentError || !enrollment) {
+    await admin.from("students").update({ deleted_at: new Date().toISOString() }).eq("id", studentId)
+    return { error: enrollmentError?.message ?? "Impossible de creer l'inscription." }
+  }
+
+  const qrCode = await issueQrCode(admin, guard.context.schoolId, enrollment.id)
+
+  let receipt: { receiptNumber: string; verificationCode: string } | undefined
+  if (collectNow && isPaymentMethod(paymentMethodRaw)) {
+    const paid = await collectPayment({
+      admin,
+      schoolId: guard.context.schoolId,
+      userId: guard.context.userId,
+      enrollmentId: enrollment.id,
+      amount: amountRaw,
+      paymentMethod: paymentMethodRaw,
+      reference: paymentReference,
+    })
+    if (paid.error) {
+      revalidatePath("/dashboard/direction/admissions")
+      return {
+        error: `Inscription creee (matricule ${matricule}) mais encaissement refuse : ${paid.error}`,
+      }
+    }
+    receipt = paid.data
+  }
+
+  await notifyEnrollment(guard.context.schoolId, `${lastName} ${firstName}`, collectNow ? amountRaw : 0)
+
+  revalidatePath("/dashboard/direction/admissions")
+  revalidatePath("/dashboard/caisse")
+  return {
+    data: {
+      matricule,
+      qrCode,
+      amountCollected: collectNow ? amountRaw : 0,
+      receiptNumber: receipt?.receiptNumber,
+      verificationCode: receipt?.verificationCode,
+    },
+  }
 }
 
 // ============================================ TUTEURS =========================
@@ -482,7 +831,7 @@ export async function createEnrollment(formData: FormData): Promise<ActionResult
     return { error: "Champs requis manquants." }
   }
 
-  const matricule = `${guard.context.schoolId.slice(0, 4).toUpperCase()}-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 10000)).padStart(4, '0')}`
+  const matricule = generateEnrollmentMatricule(guard.context.schoolId)
 
   const { error } = await admin.from("enrollments").insert({
     school_id: guard.context.schoolId,
