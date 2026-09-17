@@ -153,23 +153,32 @@ export async function createAcademicYear(formData: FormData): Promise<ActionResu
     .maybeSingle()
   if (duplicate) return { error: `L'année « ${label} » existe déjà.` }
 
-  // Toujours créée « planifiée » : UN SEUL chemin de mise en service, le RPC
-  // atomique activate_academic_year (bouton « Activer »). L'insertion est donc
-  // une écriture unique — plus de fenêtre où la clôture de l'année précédente
-  // réussissait et l'activation échouait, laissant l'école sans année active.
-  // L'index unique partiel (migration 20260917000000) garantit en base qu'une
-  // école ne peut pas avoir deux années « en_cours ».
+  // Première année de l'école : activée d'emblée (notes et appel disponibles
+  // sans un second clic). Les suivantes restent « planifiées » — un seul
+  // chemin de bascule, le RPC atomique activate_academic_year (bouton
+  // « Activer »). On n'écrit jamais « en_cours » s'il en existe déjà une :
+  // l'index unique partiel (migration 20260917000000) l'interdit, et on
+  // évite ainsi de clôturer l'année précédente par une simple création.
+  const { data: current } = await admin
+    .from("academic_years")
+    .select("id")
+    .eq("school_id", roleData.school_id)
+    .eq("status", "en_cours")
+    .is("deleted_at", null)
+    .maybeSingle()
+
   const { error } = await admin.from("academic_years").insert({
     school_id: roleData.school_id,
     label,
     start_date: startDate,
     end_date: endDate,
-    status: "planifiee",
+    status: current ? "planifiee" : "en_cours",
   })
 
   if (error) return { error: error.message }
 
   revalidatePath("/dashboard/academic-structure")
+  revalidatePath("/dashboard/pedagogie")
   return {}
 }
 

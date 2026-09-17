@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -55,6 +56,7 @@ export default function PedagogieDashboard() {
   const [loadingData, setLoadingData] = useState(true)
 
   const currentYear = academicYears.find(y => y.status === "en_cours")
+  const plannedYear = academicYears.find(y => y.status === "planifiee")
 
   useEffect(() => {
     if (!user) return
@@ -129,14 +131,20 @@ export default function PedagogieDashboard() {
       {!currentYear && (
         <Card className="border-orange-200 bg-orange-50 dark:border-orange-900 dark:bg-orange-950/20">
           <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-4">
               <div>
                 <h3 className="font-semibold text-orange-800 dark:text-orange-200">Aucune année académique en cours</h3>
                 <p className="text-sm text-orange-600 dark:text-orange-300 mt-1">
-                  Créez une année académique et passez-la en &quot;En cours&quot; pour activer la saisie des notes et l&apos;appel.
+                  {plannedYear
+                    ? `« ${plannedYear.label} » est prête : activez-la pour débloquer notes et appels.`
+                    : "Un clic ouvre la structure : la première année créée est activée automatiquement."}
                 </p>
               </div>
-              <Badge variant="outline" className="text-orange-600 border-orange-300">Config requis</Badge>
+              <Button asChild variant="outline" className="shrink-0 text-orange-700 border-orange-300 hover:bg-orange-100 dark:text-orange-200">
+                <Link href="/dashboard/academic-structure">
+                  {plannedYear ? `Activer ${plannedYear.label}` : "Créer l'année"}
+                </Link>
+              </Button>
             </div>
           </CardContent>
         </Card>

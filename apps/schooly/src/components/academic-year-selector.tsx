@@ -96,7 +96,6 @@ export function AcademicYearSelector({ schoolId }: { schoolId?: string | null })
       fd.set("label", win.label)
       fd.set("startDate", win.start_date)
       fd.set("endDate", win.end_date)
-      fd.set("status", "planifiee")
       const res = await createAcademicYear(fd)
       if (res?.error) {
         // Année déjà existante (ex: créée via Structure académique) → on la sélectionne.

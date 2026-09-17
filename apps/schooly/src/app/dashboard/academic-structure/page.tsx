@@ -34,6 +34,7 @@ import {
 } from "./actions"
 import { ActionForm } from "@/components/action-form"
 import { useSupabaseUser } from "@/hooks/use-supabase-user"
+import { computeAcademicWindow } from "@/components/academic-year-selector"
 
 type AcademicYear = { id: string; label: string; status: string }
 type GradeLevel = { id: string; name: string; level: number; cycle: string }
@@ -211,14 +212,34 @@ export default function AcademicStructurePage() {
     if (res.data) setTeachers(res.data)
   }
 
-  // Activation d'année : un seul chemin (RPC atomique), déclenché depuis
-  // l'onglet « Années ». Le message d'erreur de la garde est affiché (l'action
-  // ne lève plus d'exception pour un rôle non habilité).
-  const handleActivateYear = (yearId: string) => {
+  // Activation d'année : un seul chemin (RPC atomique). Confirmation seulement
+  // s'il faut clôturer l'année déjà en cours — sinon un clic suffit.
+  const handleActivateYear = (yearId: string, yearLabel: string) => {
+    const active = academicYears.find((y) => y.status === "en_cours")
+    if (active) {
+      const ok = window.confirm(
+        `« ${active.label} » sera clôturée.\n« ${yearLabel} » devient l'année en cours (notes, appels, facturation).\n\nContinuer ?`
+      )
+      if (!ok) return
+    }
     setActionError(null)
     startTransition(async () => {
       const res = await activateAcademicYear(yearId)
       if (res.error) { setActionError(res.error); return }
+      await loadYears()
+    })
+  }
+
+  const handleCreateSuggestedYear = () => {
+    const win = computeAcademicWindow()
+    const fd = new FormData()
+    fd.set("label", win.label)
+    fd.set("startDate", win.start_date)
+    fd.set("endDate", win.end_date)
+    setActionError(null)
+    startTransition(async () => {
+      const res = await createAcademicYear(fd)
+      if (res?.error) { setActionError(res.error); return }
       await loadYears()
     })
   }
@@ -234,21 +255,46 @@ export default function AcademicStructurePage() {
   }, [user])
 
   const currentYear = academicYears.find(y => y.status === "en_cours")
+  const plannedYear = academicYears.find(y => y.status === "planifiee")
+  const suggestedYear = computeAcademicWindow()
   const [tab, setTab] = useState("years")
+
+  const handleMissingYearCta = () => {
+    setTab("years")
+    if (plannedYear) {
+      handleActivateYear(plannedYear.id, plannedYear.label)
+      return
+    }
+    handleCreateSuggestedYear()
+  }
 
   return (
     <div className="space-y-6">
       {!currentYear && (
         <Card className="border-orange-200 bg-orange-50 dark:border-orange-900 dark:bg-orange-950/20">
           <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-4">
               <div>
                 <h3 className="font-semibold text-orange-800 dark:text-orange-200">Aucune année académique en cours</h3>
                 <p className="text-sm text-orange-600 dark:text-orange-300 mt-1">
-                  Créez une année académique et passez-la en "En cours" pour activer la saisie des notes et l'appel.
+                  {plannedYear
+                    ? `Un clic active « ${plannedYear.label} » et débloque notes et appels.`
+                    : `Un clic crée et active « ${suggestedYear.label} » (sept. → juil.).`}
                 </p>
               </div>
-              <Badge variant="outline" className="text-orange-600 border-orange-300">Configuration requise</Badge>
+              <Button
+                type="button"
+                variant="outline"
+                className="shrink-0 text-orange-700 border-orange-300 hover:bg-orange-100 dark:text-orange-200"
+                disabled={isPending}
+                onClick={handleMissingYearCta}
+              >
+                {isPending
+                  ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  : plannedYear
+                    ? `Activer ${plannedYear.label}`
+                    : `Créer ${suggestedYear.label}`}
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -285,29 +331,26 @@ export default function AcademicStructurePage() {
             <CardHeader>
               <CardTitle>Années académiques</CardTitle>
               <CardDescription>
-                Créez les années scolaires, puis activez-en une : l&apos;année active est celle que
-                suivent les notes, les appels et la facturation.
+                La première année est activée toute seule. Les suivantes restent planifiées jusqu&apos;au bouton Activer.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <ActionForm action={withReload(createAcademicYear, loadYears)} className="flex gap-3 items-end flex-wrap">
                 <div className="space-y-1">
                   <Label htmlFor="label">Label</Label>
-                  <Input name="label" placeholder="Ex: 2025-2026" required className="max-w-[200px]" />
+                  <Input name="label" defaultValue={suggestedYear.label} placeholder="Ex: 2025-2026" required className="max-w-[200px]" />
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor="startDate">Début</Label>
-                  <Input name="startDate" type="date" required />
+                  <Input name="startDate" type="date" defaultValue={suggestedYear.start_date} required />
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor="endDate">Fin</Label>
-                  <Input name="endDate" type="date" required />
+                  <Input name="endDate" type="date" defaultValue={suggestedYear.end_date} required />
                 </div>
-                {/* Pas de sélecteur de statut : une année naît toujours
-                    « planifiée », puis est mise en service par le bouton
-                    « Activer » (RPC atomique activate_academic_year). Créer
-                    directement une année active laissait une fenêtre où
-                    l'école pouvait rester sans année « en cours ». */}
+                {/* Pas de sélecteur de statut : la première année est activée
+                    automatiquement ; les suivantes naissent « planifiées » et
+                    passent en service via « Activer » (RPC atomique). */}
                 <Button type="submit" size="icon"><Plus className="h-4 w-4" /></Button>
               </ActionForm>
 
@@ -320,7 +363,7 @@ export default function AcademicStructurePage() {
               <div className="space-y-2">
                 {academicYears.length === 0 && (
                   <p className="py-6 text-center text-sm text-muted-foreground">
-                    Aucune année. Créez la première (ex. 2025-2026) puis activez-la.
+                    Aucune année. Utilisez le bandeau ci-dessus ou validez le formulaire déjà prérempli.
                   </p>
                 )}
                 {academicYears.map(year => (
@@ -335,7 +378,7 @@ export default function AcademicStructurePage() {
                           size="sm"
                           variant="outline"
                           disabled={isPending}
-                          onClick={() => handleActivateYear(year.id)}
+                          onClick={() => handleActivateYear(year.id, year.label)}
                         >
                           {isPending
                             ? <Loader2 className="h-3.5 w-3.5 animate-spin" />

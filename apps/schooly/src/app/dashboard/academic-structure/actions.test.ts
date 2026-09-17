@@ -28,6 +28,7 @@ import {
   archiveClassSubjectAssignment,
   archiveGradeLevel,
   archiveSubject,
+  createAcademicYear,
   createClass,
   createClassSubjectAssignment,
   createGradeLevel,
@@ -489,6 +490,55 @@ describe("archiveGradeLevel — retirer un niveau", () => {
 
     expect(await archiveGradeLevel("l1")).toEqual({})
     expect(writes[0]).toMatchObject({ table: "grade_levels", op: "update" })
+  })
+})
+
+describe("createAcademicYear — première année activée", () => {
+  it("active d'emblée la première année de l'école", async () => {
+    stub("academic_years", { data: null }, { data: null }, { error: null })
+
+    const res = await createAcademicYear(
+      form({ label: "2025-2026", startDate: "2025-09-01", endDate: "2026-07-15" })
+    )
+
+    expect(res).toEqual({})
+    expect(writes).toEqual([
+      {
+        table: "academic_years",
+        op: "insert",
+        payload: expect.objectContaining({
+          school_id: SCHOOL_ID,
+          label: "2025-2026",
+          status: "en_cours",
+        }),
+      },
+    ])
+  })
+
+  it("laisse « planifiée » une année créée alors qu'une autre est déjà en cours", async () => {
+    stub("academic_years", { data: null }, { data: { id: "y-active" } }, { error: null })
+
+    const res = await createAcademicYear(
+      form({ label: "2026-2027", startDate: "2026-09-01", endDate: "2027-07-15" })
+    )
+
+    expect(res).toEqual({})
+    expect(writes[0]).toMatchObject({
+      table: "academic_years",
+      op: "insert",
+      payload: { label: "2026-2027", status: "planifiee" },
+    })
+  })
+
+  it("refuse un libellé déjà utilisé", async () => {
+    stub("academic_years", { data: { id: "y1" } })
+
+    const res = await createAcademicYear(
+      form({ label: "2025-2026", startDate: "2025-09-01", endDate: "2026-07-15" })
+    )
+
+    expect(res).toEqual({ error: "L'année « 2025-2026 » existe déjà." })
+    expect(writes).toHaveLength(0)
   })
 })
 
