@@ -3,8 +3,9 @@
 import { createClient } from "@/utils/supabase/server"
 import { requireSchoolRole, denial } from "@/utils/supabase/require-role"
 import { DECISION_ROLES, TEACHING_ROLES } from "@/utils/supabase/roles"
-import { validateRules, computeSubjectAverage, computePeriodAverage, type Category } from "@/lib/evaluation/calculations"
-import { toRules, type EvaluationRule, type EvaluationPeriod } from "./evaluation-types"
+import { validateRules, computePeriodAverage } from "@/lib/evaluation/calculations"
+import { computeExpectedSubject, type EnteredGrade } from "@/lib/evaluation/completeness"
+import { toRules, type EvaluationRule, type EvaluationPeriod, type EvaluationAssessment } from "./evaluation-types"
 import { revalidatePath } from "next/cache"
 
 const text = (form: FormData, key: string) => String(form.get(key) ?? "").trim()
@@ -68,7 +69,36 @@ export async function closeEvaluationPeriod(form: FormData) {
   return error ? { error: error.message } : data?.length ? {} : { error: "Période introuvable ou déjà clôturée." }
 }
 
-export type PeriodResult = { enrollmentId: string; name: string; average: number | null; coverage: string; scale: number }
+export async function getEvaluationAssessments() {
+  const db = await createClient()
+  const guard = await requireSchoolRole(db, { allowedRoles: TEACHING_ROLES })
+  if (!guard.ok) return { error: denial(guard.reason, null).error }
+  const { data, error } = await db.from("evaluation_assessments").select("*").eq("school_id", guard.context.schoolId).order("created_at")
+  return error ? { error: error.message } : { data: data as EvaluationAssessment[] }
+}
+
+export async function createEvaluationAssessment(form: FormData) {
+  const db = await createClient()
+  const guard = await requireSchoolRole(db, { allowedRoles: TEACHING_ROLES })
+  if (!guard.ok) return { error: denial(guard.reason, null).error }
+  const maxValue = number(form, "maxValue"), weight = number(form, "weight")
+  if (!text(form, "label") || !Number.isFinite(maxValue) || maxValue <= 0 || !Number.isFinite(weight) || weight < 0) {
+    return { error: "Intitulé, barème positif et poids positif ou nul requis." }
+  }
+  const { error } = await db.from("evaluation_assessments").insert({
+    school_id: guard.context.schoolId, created_by: guard.context.userId,
+    period_id: text(form, "periodId"), class_id: text(form, "classId"), subject_id: text(form, "subjectId"),
+    grade_type: text(form, "gradeType"), label: text(form, "label"), max_value: maxValue, weight,
+  })
+  if (error) return { error: error.message }
+  revalidatePath("/dashboard/pedagogie/grades")
+  return {}
+}
+
+export type PeriodResult = {
+  enrollmentId: string; name: string; average: number | null; coverage: string; scale: number
+  complete: boolean; expected: number; entered: number; unlinked: number
+}
 
 export async function getPeriodResults(classId: string, periodId: string): Promise<{ error?: string; data?: PeriodResult[] }> {
   const db = await createClient()
@@ -79,27 +109,30 @@ export async function getPeriodResults(classId: string, periodId: string): Promi
   if (periodError || !period) return { error: "Période introuvable." }
   const { data: rule } = await db.from("evaluation_rules").select("*").eq("id", period.rule_id).eq("school_id", school).single()
   if (!rule) return { error: "Règles introuvables." }
-  const [enrollments, assignments, grades] = await Promise.all([
+  const [enrollments, assignments, grades, assessments] = await Promise.all([
     db.from("enrollments").select("id,students(first_name,last_name)").eq("school_id", school).eq("class_id", classId).eq("academic_year_id", rule.academic_year_id).is("deleted_at", null),
     db.from("class_subject_assignments").select("subject_id,coefficient").eq("school_id", school).eq("class_id", classId).is("deleted_at", null),
-    db.from("grade_entries").select("enrollment_id,subject_id,value,max_value,weight,grade_type,absence_status").eq("school_id", school).eq("period_id", periodId).is("deleted_at", null),
+    db.from("grade_entries").select("enrollment_id,subject_id,assessment_id,value,max_value,weight,grade_type,absence_status").eq("school_id", school).eq("period_id", periodId).is("deleted_at", null),
+    db.from("evaluation_assessments").select("*").eq("school_id", school).eq("period_id", periodId).eq("class_id", classId),
   ])
-  const error = enrollments.error ?? assignments.error ?? grades.error
+  const error = enrollments.error ?? assignments.error ?? grades.error ?? assessments.error
   if (error) return { error: error.message }
   try {
     const rules = toRules(rule as EvaluationRule)
     const data = (enrollments.data ?? []).map(enrollment => {
       const subjects = (assignments.data ?? []).map(assignment => ({
         coefficient: Number(assignment.coefficient),
-        average: computeSubjectAverage((grades.data ?? []).filter(g => g.enrollment_id === enrollment.id && g.subject_id === assignment.subject_id).map(g => ({
-          value: g.value === null ? null : Number(g.value), maxValue: Number(g.max_value), weight: Number(g.weight),
-          category: (["interrogation", "composition"].includes(g.grade_type) ? g.grade_type : "devoir") as Category,
-          status: g.absence_status as "graded" | "excused",
-        })), rules),
+        ...computeExpectedSubject(
+          (assessments.data ?? []).filter(a => a.subject_id === assignment.subject_id) as EvaluationAssessment[],
+          (grades.data ?? []).filter(g => g.enrollment_id === enrollment.id && g.subject_id === assignment.subject_id) as EnteredGrade[], rules),
       }))
+      const average = computePeriodAverage(subjects)
       const student = enrollment.students as unknown as { first_name: string; last_name: string } | null
       return { enrollmentId: enrollment.id, name: `${student?.last_name ?? ""} ${student?.first_name ?? ""}`.trim(),
-        average: computePeriodAverage(subjects).value, coverage: `${subjects.filter(s => s.average.value !== null).length}/${subjects.length}`, scale: rules.scale }
+        average: average.value, complete: average.complete,
+        entered: subjects.reduce((sum, s) => sum + s.entered, 0), expected: subjects.reduce((sum, s) => sum + s.expected, 0),
+        unlinked: subjects.reduce((sum, s) => sum + s.unlinked, 0),
+        coverage: `${subjects.filter(s => s.average.value !== null).length}/${subjects.length}`, scale: rules.scale }
     })
     return { data: data.sort((a, b) => (b.average ?? -1) - (a.average ?? -1)) }
   } catch (error) { return { error: error instanceof Error ? error.message : "Calcul impossible." } }

@@ -316,6 +316,8 @@ export async function createHomework(formData: FormData): Promise<ActionResult> 
 
 export type GradeEntryRow = {
   id: string
+  revision: number
+  assessment_id: string | null
   grade_type: string
   label: string | null
   value: number | null
@@ -343,6 +345,8 @@ export async function getGradeEntries(): Promise<ActionResult<GradeEntryRow[]>> 
     .from("grade_entries")
     .select(
       `id,
+       revision,
+       assessment_id,
        period_id,
        absence_status,
        grade_type,
@@ -379,16 +383,22 @@ export async function createGradeEntry(formData: FormData): Promise<ActionResult
   const { schoolId, userId } = guard.context
 
   const enrollmentId = formData.get("enrollmentId") as string
-  const subjectId = formData.get("subjectId") as string
-  const academicYearId = formData.get("academicYearId") as string
-  const gradeType = formData.get("gradeType") as string
-  const label = String(formData.get("label") ?? "").trim()
-  const periodId = String(formData.get("periodId") ?? "")
+  const assessmentId = String(formData.get("assessmentId") ?? "")
+  if (!assessmentId) return { error: "Sélectionnez une évaluation attendue." }
+  const { data: assessment, error: assessmentError } = await supabase.from("evaluation_assessments")
+    .select("*,evaluation_periods!inner(evaluation_rules!inner(academic_year_id))")
+    .eq("school_id", schoolId).eq("id", assessmentId).single()
+  if (assessmentError || !assessment) return { error: "Évaluation introuvable ou non autorisée." }
+  const subjectId = assessment.subject_id as string
+  const academicYearId = assessment.evaluation_periods.evaluation_rules.academic_year_id as string
+  const gradeType = assessment.grade_type as string
+  const label = assessment.label as string
+  const periodId = assessment.period_id as string
   const absence = formData.get("absenceStatus") === "excused" ? "excused" : "graded"
   const rawValue = String(formData.get("value") ?? "").trim()
   const value = absence === "excused" ? null : rawValue === "" ? NaN : Number(rawValue)
-  const maxValue = Number(formData.get("maxValue") ?? 20)
-  const weight = Number(formData.get("weight") ?? 1)
+  const maxValue = Number(assessment.max_value)
+  const weight = Number(assessment.weight)
   const comment = String(formData.get("comment") ?? "")
 
   if (!enrollmentId || !subjectId || !academicYearId || !periodId || !label ||
@@ -400,6 +410,7 @@ export async function createGradeEntry(formData: FormData): Promise<ActionResult
   }
 
   const { error } = await supabase.from("grade_entries").insert({
+    assessment_id: assessmentId,
     period_id: periodId,
     absence_status: absence,
     school_id: schoolId,

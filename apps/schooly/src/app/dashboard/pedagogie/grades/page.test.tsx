@@ -6,7 +6,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest"
 const mocks = vi.hoisted(() => ({
   user: { role: "direction" },
   save: vi.fn(async () => ({})),
-  results: vi.fn(async () => ({ data: [{ enrollmentId: "e", name: "Élève A", average: 13, coverage: "2/2", scale: 20 }] })),
+  results: vi.fn(async () => ({ data: [{ enrollmentId: "e", name: "Élève A", average: 13, coverage: "2/2", scale: 20, complete: true, expected: 4, entered: 4, unlinked: 0 }] })),
 }))
 vi.mock("@/hooks/use-supabase-user", () => ({ useSupabaseUser: () => mocks.user }))
 vi.mock("../actions", () => ({
@@ -18,6 +18,8 @@ vi.mock("../actions", () => ({
   getClassesForSchool: async () => ({ data: [{ id: "c", name: "CM2" }] }),
 }))
 vi.mock("../evaluation-actions", () => ({
+  getEvaluationAssessments: async () => ({ data: [{ id: "a", period_id: "p", class_id: "c", subject_id: "s", grade_type: "devoir", label: "DS1", max_value: 40, weight: 1 }] }),
+  createEvaluationAssessment: mocks.save,
   getEvaluationConfiguration: async () => ({ data: {
     rules: [{ id: "r", academic_year_id: "y", mode: "TRIMESTRE", cycle: "*", scale: 20, threshold: 10, rescue_margin: 0, interrogation_percent: null }],
     periods: [{ id: "p", rule_id: "r", label: "T1", locked_at: null, starts_at: "2026-09-01", ends_at: "2026-12-01" }],
@@ -53,7 +55,22 @@ it("demande la moyenne au serveur puis affiche résultat et couverture provisoir
   await act(async () => { form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })) })
   expect(mocks.results).toHaveBeenCalledWith("c", "p")
   expect(container.textContent).toContain("13.00/20")
-  expect(container.textContent).toContain("matières 2/2 — provisoire")
+  expect(container.textContent).toContain("matières 2/2 — saisies 4/4")
+})
+
+it("envoie l'évaluation choisie sans barème ni poids modifiables", async () => {
+  const select = container.querySelector<HTMLSelectElement>('select[name="assessmentId"]')!
+  const form = select.closest("form")!
+  expect(form.querySelector('[name="maxValue"]')).toBeNull()
+  expect(form.querySelector('[name="weight"]')).toBeNull()
+  select.value = "a"
+  form.querySelector<HTMLSelectElement>('[name="enrollmentId"]')!.value = "e"
+  form.querySelector<HTMLInputElement>('[name="value"]')!.value = "30"
+  await act(async () => { form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })) })
+  expect(mocks.save).toHaveBeenCalledTimes(1)
+  const submitted = mocks.save.mock.calls[0] as unknown as [FormData]
+  expect(submitted[0].get("assessmentId")).toBe("a")
+  expect(submitted[0].get("value")).toBe("30")
 })
 
 it("masque les paramètres et les résultats globaux au professeur", async () => {

@@ -9,6 +9,11 @@ export type EvaluationPeriod = {
   id: string; rule_id: string; label: string; position: number; is_passage: boolean
   starts_at: string; ends_at: string; locked_at: string | null
 }
+export type EvaluationAssessment = {
+  id: string; period_id: string; class_id: string; subject_id: string
+  grade_type: "interrogation" | "devoir" | "composition"; label: string; max_value: number; weight: number
+}
+
 export function toRules(rule: Omit<EvaluationRule, "id">): Rules {
   return {
     mode: rule.mode, scale: Number(rule.scale), threshold: Number(rule.threshold), rescueMargin: Number(rule.rescue_margin),
