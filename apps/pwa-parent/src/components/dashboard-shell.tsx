@@ -1,11 +1,10 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { usePathname } from "next/navigation"
 import {
   BarChart3,
-  BookOpen,
   ChevronDown,
   CircleDollarSign,
   CreditCard,
@@ -33,16 +32,81 @@ const navItems = [
   { label: "Réglages", href: "/dashboard", icon: Settings },
 ]
 
+const currencyOptions = ["FCFA", "EUR", "USD"]
+const languageOptions = ["FR", "EN"]
+
+function DashboardDropdown({
+  label,
+  options,
+  value,
+  open,
+  onToggle,
+  onSelect,
+}: {
+  label: string
+  options: string[]
+  value: string
+  open: boolean
+  onToggle: () => void
+  onSelect: (value: string) => void
+}) {
+  return (
+    <div className="dashboard-dropdown">
+      <button
+        type="button"
+        className={`dashboard-select-pill ${open ? "is-open" : ""}`}
+        onClick={onToggle}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label={label}
+      >
+        <span>{value}</span>
+        <ChevronDown className="dashboard-select-chevron" size={12} />
+      </button>
+
+      <div
+        className={`dashboard-dropdown-menu ${open ? "is-open" : ""}`}
+        role="listbox"
+        aria-label={label}
+        aria-hidden={!open}
+      >
+        <div className="dashboard-dropdown-menu-inner">
+          {options.map((option) => (
+            <button
+              key={option}
+              type="button"
+              role="option"
+              aria-selected={option === value}
+              tabIndex={open ? 0 : -1}
+              className={`dashboard-dropdown-option ${option === value ? "is-selected" : ""}`}
+              onClick={() => onSelect(option)}
+            >
+              <span>{option}</span>
+              <span className="dashboard-dropdown-check" aria-hidden="true">✓</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const [dark, setDark] = useState(true)
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
+  const [openDropdown, setOpenDropdown] = useState<"currency" | "language" | null>(null)
+  const [currency, setCurrency] = useState("FCFA")
+  const [language, setLanguage] = useState("FR")
+  const dropdownRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const saved = window.localStorage.getItem("schooly-dashboard-theme")
     setDark(saved ? saved === "dark" : true)
+    setCurrency(window.localStorage.getItem("schooly-dashboard-currency") || "FCFA")
+    setLanguage(window.localStorage.getItem("schooly-dashboard-language") || "FR")
     setMounted(true)
   }, [])
 
@@ -53,8 +117,17 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   }, [dark, mounted])
 
   useEffect(() => {
+    if (!mounted) return
+    window.localStorage.setItem("schooly-dashboard-currency", currency)
+    window.localStorage.setItem("schooly-dashboard-language", language)
+  }, [currency, language, mounted])
+
+  useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setMobileOpen(false)
+      if (event.key === "Escape") {
+        setMobileOpen(false)
+        setOpenDropdown(null)
+      }
     }
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
@@ -62,7 +135,18 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     setMobileOpen(false)
+    setOpenDropdown(null)
   }, [pathname])
+
+  useEffect(() => {
+    const onPointerDown = (event: PointerEvent) => {
+      if (!dropdownRef.current?.contains(event.target as Node)) {
+        setOpenDropdown(null)
+      }
+    }
+    document.addEventListener("pointerdown", onPointerDown)
+    return () => document.removeEventListener("pointerdown", onPointerDown)
+  }, [])
 
   const themeClass = dark ? "dashboard-dark" : "dashboard-light"
 
@@ -147,8 +231,31 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                 {collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
               </span>
             </button>
-            <div className="dashboard-select-pill"><span>FCFA</span><ChevronDown size={12} /></div>
-            <div className="dashboard-select-pill"><span>FR</span><ChevronDown size={12} /></div>
+
+            <div ref={dropdownRef} className="dashboard-dropdowns">
+              <DashboardDropdown
+                label="Devise"
+                options={currencyOptions}
+                value={currency}
+                open={openDropdown === "currency"}
+                onToggle={() => setOpenDropdown((current) => current === "currency" ? null : "currency")}
+                onSelect={(value) => {
+                  setCurrency(value)
+                  setOpenDropdown(null)
+                }}
+              />
+              <DashboardDropdown
+                label="Langue"
+                options={languageOptions}
+                value={language}
+                open={openDropdown === "language"}
+                onToggle={() => setOpenDropdown((current) => current === "language" ? null : "language")}
+                onSelect={(value) => {
+                  setLanguage(value)
+                  setOpenDropdown(null)
+                }}
+              />
+            </div>
           </div>
 
           <div className="dashboard-topbar-right">
