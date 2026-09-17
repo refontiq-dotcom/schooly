@@ -1,0 +1,308 @@
+-- ============================================================================
+-- 00008 — Transfert Intelligent & Quitus Financier
+-- Crée :
+--   * student_financial_status  (solde calculé depuis payments ; statut hold)
+--   * transfers                 (code TRF + checksum ; statut DRAFT/ISSUED/CONSUMED…)
+-- Logique :
+--   - le trigger recompute_solde remplit student_financial_status à partir de
+--     payments(amount, received_at) ; pas de dépendance au code legacy.
+--   - le statut hold seul (non les impayés) peut bloquer un transfert.
+-- ============================================================================
+begin;
+
+create table public.student_financial_status (
+  id uuid primary key default gen_random_uuid(),
+  school_id uuid not null references public.schools(id) on delete cascade,
+  student_id uuid not null references public.students(id) on delete cascade,
+  enrollment_id uuid references public.enrollments(id) on delete restrict,
+  outstanding_balance_cents bigint not null default 0,
+  currency text not null default 'XOF',
+  hold_reason text,
+  status text not null check (status in ('cleared','hold','exempt')),
+  verified_by uuid references public.users(id),
+  verified_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (school_id, student_id, enrollment_id)
+);
+
+-- Un trigger de maintenance automatique.
+drop trigger if exists trg_sfs_updated_at on public.student_financial_status;
+create trigger trg_sfs_updated_at before update on public.student_financial_status
+for each row execute function public.touch_updated_at();
+
+create index if not exists idx_sfs_student on public.student_financial_status (school_id, student_id, enrollment_id);
+
+-- ---------------------------------------------------------------- transfers --
+create table public.transfers (
+  id uuid primary key default gen_random_uuid(),
+  school_id uuid not null references public.schools(id) on delete cascade,
+    school_from uuid not null references public.schools(id) on delete restrict,
+  school_to uuid references public.schools(id),
+  student_id uuid not null references public.students(id) on delete cascade,
+  enrollment_from uuid references public.enrollments(id) on delete restrict,
+  enrollment_to uuid references public.enrollments(id) on delete restrict,
+  code text not null unique,
+  fingerprint text not null,
+  financial_clearance boolean not null default false,
+  financial_hold boolean not null default false,
+  direction_approval boolean not null default false,
+  status text not null check (status in ('DRAFT','ISSUED','CONSUMED','EXPIRED','REVOKED')),
+  issued_at timestamptz,
+  consumed_at timestamptz,
+  expires_at timestamptz,
+  created_by uuid not null references public.users(id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+drop trigger if exists trg_transfers_updated_at on public.transfers;
+create trigger trg_transfers_updated_at before update on public.transfers
+for each row execute function public.touch_updated_at();
+
+create index if not exists idx_transfers_code on public.transfers (code);
+create index if not exists idx_transfers_code on public.transfers (code);
+create index if not exists idx_transfers_school_status on public.transfers (school_id, status);
+
+-- ----------------------------------------------------------------- finances --
+-- Recalcule le solde dû (en centimes) d'un élève à partir des payments liés à
+-- son inscription. fee_schedules fournit le montant dû ; payments.amount perçu.
+create or replace function public.refresh_student_financial_status(p_school uuid, p_student uuid, p_enrollment uuid)
+returns void language plpgsql security definer set search_path = public as $$
+declare
+  due bigint; received bigint;
+begin
+  -- Montant dû : sommation des tarifs applicables à cette inscription.
+  select coalesce(sum(f.amount)::bigint,0) into due
+  from public.fee_schedules f
+  join public.enrollments e on e.grade_level_id = f.grade_level_id
+  where e.id = p_enrollment and f.school_id = p_school and f.deleted_at is null;
+
+  -- Montant perçu : payments collectés sur cette inscription.
+  select coalesce(sum(p.amount)::bigint,0) into received
+  from public.payments p
+  where p.enrollment_id = p_enrollment and p.school_id = p_school and p.deleted_at is null
+    and p.status = 'collected';
+
+  insert into public.student_financial_status (school_id, student_id, enrollment_id, outstanding_balance_cents, status)
+    values (p_school, p_student, p_enrollment, due - received,
+            case when (due - received) > 0 then 'hold' else 'cleared' end)
+  on conflict (school_id, student_id, enrollment_id) do update
+    set outstanding_balance_cents = excluded.outstanding_balance_cents,
+        status = excluded.status,
+        updated_at = now();
+end $$;
+
+-- Trigger : recalcul du solde à chaque mutation de payments.
+-- ATTENTION : payments possède enrollment_id + school_id mais PAS student_id ;
+-- on joint enrollments pour récupérer student_id.
+create or replace function public.recompute_student_financial_status() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare s uuid; e_uuid uuid;
+begin
+    if tg_op = 'INSERT' or tg_op = 'UPDATE' then
+    if (tg_op = 'UPDATE' and (new.amount is not distinct from old.amount
+        or new.status is not distinct from old.status
+        or new.enrollment_id is not distinct from old.enrollment_id)) then
+      return new;
+    end if;
+    select school_id, student_id into s, e_uuid
+    from public.enrollments where id = new.enrollment_id;
+    if found then perform public.refresh_student_financial_status(s, e_uuid, new.enrollment_id); end if;
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists trg_sfs_from_payments on public.payments;
+create trigger trg_sfs_from_payments after insert or update of amount, status, enrollment_id on public.payments
+for each row execute function public.recompute_student_financial_status();
+
+-- ---------------------------------------------------------------- validation --
+-- Code : TRF + 4 caractères aléatoires + 1 checksum = 8 au total.
+-- Le checksum est la somme pondérée (ascii * position) des 4 caractères,
+-- modulo la taille de l'alphabet (34), indexé dans le même alphabet.
+create or replace function public.generate_transfer_code() returns text
+language plpgsql as $$
+declare
+  chars text := 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; -- 34 caractères (pas de 0/O/1/I)
+  body text := '';
+  sum int := 0;
+  i int; c char(1); idx int;
+begin
+  for i in 1..4 loop
+    idx := floor(1 + random() * 34)::int;
+    c := substr(chars, idx, 1);
+    body := body || c;
+    sum := sum + ascii(c) * i;
+  end loop;
+  return 'TRF' || body || substr(chars, (sum % 34) + 1, 1);
+end $$;
+
+create or replace function public.verify_transfer_code(p_code text) returns boolean
+language sql immutable strict as $$
+with chars as (select 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'::text as c),
+     -- somme ascii(c_i) * i pour i = 1..4, sur les 4 caractères après TRF
+     body as (
+       select p_code as code, c as charset
+       from chars
+     ),
+     chk as (
+       select
+         sum(ascii(substr(code,4,i))::int * i) as s
+       from body, generate_series(1,4) AS g(i)
+     )
+select
+  left(p_code,3) = 'TRF'
+  and length(p_code) = 8
+  and (select chk.s % 34 + 1 from chk) = strpos(
+    (select c from chars), substr(p_code, 8, 1)
+  );
+$$;
+
+create or replace function public.validate_transfer_insert() returns trigger
+language plpgsql as $$
+begin
+  if new.code is null or left(new.code,3) <> 'TRF' then
+    raise exception 'Code transfert invalide (préfixe TRF requis).';
+  end if;
+  if not public.verify_transfer_code(new.code) then
+    raise exception 'Checksum du code transfert invalide.';
+  end if;
+  if new.school_from = new.school_to then
+    raise exception 'École d''origine et d''accueil ne peuvent coïncider.';
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists trg_transfer_validate on public.transfers;
+create trigger trg_transfer_validate before insert on public.transfers
+for each row execute function public.validate_transfer_insert();
+
+-- ----------------------------------------------------------------- RLS & grants
+alter table public.student_financial_status enable row level security;
+alter table public.transfers enable row level security;
+
+-- student_financial_status : direction/scolarité de l'école voit le quitus de
+-- ses élèves ; super_admin tout voir.
+create policy student_financial_status_read on public.student_financial_status for select
+  using (is_super_admin() or has_school_role(school_id, array['direction','secretariat','compta']));
+create policy student_financial_status_write on public.student_financial_status for all
+  using (is_super_admin() or has_school_role(school_id, array['direction','compta']));
+grant select, update(outstanding_balance_cents, status, hold_reason, verified_by, verified_at)
+  on public.student_financial_status to authenticated;
+grant all on public.student_financial_status to service_role;
+
+-- transfers : 
+--   - direction école d'origine crée/expire ; 
+--   - école membre (origine ou accueil) lit via school_id ; 
+--   - école d'accueil met à jour school_to + consentement ;
+--   - direction d'origine passe à ISSUED ; direction (super_admin) CONSUMED.
+create policy transfers_school_member_read on public.transfers for select
+  using (is_super_admin() or has_school_role(school_from, array['direction','secretariat'])
+         or has_school_role(school_to, array['direction','secretariat']));
+create policy transfers_origin_write on public.transfers for update
+  using (is_super_admin() or has_school_role(school_from, array['direction','secretariat']))
+  with check (is_super_admin() or has_school_role(school_from, array['direction','secretariat']));
+create policy transfers_consumer on public.transfers for update of school_to, enrollment_to
+  using (school_to is not null and has_school_role(school_to, array['direction','secretariat']));
+grant select on public.transfers to authenticated;
+grant insert, update(code, status, financial_clearance, financial_hold, direction_approval,
+                     school_to, enrollment_to, consumed_at, issued_at, expires_at)
+  on public.transfers to authenticated;
+grant all on public.transfers, public.student_financial_status to service_role;
+
+-- RPC publiques (exécutables par authenticated, contrôle d'auth en interne)
+create or replace function public.issue_transfer(p_transfer uuid)
+returns void language plpgsql security definer set search_path = public as $$
+declare
+  t public.transfers;
+  student_uuid uuid;
+begin
+  -- Contrôle de droits : direction ou secrétariat de l'école d'origine.
+  select * into t from public.transfers where id = p_transfer;
+  if not found then
+    raise exception 'Transfert introuvable.';
+  end if;
+  if not (is_super_admin() or has_school_role(t.school_from, array['direction','secretariat'])) then
+    raise exception 'Seule la direction ou le secrétariat de l''école d''origine peut émettre un transfert.';
+  end if;
+
+  -- Quitus financier : un hold bloque l'émission.
+  if exists (
+    select 1 from public.student_financial_status
+    where school_id = t.school_from and student_id = t.student_id and status = 'hold'
+  ) then
+    raise exception 'Quitus financier en suspens : règlement requis avant émission du transfert.';
+  end if;
+
+  -- Empreinte du snapshot (données inchangées).
+  student_uuid := t.student_id;
+  update public.transfers
+    set status = 'ISSUED',
+        financial_clearance = true,
+        financial_hold = false,
+        issued_at = clock_timestamp(),
+        expires_at = clock_timestamp() + interval '60 days',
+        fingerprint = encode(public.digest(student_uuid::text || t.school_from::text || t.enrollment_from::text, 'sha256'), 'hex')
+  where id = p_transfer and status = 'DRAFT';
+
+  if not found then
+    raise exception 'Transfert introuvable, déjà émis ou statut invalide.';
+  end if;
+end $$;
+grant execute on function public.issue_transfer(uuid) to authenticated;
+
+create or replace function public.consume_transfer(p_code text, p_enrollment_to uuid)
+returns uuid language plpgsql security definer set search_path = public as $$
+declare
+  t public.transfers;
+  new_school uuid;
+begin
+  select * into t from public.transfers where code = p_code;
+  if not found then
+    raise exception 'Code transfert inconnu.';
+  end if;
+  if t.status <> 'ISSUED' then
+    raise exception 'Transfert non émis ou déjà consommé.';
+  end if;
+  if clock_timestamp() >= t.expires_at then
+    update public.transfers set status = 'EXPIRED' where id = t.id;
+    raise exception 'Code transfert expiré.';
+  end if;
+
+  -- L'école d'accueil est celle authentifiée (du JWT). Si school_to n'est pas
+  -- encore renseigné, on le fixe à l'école appelante ; sinon on exige
+  -- l'autorisation sur l'école cible déclarée.
+  select school_id into new_school
+  from public.user_school_roles
+  where user_id = auth.uid() and is_active;
+  if t.school_to is null then
+    if not (is_super_admin() or has_school_role(new_school, array['direction','secretariat'])) then
+      raise exception 'Seule la direction peut consommer ce transfert.';
+    end if;
+    t.school_to := new_school;
+  else
+    if not (is_super_admin() or has_school_role(t.school_to, array['direction','secretariat'])) then
+      raise exception 'Vous n''êtes pas l''école d''accueil de ce transfert.';
+    end if;
+    new_school := t.school_to;
+  end if;
+
+  update public.transfers
+    set status = 'CONSUMED',
+        school_to = new_school,
+        enrollment_to = p_enrollment_to,
+        consumed_at = clock_timestamp()
+  where id = t.id;
+  return t.student_id;
+end $$;
+grant execute on function public.consume_transfer(text,uuid) to authenticated;
+
+revoke all on function public.generate_transfer_code() from public, anon;
+grant execute on function public.generate_transfer_code() to authenticated;
+revoke all on function public.verify_transfer_code(text) from public, anon;
+grant execute on function public.verify_transfer_code(text) to authenticated;
+
+commit;
+
+

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import Link from "next/link"
 import { createClient } from "@/utils/supabase/browser"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -17,7 +18,7 @@ import {
   getGuardians,
   getEnrollments,
 } from "@/app/dashboard/admissions/actions"
-import { Clock, GraduationCap, Users, FileText, Wallet } from "lucide-react"
+import { Clock, GraduationCap, Users, FileText, Wallet, ArrowLeftRight } from "lucide-react"
 import {
   CounterEnrollmentModal,
   type CounterPrefill,
@@ -165,10 +166,18 @@ export default function AdmissionsPage() {
             Pre-inscriptions, validation au guichet et encaissement.
           </p>
         </div>
-        <Button type="button" className="min-h-11 gap-2" onClick={() => openCounter()}>
-          <Wallet className="h-4 w-4" />
-          Inscrire au guichet
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild variant="outline" className="min-h-11 gap-2">
+            <Link href="/dashboard/admissions/movements">
+              <ArrowLeftRight className="h-4 w-4" />
+              Transferts / orientations
+            </Link>
+          </Button>
+          <Button type="button" className="min-h-11 gap-2" onClick={() => openCounter()}>
+            <Wallet className="h-4 w-4" />
+            Inscrire au guichet
+          </Button>
+        </div>
       </div>
       <Tabs value={tab} onValueChange={setTab} className="space-y-6">
         <TabsList className="grid w-full grid-cols-4">
