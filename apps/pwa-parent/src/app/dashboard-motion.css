@@ -33,6 +33,11 @@
 .schooly-dashboard-shell.dashboard-nav-transition-backward .dashboard-nav-item.is-active::after { animation-name:dashboard-active-indicator-backward; }
 .schooly-dashboard-shell.dashboard-nav-transition-forward .dashboard-nav-item:not(.is-active)::after,.schooly-dashboard-shell.dashboard-nav-transition-backward .dashboard-nav-item:not(.is-active)::after { animation:dashboard-active-indicator-out .18s cubic-bezier(.4,0,1,1) both; }
 
+/* Active tab icons follow the same 480ms fade/blur timeline as the content and indicator. */
+.dashboard-nav-item.is-active svg { animation:dashboard-active-icon-in .48s cubic-bezier(.22,1,.36,1) both; }
+.schooly-dashboard-shell.dashboard-nav-transition-forward .dashboard-nav-item.is-active svg { animation-name:dashboard-active-icon-forward; }
+.schooly-dashboard-shell.dashboard-nav-transition-backward .dashboard-nav-item.is-active svg { animation-name:dashboard-active-icon-backward; }
+
 .dashboard-page-transition::before { content:""; position:absolute; z-index:0; inset:10px 18px 0; pointer-events:none; opacity:0; border-radius:28px; box-shadow:0 26px 70px rgba(0,0,0,.12); transition:opacity .42s cubic-bezier(.22,1,.36,1),transform .42s cubic-bezier(.22,1,.36,1); }
 .dashboard-page-transition:not(.is-exiting)::before { opacity:.5; transform:translateZ(0) scale(1); }
 .dashboard-page-transition.is-exiting::before { opacity:.25; transform:translateZ(-12px) scale(.992); }
@@ -93,6 +98,9 @@
 @keyframes dashboard-active-indicator-forward { from { opacity:0; filter:blur(1.8px); transform:translate3d(6px,0,0) scale(.55); } 60% { opacity:.7; filter:blur(.6px); transform:translate3d(0,0,0) scale(1.08); } to { opacity:1; filter:blur(0); transform:translate3d(0,0,0) scale(1); } }
 @keyframes dashboard-active-indicator-backward { from { opacity:0; filter:blur(1.8px); transform:translate3d(-6px,0,0) scale(.55); } 60% { opacity:.7; filter:blur(.6px); transform:translate3d(0,0,0) scale(1.08); } to { opacity:1; filter:blur(0); transform:translate3d(0,0,0) scale(1); } }
 @keyframes dashboard-active-indicator-out { from { opacity:1; filter:blur(0); transform:scale(1); } 55% { opacity:.45; filter:blur(.8px); transform:scale(.9); } to { opacity:0; filter:blur(1.8px); transform:scale(.55); } }
+@keyframes dashboard-active-icon-in { from { opacity:0; filter:blur(1.8px); transform:translateY(3px) scale(.88); } 60% { opacity:.72; filter:blur(.5px); transform:translateY(0) scale(1.04); } to { opacity:1; filter:blur(0); transform:translateY(0) scale(1); } }
+@keyframes dashboard-active-icon-forward { from { opacity:0; filter:blur(1.8px); transform:translate3d(5px,0,0) scale(.88); } 60% { opacity:.72; filter:blur(.5px); transform:translate3d(0,0,0) scale(1.04); } to { opacity:1; filter:blur(0); transform:translate3d(0,0,0) scale(1); } }
+@keyframes dashboard-active-icon-backward { from { opacity:0; filter:blur(1.8px); transform:translate3d(-5px,0,0) scale(.88); } 60% { opacity:.72; filter:blur(.5px); transform:translate3d(0,0,0) scale(1.04); } to { opacity:1; filter:blur(0); transform:translate3d(0,0,0) scale(1); } }
 @keyframes dashboard-icon-pop { from { opacity:0; transform:scale(.6) rotate(-25deg); } to { opacity:1; transform:scale(1) rotate(0); } }
 @keyframes dashboard-dropdown-option-enter { from { opacity:0; transform:translateY(-4px) scale(.98); } to { opacity:1; transform:translateY(0) scale(1); } }
 
@@ -104,7 +112,7 @@
   .schooly-dashboard-shell.dashboard-nav-transition-forward .dashboard-topbar,.schooly-dashboard-shell.dashboard-nav-transition-backward .dashboard-topbar,
   .schooly-dashboard-shell.dashboard-nav-transition-forward .dashboard-topbar-left,.schooly-dashboard-shell.dashboard-nav-transition-forward .dashboard-topbar-right,
   .schooly-dashboard-shell.dashboard-nav-transition-backward .dashboard-topbar-left,.schooly-dashboard-shell.dashboard-nav-transition-backward .dashboard-topbar-right,
-  .dashboard-nav-item.is-active::after,.theme-icon-swap,.dashboard-dropdown-menu.is-open .dashboard-dropdown-option { animation:none !important; }
+  .dashboard-nav-item.is-active::after,.dashboard-nav-item.is-active svg,.theme-icon-swap,.dashboard-dropdown-menu.is-open .dashboard-dropdown-option { animation:none !important; }
   .dashboard-page-transition-content::after,.dashboard-page-transition::before { transition:none !important; }
   .dashboard-select-pill,.dashboard-select-chevron,.dashboard-dropdown-menu,.dashboard-dropdown-option,.dashboard-dropdown-check { transition-duration:.01ms !important; }
 }
