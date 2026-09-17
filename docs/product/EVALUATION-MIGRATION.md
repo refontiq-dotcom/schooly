@@ -59,6 +59,34 @@
 
 
 
+## Lot 5 — bulletins officiels
+
+- Réutilise `report_cards` (aucune table concurrente) : colonnes `content jsonb`
+  (instantané figé) et `version` ; trigger `report_cards_history_guard` :
+  un bulletin publié devient immuable (contenu/version figés, suppression
+  refusée, seule transition `sent → archived` autorisée).
+- Génération par classe (`generate_class_report_cards`, RPC transactionnelle,
+  direction uniquement) : uniquement les élèves à décision validée, refuse si
+  les données ont changé depuis la validation (empreinte revérifiée), contenu
+  calculé **en SQL** sur les notes gelées (moyennes par matière et par période,
+  ABS exclues, coefficients, décision annuelle, règles appliquées) ; idempotent
+  (upsert, régénération = nouvelle version tant que non publié, ignoré après).
+- Publication par classe (`publish_class_report_cards`) : statut `sent` — c'est
+  lui qui rend le bulletin visible côté familles et élèves.
+- PWA parent (`getBulletinData`) : ajoute `official` — uniquement le bulletin
+  publié, avec ses résultats figés ; affiché en section « Résultats annuels
+  officiels » du bulletin (impression/PDF inclus).
+- Portail élève : section « Bulletin officiel » avec le contenu publié.
+- Écran direction : section 7 « Bulletins officiels » (générer / publier).
+- Migration à appliquer : `20260917080000_report_cards_publish.sql`.
+- Restent hors de ce lot : PDF binaire en tâche de fond (les bulletins sont des
+  instantanés JSON imprimables), notifications, rattachement des anciennes
+  notes sans période.
+- Validation : banc SQL 53/53 (génération, contenu figé, publication,
+  regénération sans effet, suppression et falsification refusées) ; Vitest
+  222/222 ; TypeScript Schooly et pwa-parent réussis.
+
+
 ## SQL à appliquer sur la base cible
 
 Les fichiers complets sont dans le dépôt, à exécuter **dans cet ordre** :
@@ -67,6 +95,7 @@ Les fichiers complets sont dans le dépôt, à exécuter **dans cet ordre** :
 2. `/home/dukoua/Projets/schooly/packages/db/supabase/migrations/20260917050000_evaluation_assessments.sql`
 3. `/home/dukoua/Projets/schooly/packages/db/supabase/migrations/20260917060000_grade_corrections.sql`
 4. `/home/dukoua/Projets/schooly/packages/db/supabase/migrations/20260917070000_annual_validation.sql`
+5. `/home/dukoua/Projets/schooly/packages/db/supabase/migrations/20260917080000_report_cards_publish.sql`
 
 N'appliquer que les migrations pas encore appliquées sur la base cible ; ne jamais
 les rejouer. Elles supposent les migrations antérieures Schooly déjà installées.
@@ -86,6 +115,7 @@ psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f /home/dukoua/Projets/schooly/packa
 psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f /home/dukoua/Projets/schooly/packages/db/supabase/migrations/20260917050000_evaluation_assessments.sql
 psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f /home/dukoua/Projets/schooly/packages/db/supabase/migrations/20260917060000_grade_corrections.sql
 psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f /home/dukoua/Projets/schooly/packages/db/supabase/migrations/20260917070000_annual_validation.sql
+psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f /home/dukoua/Projets/schooly/packages/db/supabase/migrations/20260917080000_report_cards_publish.sql
 ```
 
 Vérification après migration :

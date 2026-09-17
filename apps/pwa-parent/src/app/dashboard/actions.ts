@@ -386,6 +386,16 @@ export type SubjectAverage = {
   count: number
 }
 
+export type OfficialBulletin = {
+  publishedAt: string
+  version: number
+  content: {
+    subjects: { name: string; coefficient: number; periods: { label: string; average: number | null }[] }[]
+    annual: { average: number | null; decision: string; observations: string | null }
+    rule: { scale: number }
+  }
+}
+
 export type BulletinData = {
   child: Child
   schoolCity: string | null
@@ -395,6 +405,7 @@ export type BulletinData = {
   decision: string
   observations: string | null
   councilAverage: number | null
+  official: OfficialBulletin | null
 }
 
 export type BulletinResult =
@@ -488,6 +499,21 @@ export async function getBulletinData(enrollmentId: string): Promise<BulletinRes
       .eq("id", row.school_id)
       .maybeSingle()
 
+    // Bulletin officiel : seul le bulletin publié (statut « sent ») est visible.
+    const { data: rc } = await admin
+      .from("report_cards")
+      .select("content, version, sent_at")
+      .eq("enrollment_id", enrollmentId)
+      .eq("academic_year_id", row.academic_year_id)
+      .eq("status", "sent")
+      .is("deleted_at", null)
+      .order("sent_at", { ascending: false })
+      .limit(1)
+
+    const officialRow = (rc ?? [])[0] as unknown as
+      | { content: OfficialBulletin["content"]; version: number; sent_at: string }
+      | undefined
+
     return {
       ok: true,
       data: {
@@ -502,6 +528,9 @@ export async function getBulletinData(enrollmentId: string): Promise<BulletinRes
           decisionRow?.[0]?.average === null || decisionRow?.[0]?.average === undefined
             ? null
             : Number(decisionRow[0].average),
+        official: officialRow
+          ? { publishedAt: officialRow.sent_at, version: officialRow.version, content: officialRow.content }
+          : null,
       },
     }
   } catch (err) {

@@ -65,7 +65,7 @@ export function BulletinView({ enrollmentId }: { enrollmentId: string }) {
     )
   }
 
-  const { child, schoolCity, subjectAverages, generalAverage, decision, observations, councilAverage } = data
+  const { child, schoolCity, subjectAverages, generalAverage, decision, observations, councilAverage, official } = data
 
   return (
     <div className="space-y-4">
@@ -167,6 +167,56 @@ export function BulletinView({ enrollmentId }: { enrollmentId: string }) {
             <p className="mt-1 whitespace-pre-wrap rounded-md bg-black/[0.03] p-3 text-sm">
               {observations}
             </p>
+          </section>
+        )}
+
+        {official && (
+          <section className="mt-5 border-t-2 border-black/30 pt-3">
+            <h2 className="text-sm font-bold uppercase">
+              Résultats annuels officiels — publiés le{" "}
+              {new Date(official.publishedAt).toLocaleDateString("fr-FR")}
+            </h2>
+            <table className="mt-1 w-full border-collapse text-sm">
+              <thead>
+                <tr className="border-b border-black/30 text-left text-xs uppercase text-black/60">
+                  <th className="py-1">Matière</th>
+                  <th className="py-1 text-center">Coef.</th>
+                  <th className="py-1 text-center">Moyennes de période</th>
+                </tr>
+              </thead>
+              <tbody>
+                {official.content.subjects.map((s) => (
+                  <tr key={s.name} className="border-b border-black/10">
+                    <td className="py-1.5">{s.name}</td>
+                    <td className="py-1.5 text-center">{s.coefficient}</td>
+                    <td className="py-1.5 text-center">
+                      {s.periods.map((p) => `${p.label} : ${p.average === null ? "—" : p.average}`).join(" · ") || "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm">
+              <p>
+                <span className="text-black/60">Moyenne annuelle validée :</span>{" "}
+                <strong>
+                  {official.content.annual.average === null
+                    ? "—"
+                    : `${official.content.annual.average} / ${official.content.rule.scale}`}
+                </strong>
+              </p>
+              <p>
+                <span className="text-black/60">Décision validée :</span>{" "}
+                <strong>
+                  {DECISION_LABELS[official.content.annual.decision] ?? official.content.annual.decision}
+                </strong>
+              </p>
+            </div>
+            {official.content.annual.observations && (
+              <p className="mt-2 whitespace-pre-wrap rounded-md bg-black/[0.03] p-3 text-sm">
+                {official.content.annual.observations}
+              </p>
+            )}
           </section>
         )}
 

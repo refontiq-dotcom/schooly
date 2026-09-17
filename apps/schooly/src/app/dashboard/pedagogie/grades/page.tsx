@@ -10,7 +10,7 @@ function Select(props: SelectHTMLAttributes<HTMLSelectElement>) {
 }
 import { useSupabaseUser } from "@/hooks/use-supabase-user"
 import { createGradeEntry, getGradeEntries, getAcademicYearsForSchool, getEnrollmentsForSchool, getSubjectsForSchool, getClassesForSchool, type GradeEntryRow, type EnrollmentListRow } from "../actions"
-import { getEvaluationConfiguration, getEvaluationAssessments, createEvaluationAssessment, createEvaluationRule, createEvaluationPeriod, closeEvaluationPeriod, getPeriodResults, getAnnualPreview, validateAnnualDecision, type PeriodResult, type AnnualPreviewResult } from "../evaluation-actions"
+import { getEvaluationConfiguration, getEvaluationAssessments, createEvaluationAssessment, createEvaluationRule, createEvaluationPeriod, closeEvaluationPeriod, getPeriodResults, getAnnualPreview, validateAnnualDecision, generateReportCards, publishReportCards, type PeriodResult, type AnnualPreviewResult } from "../evaluation-actions"
 import { GradeCorrectionPanel } from "../grade-correction-panel"
 import type { EvaluationAssessment, EvaluationPeriod, EvaluationRule } from "../evaluation-types"
 
@@ -193,6 +193,20 @@ export default function EvaluationPanel() {
           <Button type="submit">Valider et figer le résultat</Button>
         </ActionForm>}
       </li>)}</ul>}
+    </section>}
+    {ready && direction && <section className="space-y-4 rounded border p-4">
+      <h2 className="text-xl font-semibold">7. Bulletins officiels</h2>
+      <p>La génération fige le contenu calculé en base, uniquement pour les élèves à décision validée ; la publication le rend visible par les parents et les élèves. Un bulletin publié devient immuable.</p>
+      <ActionForm action={mutate(generateReportCards)} className="flex flex-wrap items-end gap-3">
+        <Field label="Classe"><Select name="classId" required><option value="">Choisir</option>{classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></Field>
+        <Field label="Année"><Select name="yearId" required><option value="">Choisir</option>{years.map(y => <option key={y.id} value={y.id}>{y.label}</option>)}</Select></Field>
+        <Button type="submit">Générer les bulletins</Button>
+      </ActionForm>
+      <ActionForm action={mutate(publishReportCards)} className="flex flex-wrap items-end gap-3">
+        <Field label="Classe"><Select name="classId" required><option value="">Choisir</option>{classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></Field>
+        <Field label="Année"><Select name="yearId" required><option value="">Choisir</option>{years.map(y => <option key={y.id} value={y.id}>{y.label}</option>)}</Select></Field>
+        <Button type="submit">Publier aux familles</Button>
+      </ActionForm>
     </section>}
     {ready && <section className="space-y-3 rounded border p-4">
       <h2 className="text-xl font-semibold">Historique autorisé</h2>

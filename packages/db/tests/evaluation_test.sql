@@ -1,5 +1,5 @@
 begin;
-select plan(43);
+select plan(53);
 insert into auth.users(id,email) values
  ('10000000-0000-0000-0000-000000000001','dir-a@test.local'),
  ('10000000-0000-0000-0000-000000000002','dir-b@test.local'),
@@ -116,6 +116,24 @@ reset role;
 alter table public.grade_entries disable trigger grade_entries_period_validate;
 select throws_ok($$update public.grade_entries set value=31 where assessment_id='70000000-0000-0000-0000-000000000001'$$
  ,'P0001','Résultat annuel validé : les notes ne peuvent plus être modifiées.','Écriture de note après validation refusée');
+-- Lot 5 : bulletins officiels — génération, publication, immuabilité.
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claims','{"sub":"10000000-0000-0000-0000-000000000001"}',true);
+select lives_ok($$select public.generate_class_report_cards('61000000-0000-0000-0000-000000000001','30000000-0000-0000-0000-000000000001')$$,'Direction génère les bulletins de la classe');
+select is((select status from public.report_cards limit 1),'generated','Bulletin généré en attente de publication');
+select is((select content->'annual'->>'decision' from public.report_cards limit 1),'admitted','Contenu figé avec la décision validée');
+select is((select (content->'subjects'->0->'periods'->0->>'average') is null from public.report_cards limit 1), true, 'Moyenne de période sans note notée : null (ABS exclue)');
+
+select lives_ok($$select public.publish_class_report_cards('61000000-0000-0000-0000-000000000001','30000000-0000-0000-0000-000000000001')$$,'Direction publie les bulletins');
+select is((select status from public.report_cards limit 1),'sent','Bulletin publié');
+select lives_ok($$select public.generate_class_report_cards('61000000-0000-0000-0000-000000000001','30000000-0000-0000-0000-000000000001')$$,'Regénération sans effet sur un bulletin publié');
+select is((select version from public.report_cards limit 1),1::int,'Contenu publié inchangé (version stable)');
+-- La direction ne dispose que du SELECT sur report_cards : les écritures passent
+-- par les RPC (security definer). En superutilisateur, les triggers restent actifs.
+reset role;
+select throws_ok($$delete from public.report_cards$$,'P0001','Un bulletin publié est conservé dans l''historique.','Suppression d''un bulletin publié refusée');
+select throws_ok($$update public.report_cards set content='{"falsifie":true}'::jsonb$$,'P0001','Bulletin publié : contenu immuable.','Falsification d''un bulletin publié refusée');
 
 select * from finish();
 rollback;

@@ -170,6 +170,24 @@ export default async function ElevePortalPage() {
   }
   const average = totalWeight > 0 ? weightedSum / totalWeight : null
 
+  // ————— Bulletin officiel publié (statut « sent » uniquement) —————
+  type OfficialContent = {
+    subjects: { name: string; coefficient: number; periods: { label: string; average: number | null }[] }[]
+    annual: { average: number | null; decision: string; observations: string | null }
+    rule: { scale: number }
+  }
+  const { data: rc } = await db
+    .from("report_cards")
+    .select("content, version, sent_at")
+    .eq("enrollment_id", enrollmentId)
+    .eq("status", "sent")
+    .is("deleted_at", null)
+    .order("sent_at", { ascending: false })
+    .limit(1)
+  const reportCard = (rc ?? [])[0] as unknown as
+    | { content: OfficialContent; version: number; sent_at: string }
+    | undefined
+
   const studentName = enrollment.students
     ? `${enrollment.students.first_name} ${enrollment.students.last_name}`
     : "Élève"
@@ -278,6 +296,58 @@ export default async function ElevePortalPage() {
           </Card>
         )}
       </section>
+
+      {/* Bulletin officiel publié */}
+      {reportCard && (
+        <section className="space-y-3">
+          <h2 className="flex items-center gap-2 text-lg font-semibold">
+            <GraduationCap className="h-5 w-5 text-primary" /> Bulletin officiel
+          </h2>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">
+                Résultats annuels — publiés le {new Date(reportCard.sent_at).toLocaleDateString("fr-FR")}
+              </CardTitle>
+              <CardDescription>Document officiel figé par l&apos;établissement.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              <ul className="divide-y">
+                {reportCard.content.subjects.map((s) => (
+                  <li key={s.name} className="flex items-center justify-between gap-3 py-2">
+                    <span>{s.name} <span className="text-muted-foreground">· coef. {s.coefficient}</span></span>
+                    <span className="font-medium">
+                      {s.periods.map((p) => `${p.label} : ${p.average === null ? "—" : p.average}`).join(" · ") || "—"}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-muted px-3 py-2">
+                <span className="font-semibold">Moyenne annuelle validée</span>
+                <span className="font-bold">
+                  {reportCard.content.annual.average === null
+                    ? "—"
+                    : `${reportCard.content.annual.average} / ${reportCard.content.rule.scale}`}
+                </span>
+              </div>
+              <p>
+                Décision :{" "}
+                <strong>
+                  {reportCard.content.annual.decision === "admitted"
+                    ? "Admis(e)"
+                    : reportCard.content.annual.decision === "repeated"
+                      ? "Rédoublant(e)"
+                      : reportCard.content.annual.decision === "excluded"
+                        ? "Exclu(e)"
+                        : "En attente"}
+                </strong>
+              </p>
+              {reportCard.content.annual.observations && (
+                <p className="whitespace-pre-wrap rounded-md bg-muted p-3">{reportCard.content.annual.observations}</p>
+              )}
+            </CardContent>
+          </Card>
+        </section>
+      )}
 
       {/* Verrouiller la session */}
       <form action={lockStudentPortal} className="flex justify-center">

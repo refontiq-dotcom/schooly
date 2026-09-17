@@ -249,3 +249,38 @@ export async function validateAnnualDecision(form: FormData) {
   revalidatePath("/dashboard/pedagogie/grades")
   return {}
 }
+
+/**
+ * Génération des bulletins officiels d'une classe : uniquement les élèves à
+ * décision validée, contenu figé calculé en SQL sur les notes gelées. Refus si
+ * des données ont changé depuis la validation (empreinte).
+ */
+export async function generateReportCards(form: FormData) {
+  const db = await createClient()
+  const guard = await requireSchoolRole(db, { allowedRoles: DECISION_ROLES })
+  if (!guard.ok) return { error: denial(guard.reason, null).error }
+  if (!text(form, "classId") || !text(form, "yearId")) return { error: "Classe et année requises." }
+  const { error } = await db.rpc("generate_class_report_cards", {
+    p_class_id: text(form, "classId"), p_academic_year_id: text(form, "yearId"),
+  })
+  if (error) return { error: error.message }
+  revalidatePath("/dashboard/pedagogie/grades")
+  return {}
+}
+
+/**
+ * Publication : les bulletins générés de la classe deviennent visibles par les
+ * parents et les élèves. Un bulletin publié devient immuable en base.
+ */
+export async function publishReportCards(form: FormData) {
+  const db = await createClient()
+  const guard = await requireSchoolRole(db, { allowedRoles: DECISION_ROLES })
+  if (!guard.ok) return { error: denial(guard.reason, null).error }
+  if (!text(form, "classId") || !text(form, "yearId")) return { error: "Classe et année requises." }
+  const { error } = await db.rpc("publish_class_report_cards", {
+    p_class_id: text(form, "classId"), p_academic_year_id: text(form, "yearId"),
+  })
+  if (error) return { error: error.message }
+  revalidatePath("/dashboard/pedagogie/grades")
+  return {}
+}
