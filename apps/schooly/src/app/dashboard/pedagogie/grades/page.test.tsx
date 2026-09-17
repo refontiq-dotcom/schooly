@@ -26,6 +26,8 @@ vi.mock("../evaluation-actions", () => ({
   } }),
   createEvaluationRule: async () => ({}), createEvaluationPeriod: async () => ({}), closeEvaluationPeriod: async () => ({}),
   getPeriodResults: mocks.results,
+  getAnnualPreview: async () => ({ data: [] }),
+  validateAnnualDecision: mocks.save,
 }))
 import GradesPage from "./page"
 let container: HTMLDivElement

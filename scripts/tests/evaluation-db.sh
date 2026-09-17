@@ -17,7 +17,7 @@ $$;
 grant usage on schema auth, public to authenticated, service_role;
 grant execute on function auth.uid() to authenticated, service_role;
 SQL
-for migration in 20260908090000_tenancy_auth.sql 20260908110000_academic_structure.sql 20260908120000_students_enrollments.sql 20260908150000_pedagogie_notes.sql 20260917040000_evaluation_rules_periods.sql 20260917050000_evaluation_assessments.sql 20260917060000_grade_corrections.sql; do
+for migration in 20260908090000_tenancy_auth.sql 20260908110000_academic_structure.sql 20260908120000_students_enrollments.sql 20260908150000_pedagogie_notes.sql 20260917040000_evaluation_rules_periods.sql 20260917050000_evaluation_assessments.sql 20260917060000_grade_corrections.sql 20260917070000_annual_validation.sql; do
   sql < "$ROOT/packages/db/supabase/migrations/$migration"
 done
 sql <<'SQL'

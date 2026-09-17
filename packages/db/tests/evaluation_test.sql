@@ -1,5 +1,5 @@
 begin;
-select plan(38);
+select plan(43);
 insert into auth.users(id,email) values
  ('10000000-0000-0000-0000-000000000001','dir-a@test.local'),
  ('10000000-0000-0000-0000-000000000002','dir-b@test.local'),
@@ -98,5 +98,24 @@ select throws_ok($$insert into public.evaluation_assessments(school_id,period_id
  values ('20000000-0000-0000-0000-000000000001','50000000-0000-0000-0000-000000000001','61000000-0000-0000-0000-000000000001','62000000-0000-0000-0000-000000000001','devoir','DS5',40,'10000000-0000-0000-0000-000000000001')$$
  ,'P0001','La période est verrouillée ou terminée.','Déclaration après clôture refusée');
 select is((select locked_at is not null from public.evaluation_periods where id='50000000-0000-0000-0000-000000000001'),true,'Clôture réellement persistée');
+-- Lot 4 : validation officielle du résultat annuel (direction uniquement).
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claims','{"sub":"10000000-0000-0000-0000-000000000001"}',true);
+select throws_ok($$select public.validate_annual_decision('65000000-0000-0000-0000-000000000001','admitted',15,'empreinte-faussee',null)$$
+ ,'40001','Les données ont changé depuis l''aperçu : relancez le calcul.','Validation avec empreinte obsolète refusée');
+select lives_ok($$select public.validate_annual_decision('65000000-0000-0000-0000-000000000001','admitted',15,
+ (select public.annual_input_fingerprint('65000000-0000-0000-0000-000000000001')),null)$$,'Direction valide le résultat annuel');
+select throws_ok($$select public.validate_annual_decision('65000000-0000-0000-0000-000000000001','admitted',15,
+ (select public.annual_input_fingerprint('65000000-0000-0000-0000-000000000001')),null)$$
+ ,'P0001','Résultat déjà validé et immuable.','Revalidation refusée');
+select is((select decision from public.academic_decisions where enrollment_id='65000000-0000-0000-0000-000000000001'),'admitted','Décision validée persistée');
+-- En superutilisateur : on neutralise le verrou de période (antérieur alphabétiquement)
+-- pour isoler le verrou de validation. Le rollback final restaure l'état des triggers.
+reset role;
+alter table public.grade_entries disable trigger grade_entries_period_validate;
+select throws_ok($$update public.grade_entries set value=31 where assessment_id='70000000-0000-0000-0000-000000000001'$$
+ ,'P0001','Résultat annuel validé : les notes ne peuvent plus être modifiées.','Écriture de note après validation refusée');
+
 select * from finish();
 rollback;

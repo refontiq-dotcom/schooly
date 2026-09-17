@@ -6,6 +6,7 @@ import { DECISION_ROLES, TEACHING_ROLES } from "@/utils/supabase/roles"
 import { validateRules, computePeriodAverage } from "@/lib/evaluation/calculations"
 import { computeExpectedSubject, type EnteredGrade } from "@/lib/evaluation/completeness"
 import { toRules, type EvaluationRule, type EvaluationPeriod, type EvaluationAssessment } from "./evaluation-types"
+import { computeAnnualPreview, type AnnualPeriod } from "@/lib/evaluation/annual"
 import { revalidatePath } from "next/cache"
 
 const text = (form: FormData, key: string) => String(form.get(key) ?? "").trim()
@@ -100,15 +101,10 @@ export type PeriodResult = {
   complete: boolean; expected: number; entered: number; unlinked: number
 }
 
-export async function getPeriodResults(classId: string, periodId: string): Promise<{ error?: string; data?: PeriodResult[] }> {
-  const db = await createClient()
-  const guard = await requireSchoolRole(db, { allowedRoles: DECISION_ROLES })
-  if (!guard.ok) return { error: denial(guard.reason, null).error }
-  const school = guard.context.schoolId
-  const { data: period, error: periodError } = await db.from("evaluation_periods").select("rule_id").eq("id", periodId).eq("school_id", school).single()
-  if (periodError || !period) return { error: "Période introuvable." }
-  const { data: rule } = await db.from("evaluation_rules").select("*").eq("id", period.rule_id).eq("school_id", school).single()
-  if (!rule) return { error: "Règles introuvables." }
+type Db = Awaited<ReturnType<typeof createClient>>
+
+/** Calcul d'une période pour une classe : réutilisé par l'aperçu mensuel et annuel. */
+async function loadPeriodResults(db: Db, school: string, rule: EvaluationRule, classId: string, periodId: string) {
   const [enrollments, assignments, grades, assessments] = await Promise.all([
     db.from("enrollments").select("id,students(first_name,last_name)").eq("school_id", school).eq("class_id", classId).eq("academic_year_id", rule.academic_year_id).is("deleted_at", null),
     db.from("class_subject_assignments").select("subject_id,coefficient").eq("school_id", school).eq("class_id", classId).is("deleted_at", null),
@@ -118,7 +114,7 @@ export async function getPeriodResults(classId: string, periodId: string): Promi
   const error = enrollments.error ?? assignments.error ?? grades.error ?? assessments.error
   if (error) return { error: error.message }
   try {
-    const rules = toRules(rule as EvaluationRule)
+    const rules = toRules(rule)
     const data = (enrollments.data ?? []).map(enrollment => {
       const subjects = (assignments.data ?? []).map(assignment => ({
         coefficient: Number(assignment.coefficient),
@@ -136,4 +132,120 @@ export async function getPeriodResults(classId: string, periodId: string): Promi
     })
     return { data: data.sort((a, b) => (b.average ?? -1) - (a.average ?? -1)) }
   } catch (error) { return { error: error instanceof Error ? error.message : "Calcul impossible." } }
+}
+
+export async function getPeriodResults(classId: string, periodId: string): Promise<{ error?: string; data?: PeriodResult[] }> {
+  const db = await createClient()
+  const guard = await requireSchoolRole(db, { allowedRoles: DECISION_ROLES })
+  if (!guard.ok) return { error: denial(guard.reason, null).error }
+  const school = guard.context.schoolId
+  const { data: period, error: periodError } = await db.from("evaluation_periods").select("rule_id").eq("id", periodId).eq("school_id", school).single()
+  if (periodError || !period) return { error: "Période introuvable." }
+  const { data: rule } = await db.from("evaluation_rules").select("*").eq("id", period.rule_id).eq("school_id", school).single()
+  if (!rule) return { error: "Règles introuvables." }
+  return loadPeriodResults(db, school, rule as EvaluationRule, classId, periodId)
+}
+
+export type AnnualPreviewResult = {
+  enrollmentId: string; name: string
+  average: number | null; complete: boolean
+  proposal: "admitted" | "rescuable" | "deferred" | "incomplete"
+  allPeriodsClosed: boolean; readyForValidation: boolean; blockers: string[]
+  fingerprint: string
+}
+
+/**
+ * Aperçu annuel : cumul des périodes selon le régime. Règle de cycle
+ * spécifique prioritaire, sinon règle de l'établissement (`*`).
+ * N'enregistre AUCUNE décision : la validation officielle est un lot distinct.
+ */
+export async function getAnnualPreview(classId: string, academicYearId: string): Promise<{ error?: string; data?: AnnualPreviewResult[] }> {
+  const db = await createClient()
+  const guard = await requireSchoolRole(db, { allowedRoles: DECISION_ROLES })
+  if (!guard.ok) return { error: denial(guard.reason, null).error }
+  const school = guard.context.schoolId
+
+  const { data: klass, error: classError } = await db.from("classes")
+    .select("id,grade_levels(cycle)").eq("id", classId).eq("school_id", school).is("deleted_at", null).single()
+  if (classError || !klass) return { error: "Classe introuvable." }
+  const cycle = (klass.grade_levels as unknown as { cycle: string } | null)?.cycle
+
+  const { data: rules, error: rulesError } = await db.from("evaluation_rules")
+    .select("*").eq("school_id", school).eq("academic_year_id", academicYearId)
+  if (rulesError) return { error: rulesError.message }
+  const candidates = (rules ?? []) as EvaluationRule[]
+  const rule = candidates.find(r => r.cycle === cycle) ?? candidates.find(r => r.cycle === "*")
+  if (!rule) return { error: "Aucune règle pour cette année et ce cycle." }
+
+  const { data: periods, error: periodsError } = await db.from("evaluation_periods")
+    .select("*").eq("school_id", school).eq("rule_id", rule.id).order("position")
+  if (periodsError) return { error: periodsError.message }
+  if (!periods || periods.length === 0) return { error: "Aucune période pour ces règles." }
+
+  // Une requête par période : le cumul annuel réutilise le calcul de période,
+  // seule source des moyennes par matière, complétude et notes hors évaluation.
+  const perPeriod: { period: EvaluationPeriod; rows: Map<string, PeriodResult> }[] = []
+  for (const period of periods as EvaluationPeriod[]) {
+    const outcome = await loadPeriodResults(db, school, rule, classId, period.id)
+    if (outcome.error) return { error: outcome.error }
+    perPeriod.push({ period, rows: new Map((outcome.data ?? []).map(r => [r.enrollmentId, r])) })
+  }
+
+  try {
+    const configured = toRules(rule)
+    const now = Date.now()
+    const first = perPeriod[0]
+    const data: AnnualPreviewResult[] = [...first.rows.entries()].map(([enrollmentId, row]) => {
+      const annualPeriods: AnnualPeriod[] = perPeriod.map(({ period, rows }) => {
+        const result = rows.get(enrollmentId)
+        return {
+          id: period.id, position: period.position, isPassage: period.is_passage,
+          startsAt: period.starts_at, endsAt: period.ends_at, lockedAt: period.locked_at,
+          average: { value: result?.average ?? null, complete: result?.complete ?? false },
+        }
+      })
+      const preview = computeAnnualPreview(annualPeriods, configured, now)
+      return {
+        enrollmentId, name: row.name, average: preview.average.value, complete: preview.average.complete,
+        proposal: preview.proposal, allPeriodsClosed: preview.allPeriodsClosed,
+        readyForValidation: preview.readyForValidation, blockers: preview.blockers, fingerprint: "",
+      }
+    })
+    data.sort((a, b) => (b.average ?? -1) - (a.average ?? -1))
+    // L'empreinte vient de la base (source de vérité de la validation) : le client
+    // ne la recalcule jamais, la RPC refusera toute donnée changée depuis l'aperçu.
+    const fingerprints = await Promise.all(data.map(row =>
+      db.rpc("annual_input_fingerprint", { p_enrollment_id: row.enrollmentId })))
+    const fingerprintError = fingerprints.find(f => f.error)
+    if (fingerprintError) return { error: "Empreinte des données indisponible." }
+    fingerprints.forEach((f, index) => { data[index].fingerprint = String(f.data) })
+    return { data }
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Cumul annuel impossible." }
+  }
+}
+
+/**
+ * Validation officielle : appelle la RPC transactionnelle qui revérifie
+ * l'empreinte, la clôture des périodes et la cohérence du seuil, puis fige
+ * la décision. Échec explicite si les données ont changé depuis l'aperçu.
+ */
+export async function validateAnnualDecision(form: FormData) {
+  const db = await createClient()
+  const guard = await requireSchoolRole(db, { allowedRoles: DECISION_ROLES })
+  if (!guard.ok) return { error: denial(guard.reason, null).error }
+  const decision = text(form, "decision")
+  const fingerprint = text(form, "fingerprint")
+  const average = number(form, "average")
+  if (!text(form, "enrollmentId") || !decision || !fingerprint || !Number.isFinite(average)
+    || !["admitted", "repeated", "pending"].includes(decision)) {
+    return { error: "Paramètres de validation incomplets." }
+  }
+  const { error } = await db.rpc("validate_annual_decision", {
+    p_enrollment_id: text(form, "enrollmentId"), p_decision: decision, p_average: average,
+    p_fingerprint: fingerprint, p_observations: text(form, "observations") || null,
+  })
+  if (error) return { error: error.message }
+  revalidatePath("/dashboard/pedagogie/grades")
+  return {}
 }

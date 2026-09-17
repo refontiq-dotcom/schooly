@@ -25,6 +25,40 @@
 - Restent hors de ce lot : rattachement des anciennes notes, validation annuelle,
   bulletins officiels.
 
+## Lot 4 — résultats annuels et décision validée par la direction
+
+- Moteur d'aperçu annuel (`annual.ts`) : trois trimestres, deux semestres ou
+  compositions primaire (40 % régulières, 60 % passage), sans arrondi
+  intermédiaire ; contrôle des périodes manquantes, doublons, chevauchements
+  et moyennes invalides. Une période incomplète empêche toute admission.
+- Aperçu serveur (`getAnnualPreview`) : cumul par régime à partir des moyennes
+  de période, décision proposée (`admitted`/`rescuable`/`deferred`/`incomplete`),
+  motifs de blocage et empreinte des données **calculée en SQL uniquement**
+  (`annual_input_fingerprint`) : règles, coefficients, évaluations attendues,
+  périodes et notes (avec révision) — jamais recalculée côté client.
+- Validation officielle (`validateAnnualDecision` → RPC
+  `validate_annual_decision`) : transactionnelle, réservée à la direction,
+  elle revérifie l'empreinte (`40001` si les données ont changé depuis
+  l'aperçu), la clôture de toutes les périodes et la cohérence du seuil et de
+  la marge de rachat, puis enregistre la décision avec instantané
+  (`academic_decisions.validated_at/input_fingerprint/snapshot`).
+- Immuabilité : une décision validée ne peut plus être modifiée ni revalidée ;
+  les notes de l'élève validé sont verrouillées en écriture
+  (`lock_validated_grade_writes`), en complément des verrous de période.
+- Écran : section 6 « Aperçu annuel et décision proposée » avec calcul par
+  classe/année, motifs de non-validabilité et formulaire de validation
+  (choix de décision borné à ce que la règle autorise).
+- Migration à appliquer :
+  `20260917070000_annual_validation.sql` (aucune nouvelle table, étend
+  `academic_decisions`).
+- Restent hors de ce lot : bulletins officiels, publication aux parents/élèves,
+  rattachement des anciennes notes sans période.
+- Validation : banc SQL 43/43 assertions (dont validation, revalidation
+  refusée, décision persistée, écriture de note refusée après validation) ;
+  suite Vitest 222/222 ; TypeScript Schooly réussi.
+
+
+
 ## SQL à appliquer sur la base cible
 
 Les fichiers complets sont dans le dépôt, à exécuter **dans cet ordre** :
@@ -32,6 +66,7 @@ Les fichiers complets sont dans le dépôt, à exécuter **dans cet ordre** :
 1. `/home/dukoua/Projets/schooly/packages/db/supabase/migrations/20260917040000_evaluation_rules_periods.sql`
 2. `/home/dukoua/Projets/schooly/packages/db/supabase/migrations/20260917050000_evaluation_assessments.sql`
 3. `/home/dukoua/Projets/schooly/packages/db/supabase/migrations/20260917060000_grade_corrections.sql`
+4. `/home/dukoua/Projets/schooly/packages/db/supabase/migrations/20260917070000_annual_validation.sql`
 
 N'appliquer que les migrations pas encore appliquées sur la base cible ; ne jamais
 les rejouer. Elles supposent les migrations antérieures Schooly déjà installées.
@@ -50,6 +85,7 @@ Alternative psql (DATABASE_URL doit cibler explicitement la bonne base) :
 psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f /home/dukoua/Projets/schooly/packages/db/supabase/migrations/20260917040000_evaluation_rules_periods.sql
 psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f /home/dukoua/Projets/schooly/packages/db/supabase/migrations/20260917050000_evaluation_assessments.sql
 psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f /home/dukoua/Projets/schooly/packages/db/supabase/migrations/20260917060000_grade_corrections.sql
+psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f /home/dukoua/Projets/schooly/packages/db/supabase/migrations/20260917070000_annual_validation.sql
 ```
 
 Vérification après migration :

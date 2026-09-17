@@ -10,12 +10,16 @@ function Select(props: SelectHTMLAttributes<HTMLSelectElement>) {
 }
 import { useSupabaseUser } from "@/hooks/use-supabase-user"
 import { createGradeEntry, getGradeEntries, getAcademicYearsForSchool, getEnrollmentsForSchool, getSubjectsForSchool, getClassesForSchool, type GradeEntryRow, type EnrollmentListRow } from "../actions"
-import { getEvaluationConfiguration, getEvaluationAssessments, createEvaluationAssessment, createEvaluationRule, createEvaluationPeriod, closeEvaluationPeriod, getPeriodResults, type PeriodResult } from "../evaluation-actions"
+import { getEvaluationConfiguration, getEvaluationAssessments, createEvaluationAssessment, createEvaluationRule, createEvaluationPeriod, closeEvaluationPeriod, getPeriodResults, getAnnualPreview, validateAnnualDecision, type PeriodResult, type AnnualPreviewResult } from "../evaluation-actions"
 import { GradeCorrectionPanel } from "../grade-correction-panel"
 import type { EvaluationAssessment, EvaluationPeriod, EvaluationRule } from "../evaluation-types"
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return <label className="grid gap-1 text-sm">{label}{children}</label>
+}
+// Libellés des décisions proposées : l'aperçu n'engage aucune décision officielle.
+const DECISION_LABELS: Record<AnnualPreviewResult["proposal"], string> = {
+  admitted: "admis", rescuable: "rachetable", deferred: "ajourné", incomplete: "indéterminée (incomplet)",
 }
 export default function EvaluationPanel() {
   const user = useSupabaseUser()
@@ -29,6 +33,7 @@ export default function EvaluationPanel() {
   const [grades, setGrades] = useState<GradeEntryRow[]>([])
   const [assessments, setAssessments] = useState<EvaluationAssessment[]>([])
   const [results, setResults] = useState<PeriodResult[] | null>(null)
+  const [annual, setAnnual] = useState<AnnualPreviewResult[] | null>(null)
   const [message, setMessage] = useState("")
   const [ready, setReady] = useState(false)
   const [absent, setAbsent] = useState(false)
@@ -155,6 +160,39 @@ export default function EvaluationPanel() {
         <Button type="submit">Calculer côté serveur</Button>
       </ActionForm>
       {results && <ul>{results.length === 0 && <li>Aucune inscription pour cette classe et cette année.</li>}{results.map(r => <li className="border-t py-2" key={r.enrollmentId}>{r.name} — {r.average === null ? "Non calculable" : `${r.average.toFixed(2)}/${r.scale}`} — matières {r.coverage} — saisies {r.entered}/{r.expected}{r.unlinked > 0 && ` — ${r.unlinked} note(s) hors évaluation`}{r.complete ? "" : " — incomplet, provisoire"}</li>)}</ul>}
+    </section>}
+    {ready && direction && <section className="space-y-4 rounded border p-4">
+      <h2 className="text-xl font-semibold">6. Aperçu annuel et décision proposée</h2>
+      <p>Aucune décision n’est enregistrée ici : le cumul exige le nombre de périodes du régime, des périodes complètes et toutes les périodes verrouillées. La validation officielle par la direction reste à raccorder.</p>
+      <ActionForm action={async form => {
+        setAnnual(null)
+        try {
+          const result = await getAnnualPreview(String(form.get("classId")), String(form.get("yearId")))
+          if (result.error) return { error: result.error }
+          setAnnual(result.data ?? [])
+          return {}
+        } catch { return { error: "Cumul indisponible. Réessayez." } }
+      }} className="flex flex-wrap items-end gap-3">
+        <Field label="Classe"><Select name="classId" required><option value="">Choisir</option>{classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></Field>
+        <Field label="Année"><Select name="yearId" required><option value="">Choisir</option>{years.map(y => <option key={y.id} value={y.id}>{y.label}</option>)}</Select></Field>
+        <Button type="submit">Calculer l’année</Button>
+      </ActionForm>
+      {annual && <ul>{annual.length === 0 && <li>Aucune inscription pour cette classe et cette année.</li>}{annual.map(r => <li className="border-t py-2" key={r.enrollmentId}>
+        {r.name} — {r.average === null ? "Non calculable" : `${r.average.toFixed(2)}`} — décision proposée : {DECISION_LABELS[r.proposal]}
+        {r.readyForValidation ? " — prêt à valider" : " — non validable"}
+        {r.blockers.length > 0 && <span className="block text-sm">Motifs : {r.blockers.join(" ")}</span>}
+        {r.readyForValidation && <ActionForm action={mutate(validateAnnualDecision)} className="mt-2 flex flex-wrap items-end gap-3">
+          <input type="hidden" name="enrollmentId" value={r.enrollmentId} />
+          <input type="hidden" name="fingerprint" value={r.fingerprint} />
+          <input type="hidden" name="average" value={r.average ?? ""} />
+          <Field label="Décision officielle"><Select name="decision" defaultValue={r.proposal === "rescuable" ? "repeated" : r.proposal === "admitted" ? "admitted" : "repeated"} disabled={r.proposal !== "rescuable"}>
+            {r.proposal === "rescuable" && <><option value="admitted">Admis</option><option value="repeated">Rédoublant</option><option value="pending">En attente</option></>}
+            {r.proposal === "admitted" && <option value="admitted">Admis</option>}
+          </Select></Field>
+          <Field label="Observations (facultatif)"><Input name="observations" /></Field>
+          <Button type="submit">Valider et figer le résultat</Button>
+        </ActionForm>}
+      </li>)}</ul>}
     </section>}
     {ready && <section className="space-y-3 rounded border p-4">
       <h2 className="text-xl font-semibold">Historique autorisé</h2>
