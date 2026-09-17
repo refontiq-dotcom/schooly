@@ -362,8 +362,8 @@ TROUVETOU_INSTANCE_URL=https://admin.schooly.ci
 ```text
 schooly :
   packages/billing/scripts/sync-trouvetou.mjs   → script push HTTP (npm run trouvetou:sync)
-  apps/web-admin/src/app/dashboard/admin/trouvetou/page.tsx   → page admin publication
-  apps/web-admin/src/app/api/v1/admin/trouvetou/*             → API internes (publish, profile…)
+  apps/schooly/src/app/dashboard/admin/trouvetou/page.tsx   → page admin publication
+  apps/schooly/src/app/api/v1/admin/trouvetou/*             → API internes (publish, profile…)
   packages/db/supabase/migrations/20260913000000_trouvetou_champs_etendus.sql
   trouvetou-migrations/20260913000000_schooly_connector.sql  → SQL Trouvetou (exécuté)
   trouvetou-migrations/20260913010000_provider_schooly.sql   → SQL provider (à exécuter)

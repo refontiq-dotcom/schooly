@@ -9,14 +9,24 @@ Ce fichier sert de point d'entrée pour tout développeur ou agent IA rejoignant
 - **Multi-tenant strict (Base de données RLS)** : sécurité absolue et séparation des données entre les écoles.
 - **Sobriété technique** : pas de stockages lourds.
 
-📄 **Le Cahier des Charges complet se trouve ici :** [`cahier-des-charges-schooly-1.md`](./cahier-des-charges-schooly-1.md) (consultez sa section de suivi pour connaître l'avancement).
+📄 **Le Cahier des Charges complet se trouve ici :** [`docs/product/cahier-des-charges-schooly.md`](./docs/product/cahier-des-charges-schooly.md) (consultez sa section de suivi pour connaître l'avancement).
+
+📂 **Documentation :**
+- `docs/product/` — Cahier des charges et spécifications produit
+- `docs/specs/` — Architecture de l'écosystème Refontiq et plan de travail
+- `docs/deployment/` — Guides de déploiement (Vercel, production)
+- `docs/security/` — Audits de sécurité (RLS, auth)
+- `docs/user-guide/` — Guide utilisateur
 
 ## 2. Architecture du Monorepo
 Ce projet utilise un monorepo (probablement via Turborepo / pnpm workspace) structuré ainsi :
-- `apps/web-admin/` : Le frontend administratif pour la Direction, Secrétariat, Comptabilité, etc. (Next.js App Router).
+- `apps/schooly/` : Le frontend administratif pour la Direction, Secrétariat, Comptabilité, etc. (Next.js App Router).
 - `apps/pwa-parent/` : Le portail PWA pour les parents et élèves (Next.js PWA offline-first).
 - `packages/ui/` : Bibliothèque de composants partagés (basée sur shadcn/ui et Tailwind CSS).
 - `packages/db/` : Dossier contenant la configuration Supabase, le schéma, les migrations SQL, et les tests RLS.
+- `packages/billing/` : Package partagé de facturation et connecteur Trouvetou (`@refontiq/billing`).
+- `docs/` : Cahier des charges, spécifications, guides de déploiement, audits et guide utilisateur.
+- `scripts/` : Scripts utilitaires (backup, déploiement, test de charge).
 
 ## 3. Stack Technique
 - **Frontend** : Next.js (App Router), React, TypeScript strict, Tailwind CSS, shadcn/ui.
@@ -32,7 +42,7 @@ Ce projet utilise un monorepo (probablement via Turborepo / pnpm workspace) stru
 
 ## 5. Comment reprendre le développement (Pour un agent IA / Développeur)
 1. Lisez **obligatoirement** ce `README.md`.
-2. Ouvrez le [`cahier-des-charges-schooly-1.md`](./cahier-des-charges-schooly-1.md) et descendez à la **Section 10 (Roadmap)** pour identifier l'étape en cours marquée d'un `[ ]` (case non cochée).
+2. Ouvrez le [`docs/product/cahier-des-charges-schooly.md`](./docs/product/cahier-des-charges-schooly.md) et descendez à la **Section 10 (Roadmap)** pour identifier l'étape en cours marquée d'un `[ ]` (case non cochée).
 3. Observez la **Section 11 (Checklist de démarrage)** pour vérifier que toutes les étapes de fondations sont remplies.
 4. Vérifiez les migrations dans `packages/db/supabase/migrations` pour connaître l'état de la base de données.
 5. Proposez toujours un **plan d'implémentation** avant toute modification de masse.

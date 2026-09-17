@@ -130,7 +130,7 @@ changer son comportement actuel pour les utilisateurs.
 **Repo** : Schooly (nouveau projet)
 **Prompt** :
 ```
-Lis intégralement le fichier cahier-des-charges-schooly.md à la racine
+Lis intégralement le fichier docs/product/cahier-des-charges-schooly.md
 du repo. Confirme ta compréhension des principes directeurs (section 2),
 du stack recommandé (section 3) et de la roadmap par phases (section 10).
 
