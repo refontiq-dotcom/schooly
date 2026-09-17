@@ -24,15 +24,22 @@
 .schooly-dashboard-shell.dashboard-nav-transition-backward .dashboard-topbar-left,
 .schooly-dashboard-shell.dashboard-nav-transition-backward .dashboard-topbar-right { animation: dashboard-header-content-backward .18s cubic-bezier(.4,0,1,1) both; }
 
-/* Stronger content fade: the active page softly dissolves in/out while its directional transform remains untouched. */
+/* Strong active-tab fade. Directional transforms stay on the page transition itself. */
 .dashboard-page-transition-content::after { content:""; position:absolute; inset:0; z-index:10; pointer-events:none; opacity:0; background:var(--sd-bg); transition:opacity .30s cubic-bezier(.22,1,.36,1); }
 .dashboard-page-transition.is-exiting .dashboard-page-transition-content::after { opacity:.34; transition-duration:.18s; }
 .dashboard-page-transition-content { isolation:isolate; }
-.dashboard-page-transition-content > * { animation: dashboard-active-content-fade-in .48s cubic-bezier(.22,1,.36,1) both; }
-.dashboard-page-transition.direction-backward .dashboard-page-transition-content > * { animation-name: dashboard-active-content-fade-in-backward; }
+.dashboard-page-transition-content > * { animation:dashboard-active-content-fade-in .48s cubic-bezier(.22,1,.36,1) both; }
+.dashboard-page-transition.direction-backward .dashboard-page-transition-content > * { animation-name:dashboard-active-content-fade-in-backward; }
 .dashboard-page-transition.is-exiting .dashboard-page-transition-content > * { animation-duration:.18s; animation-timing-function:cubic-bezier(.4,0,1,1); }
-.dashboard-page-transition.direction-forward.is-exiting .dashboard-page-transition-content > * { animation-name: dashboard-active-content-fade-out-forward; }
-.dashboard-page-transition.direction-backward.is-exiting .dashboard-page-transition-content > * { animation-name: dashboard-active-content-fade-out-backward; }
+.dashboard-page-transition.direction-forward.is-exiting .dashboard-page-transition-content > * { animation-name:dashboard-active-content-fade-out-forward; }
+.dashboard-page-transition.direction-backward.is-exiting .dashboard-page-transition-content > * { animation-name:dashboard-active-content-fade-out-backward; }
+
+/* Active navigation indicator follows the same fade timeline and softly tracks the selected tab. */
+.dashboard-nav-item.is-active::after { content:""; position:absolute; right:8px; width:4px; height:4px; border-radius:50%; background:var(--sd-accent); box-shadow:0 0 12px var(--sd-accent); animation:dashboard-active-indicator-in .48s cubic-bezier(.22,1,.36,1) both; }
+.schooly-dashboard-shell.dashboard-nav-transition-forward .dashboard-nav-item.is-active::after { animation-name:dashboard-active-indicator-forward; }
+.schooly-dashboard-shell.dashboard-nav-transition-backward .dashboard-nav-item.is-active::after { animation-name:dashboard-active-indicator-backward; }
+.schooly-dashboard-shell.dashboard-nav-transition-forward .dashboard-nav-item:not(.is-active)::after,
+.schooly-dashboard-shell.dashboard-nav-transition-backward .dashboard-nav-item:not(.is-active)::after { animation:dashboard-active-indicator-out .18s cubic-bezier(.4,0,1,1) both; }
 
 /* A restrained ambient shadow makes the three layers read as one depth stack. */
 .dashboard-page-transition::before { content:""; position:absolute; z-index:0; inset:10px 18px 0; pointer-events:none; opacity:0; border-radius:28px; box-shadow:0 26px 70px rgba(0,0,0,.12); transition:opacity .42s cubic-bezier(.22,1,.36,1),transform .42s cubic-bezier(.22,1,.36,1); }
@@ -53,7 +60,6 @@
 .sidebar-toggle-icon { display:grid; transition:transform .35s cubic-bezier(.22,1,.36,1); }
 .sidebar-toggle-icon.is-collapsed { transform:rotate(180deg); }
 .theme-icon-swap { display:grid; animation:dashboard-icon-pop .28s cubic-bezier(.22,1,.36,1); }
-.dashboard-nav-item.is-active::after { content:""; position:absolute; right:8px; width:4px; height:4px; border-radius:50%; background:var(--sd-accent); box-shadow:0 0 12px var(--sd-accent); animation:dashboard-active-dot .3s cubic-bezier(.22,1,.36,1) both; }
 .dashboard-dropdowns { display:flex; align-items:center; gap:6px; }
 .dashboard-dropdown { position:relative; }
 .dashboard-select-pill { position:relative; z-index:2; display:inline-flex; align-items:center; gap:6px; transform-origin:center; transition:background-color .2s ease,border-color .2s ease,color .2s ease,box-shadow .25s ease,transform .25s cubic-bezier(.22,1,.36,1); }
@@ -92,8 +98,11 @@
 @keyframes dashboard-active-content-fade-in-backward { from { opacity:0; } 65% { opacity:.72; } to { opacity:1; } }
 @keyframes dashboard-active-content-fade-out-forward { from { opacity:1; } 55% { opacity:.45; } to { opacity:0; } }
 @keyframes dashboard-active-content-fade-out-backward { from { opacity:1; } 55% { opacity:.45; } to { opacity:0; } }
+@keyframes dashboard-active-indicator-in { from { opacity:0; transform:translateY(3px) scale(.55); } 60% { opacity:.7; transform:translateY(0) scale(1.08); } to { opacity:1; transform:translateY(0) scale(1); } }
+@keyframes dashboard-active-indicator-forward { from { opacity:0; transform:translate3d(6px,0,0) scale(.55); } 60% { opacity:.7; transform:translate3d(0,0,0) scale(1.08); } to { opacity:1; transform:translate3d(0,0,0) scale(1); } }
+@keyframes dashboard-active-indicator-backward { from { opacity:0; transform:translate3d(-6px,0,0) scale(.55); } 60% { opacity:.7; transform:translate3d(0,0,0) scale(1.08); } to { opacity:1; transform:translate3d(0,0,0) scale(1); } }
+@keyframes dashboard-active-indicator-out { from { opacity:1; transform:scale(1); } to { opacity:0; transform:scale(.55); } }
 @keyframes dashboard-icon-pop { from { opacity:0; transform:scale(.6) rotate(-25deg); } to { opacity:1; transform:scale(1) rotate(0); } }
-@keyframes dashboard-active-dot { from { opacity:0; transform:scale(0); } to { opacity:1; transform:scale(1); } }
 @keyframes dashboard-dropdown-option-enter { from { opacity:0; transform:translateY(-4px) scale(.98); } to { opacity:1; transform:translateY(0) scale(1); } }
 
 @media (max-width:640px) { .dashboard-dropdown-menu { left:auto; right:0; } }
@@ -104,7 +113,7 @@
   .schooly-dashboard-shell.dashboard-nav-transition-forward .dashboard-topbar,.schooly-dashboard-shell.dashboard-nav-transition-backward .dashboard-topbar,
   .schooly-dashboard-shell.dashboard-nav-transition-forward .dashboard-topbar-left,.schooly-dashboard-shell.dashboard-nav-transition-forward .dashboard-topbar-right,
   .schooly-dashboard-shell.dashboard-nav-transition-backward .dashboard-topbar-left,.schooly-dashboard-shell.dashboard-nav-transition-backward .dashboard-topbar-right,
-  .theme-icon-swap,.dashboard-nav-item.is-active::after,.dashboard-dropdown-menu.is-open .dashboard-dropdown-option { animation:none !important; }
+  .dashboard-nav-item.is-active::after,.theme-icon-swap,.dashboard-dropdown-menu.is-open .dashboard-dropdown-option { animation:none !important; }
   .dashboard-page-transition-content::after,.dashboard-page-transition::before { transition:none !important; }
   .dashboard-select-pill,.dashboard-select-chevron,.dashboard-dropdown-menu,.dashboard-dropdown-option,.dashboard-dropdown-check { transition-duration:.01ms !important; }
 }
