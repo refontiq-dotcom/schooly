@@ -44,6 +44,23 @@
   opacity: 1;
 }
 
+/* Sidebar/page synchronization: the rail moves by the same 180ms exit window
+   as the page, but with a deliberately smaller offset so it remains anchored. */
+.dashboard-sidebar,
+.dashboard-topbar {
+  will-change: width, min-width, transform, opacity;
+}
+
+.schooly-dashboard-shell.dashboard-nav-transition-forward .dashboard-sidebar,
+.schooly-dashboard-shell.dashboard-nav-transition-forward .dashboard-topbar {
+  animation: dashboard-shell-exit-forward .18s cubic-bezier(.4,0,1,1) both;
+}
+
+.schooly-dashboard-shell.dashboard-nav-transition-backward .dashboard-sidebar,
+.schooly-dashboard-shell.dashboard-nav-transition-backward .dashboard-topbar {
+  animation: dashboard-shell-exit-backward .18s cubic-bezier(.4,0,1,1) both;
+}
+
 .dashboard-menu-icon {
   position: absolute;
   display: grid;
@@ -275,6 +292,16 @@
 .dashboard-mobile-menu:active,
 .dashboard-nav-item:active { transform: scale(.96); }
 
+@keyframes dashboard-shell-exit-forward {
+  from { opacity: 1; transform: translate3d(0, 0, 0); }
+  to { opacity: .94; transform: translate3d(-5px, 0, 0); }
+}
+
+@keyframes dashboard-shell-exit-backward {
+  from { opacity: 1; transform: translate3d(0, 0, 0); }
+  to { opacity: .94; transform: translate3d(5px, 0, 0); }
+}
+
 @keyframes dashboard-page-enter-forward {
   from { opacity: 0; transform: translate3d(28px, 10px, 0) scale(.985); filter: blur(3px); }
   to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); filter: blur(0); }
@@ -317,6 +344,10 @@
 @media (prefers-reduced-motion: reduce) {
   .dashboard-page-transition-content,
   .dashboard-page-transition.is-exiting .dashboard-page-transition-content,
+  .schooly-dashboard-shell.dashboard-nav-transition-forward .dashboard-sidebar,
+  .schooly-dashboard-shell.dashboard-nav-transition-forward .dashboard-topbar,
+  .schooly-dashboard-shell.dashboard-nav-transition-backward .dashboard-sidebar,
+  .schooly-dashboard-shell.dashboard-nav-transition-backward .dashboard-topbar,
   .theme-icon-swap,
   .dashboard-nav-item.is-active::after,
   .dashboard-dropdown-menu.is-open .dashboard-dropdown-option {
