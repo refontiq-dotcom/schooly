@@ -8,23 +8,16 @@
 .dashboard-page-transition-glow { position: fixed; z-index: 60; inset: 0; pointer-events: none; opacity: 0; background: radial-gradient(circle at 50% 8%, rgba(211,71,255,.08), transparent 38%); transition: opacity .18s ease; }
 .dashboard-page-transition.is-exiting .dashboard-page-transition-glow { opacity: 1; }
 
-/* Sidebar + header share one directional motion timeline. The header gets a slightly softer depth response so it feels attached to the content plane. */
-.dashboard-sidebar,
-.dashboard-topbar { will-change: width, min-width, transform, opacity, filter, box-shadow; transform-origin: center top; }
+.dashboard-sidebar,.dashboard-topbar { will-change: width, min-width, transform, opacity, filter, box-shadow; transform-origin: center top; }
 .schooly-dashboard-shell.dashboard-nav-transition-forward .dashboard-sidebar { animation: dashboard-shell-exit-forward .18s cubic-bezier(.4,0,1,1) both; }
 .schooly-dashboard-shell.dashboard-nav-transition-backward .dashboard-sidebar { animation: dashboard-shell-exit-backward .18s cubic-bezier(.4,0,1,1) both; }
 .schooly-dashboard-shell.dashboard-nav-transition-forward .dashboard-topbar { animation: dashboard-header-exit-forward .18s cubic-bezier(.4,0,1,1) both; }
 .schooly-dashboard-shell.dashboard-nav-transition-backward .dashboard-topbar { animation: dashboard-header-exit-backward .18s cubic-bezier(.4,0,1,1) both; }
-.schooly-dashboard-shell.dashboard-nav-transition-forward .dashboard-sidebar,
-.schooly-dashboard-shell.dashboard-nav-transition-forward .dashboard-topbar,
-.schooly-dashboard-shell.dashboard-nav-transition-backward .dashboard-sidebar,
-.schooly-dashboard-shell.dashboard-nav-transition-backward .dashboard-topbar { z-index: 20; }
-.schooly-dashboard-shell.dashboard-nav-transition-forward .dashboard-topbar-left,
-.schooly-dashboard-shell.dashboard-nav-transition-forward .dashboard-topbar-right { animation: dashboard-header-content-forward .18s cubic-bezier(.4,0,1,1) both; }
-.schooly-dashboard-shell.dashboard-nav-transition-backward .dashboard-topbar-left,
-.schooly-dashboard-shell.dashboard-nav-transition-backward .dashboard-topbar-right { animation: dashboard-header-content-backward .18s cubic-bezier(.4,0,1,1) both; }
+.schooly-dashboard-shell.dashboard-nav-transition-forward .dashboard-sidebar,.schooly-dashboard-shell.dashboard-nav-transition-forward .dashboard-topbar,.schooly-dashboard-shell.dashboard-nav-transition-backward .dashboard-sidebar,.schooly-dashboard-shell.dashboard-nav-transition-backward .dashboard-topbar { z-index:20; }
+.schooly-dashboard-shell.dashboard-nav-transition-forward .dashboard-topbar-left,.schooly-dashboard-shell.dashboard-nav-transition-forward .dashboard-topbar-right { animation:dashboard-header-content-forward .18s cubic-bezier(.4,0,1,1) both; }
+.schooly-dashboard-shell.dashboard-nav-transition-backward .dashboard-topbar-left,.schooly-dashboard-shell.dashboard-nav-transition-backward .dashboard-topbar-right { animation:dashboard-header-content-backward .18s cubic-bezier(.4,0,1,1) both; }
 
-/* Strong active-tab fade. Directional transforms stay on the page transition itself. */
+/* Strong active-tab fade, with a restrained blur layered onto the same fade timeline. */
 .dashboard-page-transition-content::after { content:""; position:absolute; inset:0; z-index:10; pointer-events:none; opacity:0; background:var(--sd-bg); transition:opacity .30s cubic-bezier(.22,1,.36,1); }
 .dashboard-page-transition.is-exiting .dashboard-page-transition-content::after { opacity:.34; transition-duration:.18s; }
 .dashboard-page-transition-content { isolation:isolate; }
@@ -34,14 +27,11 @@
 .dashboard-page-transition.direction-forward.is-exiting .dashboard-page-transition-content > * { animation-name:dashboard-active-content-fade-out-forward; }
 .dashboard-page-transition.direction-backward.is-exiting .dashboard-page-transition-content > * { animation-name:dashboard-active-content-fade-out-backward; }
 
-/* Active navigation indicator follows the same fade timeline and softly tracks the selected tab. */
 .dashboard-nav-item.is-active::after { content:""; position:absolute; right:8px; width:4px; height:4px; border-radius:50%; background:var(--sd-accent); box-shadow:0 0 12px var(--sd-accent); animation:dashboard-active-indicator-in .48s cubic-bezier(.22,1,.36,1) both; }
 .schooly-dashboard-shell.dashboard-nav-transition-forward .dashboard-nav-item.is-active::after { animation-name:dashboard-active-indicator-forward; }
 .schooly-dashboard-shell.dashboard-nav-transition-backward .dashboard-nav-item.is-active::after { animation-name:dashboard-active-indicator-backward; }
-.schooly-dashboard-shell.dashboard-nav-transition-forward .dashboard-nav-item:not(.is-active)::after,
-.schooly-dashboard-shell.dashboard-nav-transition-backward .dashboard-nav-item:not(.is-active)::after { animation:dashboard-active-indicator-out .18s cubic-bezier(.4,0,1,1) both; }
+.schooly-dashboard-shell.dashboard-nav-transition-forward .dashboard-nav-item:not(.is-active)::after,.schooly-dashboard-shell.dashboard-nav-transition-backward .dashboard-nav-item:not(.is-active)::after { animation:dashboard-active-indicator-out .18s cubic-bezier(.4,0,1,1) both; }
 
-/* A restrained ambient shadow makes the three layers read as one depth stack. */
 .dashboard-page-transition::before { content:""; position:absolute; z-index:0; inset:10px 18px 0; pointer-events:none; opacity:0; border-radius:28px; box-shadow:0 26px 70px rgba(0,0,0,.12); transition:opacity .42s cubic-bezier(.22,1,.36,1),transform .42s cubic-bezier(.22,1,.36,1); }
 .dashboard-page-transition:not(.is-exiting)::before { opacity:.5; transform:translateZ(0) scale(1); }
 .dashboard-page-transition.is-exiting::before { opacity:.25; transform:translateZ(-12px) scale(.992); }
@@ -94,10 +84,10 @@
 @keyframes dashboard-page-enter-backward { from { opacity:0; transform:translate3d(-28px,10px,0) scale(.985); filter:blur(3px); } to { opacity:1; transform:translate3d(0,0,0) scale(1); filter:blur(0); } }
 @keyframes dashboard-page-exit-forward { from { opacity:1; transform:translate3d(0,0,0) scale(1); filter:blur(0); } to { opacity:0; transform:translate3d(-22px,-4px,0) scale(.992); filter:blur(2px); } }
 @keyframes dashboard-page-exit-backward { from { opacity:1; transform:translate3d(0,0,0) scale(1); filter:blur(0); } to { opacity:0; transform:translate3d(22px,-4px,0) scale(.992); filter:blur(2px); } }
-@keyframes dashboard-active-content-fade-in { from { opacity:0; } 65% { opacity:.72; } to { opacity:1; } }
-@keyframes dashboard-active-content-fade-in-backward { from { opacity:0; } 65% { opacity:.72; } to { opacity:1; } }
-@keyframes dashboard-active-content-fade-out-forward { from { opacity:1; } 55% { opacity:.45; } to { opacity:0; } }
-@keyframes dashboard-active-content-fade-out-backward { from { opacity:1; } 55% { opacity:.45; } to { opacity:0; } }
+@keyframes dashboard-active-content-fade-in { from { opacity:0; filter:blur(2.5px); } 55% { opacity:.72; filter:blur(1px); } to { opacity:1; filter:blur(0); } }
+@keyframes dashboard-active-content-fade-in-backward { from { opacity:0; filter:blur(2.5px); } 55% { opacity:.72; filter:blur(1px); } to { opacity:1; filter:blur(0); } }
+@keyframes dashboard-active-content-fade-out-forward { from { opacity:1; filter:blur(0); } 55% { opacity:.45; filter:blur(1.2px); } to { opacity:0; filter:blur(2.5px); } }
+@keyframes dashboard-active-content-fade-out-backward { from { opacity:1; filter:blur(0); } 55% { opacity:.45; filter:blur(1.2px); } to { opacity:0; filter:blur(2.5px); } }
 @keyframes dashboard-active-indicator-in { from { opacity:0; transform:translateY(3px) scale(.55); } 60% { opacity:.7; transform:translateY(0) scale(1.08); } to { opacity:1; transform:translateY(0) scale(1); } }
 @keyframes dashboard-active-indicator-forward { from { opacity:0; transform:translate3d(6px,0,0) scale(.55); } 60% { opacity:.7; transform:translate3d(0,0,0) scale(1.08); } to { opacity:1; transform:translate3d(0,0,0) scale(1); } }
 @keyframes dashboard-active-indicator-backward { from { opacity:0; transform:translate3d(-6px,0,0) scale(.55); } 60% { opacity:.7; transform:translate3d(0,0,0) scale(1.08); } to { opacity:1; transform:translate3d(0,0,0) scale(1); } }
