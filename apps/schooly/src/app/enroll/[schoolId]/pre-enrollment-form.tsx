@@ -150,8 +150,8 @@ export default function PreEnrollmentForm({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="gradeLevelId">Niveau souhaité</Label>
-            <Select value={selectedGradeLevel} onValueChange={setSelectedGradeLevel} name="gradeLevelId">
+            <Label htmlFor="gradeLevelId">Niveau souhaité *</Label>
+            <Select value={selectedGradeLevel} onValueChange={setSelectedGradeLevel} name="gradeLevelId" required>
               <SelectTrigger>
                 <SelectValue placeholder="Sélectionner un niveau" />
               </SelectTrigger>
@@ -287,7 +287,7 @@ export default function PreEnrollmentForm({
             </p>
           </div>
 
-          <Button type="submit" className="w-full" disabled={loading}>
+          <Button type="submit" className="w-full" disabled={loading || !selectedGradeLevel}>
             {loading ? "Enregistrement..." : "Réserver ma place"}
           </Button>
         </form>

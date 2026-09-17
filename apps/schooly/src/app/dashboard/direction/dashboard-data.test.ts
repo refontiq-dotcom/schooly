@@ -165,11 +165,11 @@ const FIXTURES = {
     { id: "y1", label: "2024-2025", status: "cloturee", start_date: "2024-09-01", end_date: "2025-06-30" },
   ],
   enrollments: [
-    { id: "e1", enrollment_date: "2025-10-01", status: "active", matricule: "M1", academic_year_id: "y2", grade_level_id: "g1", financial_profile_id: null, class_id: "c1", students: { first_name: "Alice", last_name: "Koné" } },
-    { id: "e2", enrollment_date: "2026-01-05", status: "active", matricule: "M2", academic_year_id: "y2", grade_level_id: "g1", financial_profile_id: "p2", class_id: "c1", students: { first_name: "Bob", last_name: "Traoré" } },
+    { id: "e1", enrollment_date: "2025-10-01", status: "confirmed", matricule: "M1", academic_year_id: "y2", grade_level_id: "g1", financial_profile_id: null, class_id: "c1", students: { first_name: "Alice", last_name: "Koné" } },
+    { id: "e2", enrollment_date: "2026-01-05", status: "confirmed", matricule: "M2", academic_year_id: "y2", grade_level_id: "g1", financial_profile_id: "p2", class_id: "c1", students: { first_name: "Bob", last_name: "Traoré" } },
     { id: "e3", enrollment_date: "2025-11-01", status: "active", matricule: "M3", academic_year_id: "y2", grade_level_id: "g2", financial_profile_id: null, class_id: null, students: { first_name: "Carol", last_name: "Diallo" } },
     { id: "e5", enrollment_date: "2026-01-06", status: "transferred", matricule: "M5", academic_year_id: "y2", grade_level_id: "g1", financial_profile_id: null, class_id: null, students: { first_name: "Eve", last_name: "Bamba" } },
-    { id: "e4", enrollment_date: "2024-10-01", status: "active", matricule: "M4", academic_year_id: "y1", grade_level_id: "g1", financial_profile_id: null, class_id: null, students: { first_name: "Dave", last_name: "Yao" } },
+    { id: "e4", enrollment_date: "2024-10-01", status: "confirmed", matricule: "M4", academic_year_id: "y1", grade_level_id: "g1", financial_profile_id: null, class_id: null, students: { first_name: "Dave", last_name: "Yao" } },
   ],
   fee_schedules: [
     { grade_level_id: "g1", financial_profile_id: null, amount: 100_000 },

@@ -365,7 +365,7 @@ export async function executeRollover(oldYearId: string, newYearId: string) {
       class_id: target.classId,
       financial_profile_id: enr.financial_profile_id,
       academic_year_id: newYearId,
-      status: "active",
+      status: "confirmed",
       enrollment_date: new Date().toISOString().slice(0, 10),
       // Matricule unique par inscription (contrainte school_id + matricule).
       // Format : <PREFIX>-<ANNEE>-<ALEA> (même convention que createEnrollment).

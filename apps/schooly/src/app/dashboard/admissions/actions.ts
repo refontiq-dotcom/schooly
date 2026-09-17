@@ -44,7 +44,7 @@ export async function createPreEnrollment(formData: FormData): Promise<ActionRes
   const gradeLevelId = formData.get("gradeLevelId") as string
   const guardianPhone = formData.get("guardianPhone") as string
 
-  if (!schoolId || !firstName || !lastName || !dateOfBirth || !guardianPhone) {
+  if (!schoolId || !firstName || !lastName || !dateOfBirth || !guardianPhone || !gradeLevelId) {
     return { error: "Tous les champs sont requis." }
   }
 
@@ -64,6 +64,16 @@ export async function createPreEnrollment(formData: FormData): Promise<ActionRes
     .single()
 
   if (!school) return { error: "Établissement introuvable." }
+
+  const { data: gradeLevel } = await admin
+    .from("grade_levels")
+    .select("id")
+    .eq("id", gradeLevelId)
+    .eq("school_id", schoolId)
+    .is("deleted_at", null)
+    .maybeSingle()
+
+  if (!gradeLevel) return { error: "Niveau scolaire introuvable pour cet établissement." }
 
   let code = generateCode()
   let attempts = 0
@@ -89,7 +99,7 @@ export async function createPreEnrollment(formData: FormData): Promise<ActionRes
     first_name: firstName,
     last_name: lastName,
     date_of_birth: dateOfBirth,
-    grade_level_id: gradeLevelId || null,
+    grade_level_id: gradeLevelId,
     guardian_phone: guardianPhone,
     code,
     status: "pending",
@@ -98,7 +108,7 @@ export async function createPreEnrollment(formData: FormData): Promise<ActionRes
 
   if (error) return { error: error.message }
 
-  revalidatePath("/register-school/[id]")
+  revalidatePath(`/enroll/${schoolId}`)
   return { data: { code } }
 }
 
@@ -165,7 +175,7 @@ export async function validatePreEnrollment(formData: FormData): Promise<ActionR
   const guard = await requireSchoolRole(supabase, { allowedRoles: [...ADMISSIONS_ROLES] })
   if (!guard.ok) return { error: denial(guard.reason, null).error }
 
-  const preEnrollmentId = formData.get("preEnrollmentId") as string
+  const preEnrollmentId = (formData.get("preEnrollmentId") || formData.get("id")) as string
 
   if (!preEnrollmentId) {
     return { error: "Pré-inscription introuvable." }
@@ -190,6 +200,27 @@ export async function validatePreEnrollment(formData: FormData): Promise<ActionR
     return { error: "Accès non autorisé." }
   }
 
+  if (!preEnrollment.grade_level_id) {
+    return { error: "Niveau scolaire manquant sur la pré-inscription." }
+  }
+
+  const { data: gradeLevel } = await admin
+    .from("grade_levels")
+    .select("id")
+    .eq("id", preEnrollment.grade_level_id)
+    .eq("school_id", preEnrollment.school_id)
+    .is("deleted_at", null)
+    .single()
+
+  if (!gradeLevel) {
+    return { error: "Niveau scolaire introuvable pour cet établissement." }
+  }
+
+  const academicYear = await getCurrentAcademicYear(preEnrollment.school_id)
+  if (!academicYear?.id) {
+    return { error: "Aucune année académique en cours. Impossible de valider l'inscription." }
+  }
+
   const studentId = crypto.randomUUID()
   const matricule = `${preEnrollment.school_id.slice(0, 4).toUpperCase()}-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 10000)).padStart(4, '0')}`
 
@@ -208,7 +239,7 @@ export async function validatePreEnrollment(formData: FormData): Promise<ActionR
     .from("guardians")
     .select("id")
     .eq("phone", preEnrollment.guardian_phone)
-    .single()
+    .maybeSingle()
 
   let guardianId = existingGuardian?.id
 
@@ -217,7 +248,7 @@ export async function validatePreEnrollment(formData: FormData): Promise<ActionR
       .from("guardians")
       .insert({
         phone: preEnrollment.guardian_phone,
-        full_name: "À compléter",
+        full_name: `${preEnrollment.last_name} ${preEnrollment.first_name} (tuteur)`,
       })
       .select("id")
       .single()
@@ -231,8 +262,8 @@ export async function validatePreEnrollment(formData: FormData): Promise<ActionR
     student_id: studentId,
     guardian_id: guardianId,
     grade_level_id: preEnrollment.grade_level_id,
-    academic_year_id: (await getCurrentAcademicYear(preEnrollment.school_id))?.id,
-    status: "active",
+    academic_year_id: academicYear.id,
+    status: "confirmed",
     matricule,
   })
 
@@ -461,7 +492,7 @@ export async function createEnrollment(formData: FormData): Promise<ActionResult
     class_id: classId || null,
     academic_year_id: academicYearId,
     financial_profile_id: financialProfileId || null,
-    status: "active",
+    status: "confirmed",
     matricule,
   })
 

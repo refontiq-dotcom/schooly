@@ -31,13 +31,13 @@ export async function GET(
     return NextResponse.json({ error: "Ecole non trouvee ou non publiee" }, { status: 404 })
   }
 
-  // Recuperer les niveaux avec places disponibles
+  // Capacite = somme des classes du niveau (grade_levels n'a pas de colonne capacity).
   const { data: levels } = await supabase
     .from("grade_levels")
-    .select("id, label, capacity")
+    .select("id, name, level, cycle")
     .eq("school_id", schoolId)
     .is("deleted_at", null)
-    .order("sort_order", { ascending: true })
+    .order("level", { ascending: true })
 
   if (!levels || levels.length === 0) {
     return NextResponse.json({
@@ -57,17 +57,28 @@ export async function GET(
     })
   }
 
-  // Compter les inscriptions actives par niveau
   const niveauIds = levels.map((l) => l.id)
+  const { data: classRows } = await supabase
+    .from("classes")
+    .select("grade_level_id, capacity")
+    .eq("school_id", schoolId)
+    .is("deleted_at", null)
+    .in("grade_level_id", niveauIds)
+
+  const capacityByLevel: Record<string, number> = {}
+  for (const row of classRows || []) {
+    capacityByLevel[row.grade_level_id] =
+      (capacityByLevel[row.grade_level_id] || 0) + (row.capacity || 0)
+  }
+
   const { data: enrollments } = await supabase
     .from("enrollments")
     .select("grade_level_id")
     .eq("school_id", schoolId)
-    .eq("status", "active")
+    .in("status", ["confirmed", "active"])
     .is("deleted_at", null)
     .in("grade_level_id", niveauIds)
 
-  // Compter par niveau
   const counts: Record<string, number> = {}
   for (const e of enrollments || []) {
     counts[e.grade_level_id] = (counts[e.grade_level_id] || 0) + 1
@@ -75,17 +86,16 @@ export async function GET(
 
   const niveaux = levels.map((l) => {
     const enrolled = counts[l.id] || 0
-    const places = Math.max(0, (l.capacity || 0) - enrolled)
-    // Chercher le tarif public si disponible
+    const capacite = capacityByLevel[l.id] || 0
     const tarif = Array.isArray(school.grille_tarifaire_publique)
       ? school.grille_tarifaire_publique.find((t: any) => t.grade_level_id === l.id)
       : null
     return {
       id: l.id,
-      label: l.label,
-      capacite: l.capacity,
+      label: l.name,
+      capacite,
       inscrits: enrolled,
-      places_disponibles: places,
+      places_disponibles: Math.max(0, capacite - enrolled),
       prix_min: tarif?.prix_min || null,
       prix_max: tarif?.prix_max || null,
     }

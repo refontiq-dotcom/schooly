@@ -76,7 +76,7 @@ export async function getSchoolBillingSummary() {
     .from("enrollments")
     .select("id", { count: "exact", head: true })
     .eq("school_id", schoolId)
-    .eq("status", "active")
+    .in("status", ["confirmed", "active"])
     .is("deleted_at", null)
 
   const { data: requests } = await admin

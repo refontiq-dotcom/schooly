@@ -152,8 +152,12 @@ export default function AdmissionsPage() {
     } else {
       toast.success("Élève inscrit avec succès ! Matricule : " + result.data?.matricule)
       if (schoolId) {
-        const res = await getPreEnrollments(schoolId)
-        if (res.data) setPreEnrollments(res.data)
+        const [preRes, enrollRes] = await Promise.all([
+          getPreEnrollments(schoolId),
+          getEnrollments(schoolId),
+        ])
+        if (preRes.data) setPreEnrollments(preRes.data)
+        if (enrollRes.data) setEnrollments(enrollRes.data)
       }
     }
     return result
@@ -201,7 +205,9 @@ export default function AdmissionsPage() {
     return result
   }
 
-  const pendingPreEnrollments = preEnrollments.filter(p => p.status === "pending")
+  const pendingPreEnrollments = preEnrollments.filter(
+    p => p.status === "pending" && new Date(p.expires_at) >= new Date()
+  )
 
   if (loading) {
     return <div className="p-6 text-center text-muted-foreground">Chargement...</div>
@@ -238,7 +244,10 @@ export default function AdmissionsPage() {
                 {preEnrollments.length === 0 && (
                   <p className="text-sm text-muted-foreground text-center py-4">Aucune pré-inscription.</p>
                 )}
-                {preEnrollments.map(pre => (
+                {preEnrollments.map(pre => {
+                  const isExpired = pre.status === "pending" && new Date(pre.expires_at) < new Date()
+                  const badgeStatus = isExpired ? "expired" : pre.status
+                  return (
                   <div key={pre.id} className="flex items-center justify-between p-4 rounded-lg border">
                     <div className="space-y-1">
                       <p className="font-medium">{pre.last_name} {pre.first_name}</p>
@@ -246,22 +255,23 @@ export default function AdmissionsPage() {
                         Né(e) le {pre.date_of_birth} · {pre.grade_levels?.name || "Niveau non spécifié"}
                       </p>
                       <div className="flex items-center gap-2">
-                        <Badge variant={pre.status === "pending" ? "secondary" : pre.status === "validated" ? "default" : "destructive"}>
-                          {pre.status === "pending" ? "En attente" : pre.status === "validated" ? "Validée" : "Expirée"}
+                        <Badge variant={badgeStatus === "pending" ? "secondary" : badgeStatus === "validated" ? "default" : "destructive"}>
+                          {badgeStatus === "pending" ? "En attente" : badgeStatus === "validated" ? "Validée" : "Expirée"}
                         </Badge>
                         <span className="text-xs font-mono bg-muted px-2 py-0.5 rounded">{pre.code}</span>
                       </div>
                     </div>
-                    {pre.status === "pending" && (
+                    {pre.status === "pending" && !isExpired && (
                       <ActionForm action={handleValidate}>
-                        <input type="hidden" name="id" value={pre.id} />
+                        <input type="hidden" name="preEnrollmentId" value={pre.id} />
                         <Button size="sm">
                           <CheckCircle2 className="w-4 h-4" /> Valider
                         </Button>
                       </ActionForm>
                     )}
                   </div>
-                ))}
+                  )
+                })}
               </div>
             </CardContent>
           </Card>
@@ -280,7 +290,12 @@ export default function AdmissionsPage() {
                 <div className="space-y-2">
                   {students.map((s: any) => (
                     <div key={s.id} className="p-3 rounded-lg border text-sm">
-                      <p className="font-medium">{s.first_name} {s.last_name}</p>
+                      <p className="font-medium">{s.last_name} {s.first_name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Né(e) le {s.date_of_birth}
+                        {s.enrollments?.[0]?.grade_levels?.name ? ` · ${s.enrollments[0].grade_levels.name}` : ""}
+                        {s.enrollments?.[0]?.classes?.name ? ` · ${s.enrollments[0].classes.name}` : ""}
+                      </p>
                     </div>
                   ))}
                 </div>
@@ -303,6 +318,7 @@ export default function AdmissionsPage() {
                   {guardians.map((g: any) => (
                     <div key={g.id} className="p-3 rounded-lg border text-sm">
                       <p className="font-medium">{g.full_name}</p>
+                      <p className="text-xs text-muted-foreground">{g.phone}</p>
                     </div>
                   ))}
                 </div>
@@ -323,8 +339,18 @@ export default function AdmissionsPage() {
               ) : (
                 <div className="space-y-2">
                   {enrollments.map((e: any) => (
-                    <div key={e.id} className="p-3 rounded-lg border text-sm">
-                      <p className="font-medium">{e.matricule || "Inscription"}</p>
+                    <div key={e.id} className="p-3 rounded-lg border text-sm flex items-center justify-between gap-3">
+                      <div>
+                        <p className="font-medium font-mono">{e.matricule || "Sans matricule"}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {e.students?.last_name} {e.students?.first_name}
+                          {e.grade_levels?.name ? ` · ${e.grade_levels.name}` : ""}
+                          {e.academic_years?.label ? ` · ${e.academic_years.label}` : ""}
+                        </p>
+                      </div>
+                      <Badge variant={e.status === "confirmed" || e.status === "active" ? "default" : "secondary"}>
+                        {e.status === "confirmed" || e.status === "active" ? "Confirmée" : e.status}
+                      </Badge>
                     </div>
                   ))}
                 </div>

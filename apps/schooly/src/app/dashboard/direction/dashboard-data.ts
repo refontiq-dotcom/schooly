@@ -477,11 +477,13 @@ export async function getDirectionDashboard(
     ? allEnrollments.filter((e) => e.academic_year_id === activeYear.id)
     : []
   const activeEnrollments = activeYearEnrollments.filter(
-    (e) => e.status === "active"
+    (e) => e.status === "confirmed" || e.status === "active"
   )
   const previousYearActive = previousYear
     ? allEnrollments.filter(
-        (e) => e.academic_year_id === previousYear.id && e.status === "active"
+        (e) =>
+          e.academic_year_id === previousYear.id &&
+          (e.status === "confirmed" || e.status === "active")
       ).length
     : 0
 
