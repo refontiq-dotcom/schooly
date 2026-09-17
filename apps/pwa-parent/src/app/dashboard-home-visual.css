@@ -10,27 +10,23 @@
     align-content: start;
   }
 
-  .dashboard-content > * {
-    grid-column: 1 / -1;
-    min-width: 0;
-  }
+  .dashboard-content > * { grid-column: 1 / -1; min-width: 0; }
 
-  /* The child card becomes the compact profile/rank panel from the reference. */
   .dashboard-content > div:has(a[href^="/dashboard/bulletin"]) {
     grid-column: span 4;
     min-height: 318px;
     overflow: hidden;
     position: relative;
-    border: 1px solid var(--sd-border) !important;
-    border-radius: 14px !important;
+    border:1px solid var(--sd-border) !important;
+    border-radius:14px !important;
     background:linear-gradient(180deg,rgba(37,43,54,.96),rgba(31,36,46,.94)) !important;
-    box-shadow:0 18px 42px rgba(0,0,0,.16), inset 0 1px 0 rgba(255,255,255,.025);
+    box-shadow:0 18px 42px rgba(0,0,0,.16),inset 0 1px 0 rgba(255,255,255,.025);
     transition:transform .38s cubic-bezier(.22,1,.36,1),box-shadow .38s ease,border-color .3s ease,background-color .45s ease !important;
   }
 
   .dashboard-light .dashboard-content > div:has(a[href^="/dashboard/bulletin"]) {
     background:rgba(255,255,255,.86) !important;
-    box-shadow:0 18px 42px rgba(72,50,94,.09), inset 0 1px 0 rgba(255,255,255,.8);
+    box-shadow:0 18px 42px rgba(72,50,94,.09),inset 0 1px 0 rgba(255,255,255,.8);
   }
 
   .dashboard-content > div:has(a[href^="/dashboard/bulletin"])::before {
@@ -100,12 +96,11 @@
     border-color:rgba(211,71,255,.4) !important;
   }
 
-  /* Finance becomes the reference's right-side dashboard panel. */
   .dashboard-content > section:has(.grid.grid-cols-3) {
     grid-column:span 8;
     display:grid;
     grid-template-columns:repeat(12,minmax(0,1fr));
-    grid-template-rows:auto auto minmax(112px,auto) auto auto;
+    grid-template-rows:auto auto minmax(112px,auto) auto;
     gap:10px 12px;
     min-width:0;
     align-self:stretch;
@@ -148,7 +143,6 @@
     letter-spacing:-.025em;
   }
 
-  /* Central hero/banner — CSS-generated so no external image asset is needed. */
   .dashboard-content > section:has(.grid.grid-cols-3)::before {
     content:"Suivi scolaire  •  Votre espace parent";
     grid-column:1 / -1;
@@ -166,27 +160,14 @@
     font-weight:650;
     letter-spacing:.01em;
     text-align:center;
-    background:
-      radial-gradient(circle at 18% 30%,rgba(255,255,255,.24),transparent 24%),
-      radial-gradient(circle at 82% 72%,rgba(122,84,255,.7),transparent 34%),
-      linear-gradient(135deg,#7a24c7 0%,#d347ff 44%,#5540d7 100%);
+    background:radial-gradient(circle at 18% 30%,rgba(255,255,255,.24),transparent 24%),radial-gradient(circle at 82% 72%,rgba(122,84,255,.7),transparent 34%),linear-gradient(135deg,#7a24c7 0%,#d347ff 44%,#5540d7 100%);
     box-shadow:0 18px 34px rgba(95,36,170,.24),inset 0 1px 0 rgba(255,255,255,.18);
     animation:schooly-home-banner-in .55s cubic-bezier(.22,1,.36,1) both;
   }
 
-  .dashboard-content > section:has(.grid.grid-cols-3)::after {
-    content:"";
-    grid-column:1 / -1;
-    grid-row:4;
-    min-height:1px;
-    display:block;
-    pointer-events:none;
-  }
-
-  /* The payment card follows the hero, visually matching the compact activity list. */
   .dashboard-content > section:has(.grid.grid-cols-3) > :last-child {
     grid-column:1 / -1;
-    grid-row:5;
+    grid-row:4;
     min-width:0;
     border-radius:14px !important;
     border:1px solid var(--sd-border) !important;
@@ -211,13 +192,10 @@
     background:rgba(211,71,255,.055);
   }
 
-  /* Keep optional moratorium cards below the hero/activity area. */
   .dashboard-content > section:has(.grid.grid-cols-3) > :not(:first-child):not(.grid):not(:last-child) {
     grid-column:1 / -1;
-    grid-row:6;
   }
 
-  /* Existing dashboard entrance system remains the source of truth for page direction. */
   .dashboard-content > section:has(.grid.grid-cols-3) > *,
   .dashboard-content > div:has(a[href^="/dashboard/bulletin"]) {
     will-change:transform,opacity;
