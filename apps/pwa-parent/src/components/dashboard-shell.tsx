@@ -100,6 +100,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const [openDropdown, setOpenDropdown] = useState<"currency" | "language" | null>(null)
   const [currency, setCurrency] = useState("FCFA")
   const [language, setLanguage] = useState("FR")
+  const [navigationDirection, setNavigationDirection] = useState<"forward" | "backward" | null>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -136,7 +137,20 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     setMobileOpen(false)
     setOpenDropdown(null)
+    setNavigationDirection(null)
   }, [pathname])
+
+  useEffect(() => {
+    const onNavigation = (event: Event) => {
+      const customEvent = event as CustomEvent<{ direction?: "forward" | "backward" }>
+      const nextDirection = customEvent.detail?.direction
+      if (nextDirection !== "forward" && nextDirection !== "backward") return
+      setNavigationDirection(nextDirection)
+    }
+
+    window.addEventListener("schooly-dashboard-navigation", onNavigation)
+    return () => window.removeEventListener("schooly-dashboard-navigation", onNavigation)
+  }, [])
 
   useEffect(() => {
     const onPointerDown = (event: PointerEvent) => {
@@ -149,9 +163,10 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   }, [])
 
   const themeClass = dark ? "dashboard-dark" : "dashboard-light"
+  const navigationClass = navigationDirection ? `dashboard-nav-transition-${navigationDirection}` : ""
 
   return (
-    <div className={`schooly-dashboard-shell ${themeClass}`}>
+    <div className={`schooly-dashboard-shell ${themeClass} ${navigationClass}`}>
       <div className="dashboard-orbit dashboard-orbit-one" />
       <div className="dashboard-orbit dashboard-orbit-two" />
 
