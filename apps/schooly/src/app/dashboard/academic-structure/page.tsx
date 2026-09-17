@@ -7,6 +7,14 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
+import {
+  Dialog,
+  DialogClose,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Plus, Play, BookOpen, GraduationCap, Users, FileText, RotateCcw, Loader2, Pencil, Trash2 } from "lucide-react"
 import { YearRolloverPanel } from "./year-rollover-panel"
 import { activateAcademicYear } from "./rollover-actions"
@@ -74,12 +82,6 @@ function withReload(
   }
 }
 
-/**
- * Archivage (suppression logique) d'une ligne du référentiel.
- * Confirmation obligatoire — aucune action destructrice sans confirmation —
- * refus affiché tel quel (les règles métier vivent côté serveur : élément
- * encore utilisé, année en cours…), puis rechargement de la liste.
- */
 function ArchiveButton({
   action,
   id,
@@ -93,85 +95,157 @@ function ArchiveButton({
   confirmMessage: string
   onDone: () => Promise<void>
 }) {
+  const [open, setOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
+  const close = () => {
+    if (isPending) return
+    setOpen(false)
+    setError(null)
+  }
+
   return (
-    <span className="flex items-center gap-2">
-      {error && <span className="max-w-[280px] text-xs text-destructive">{error}</span>}
+    <>
       <Button
         size="sm"
         variant="ghost"
         title={title}
         aria-label={title}
         disabled={isPending}
-        onClick={() => {
-          if (!window.confirm(confirmMessage)) return
-          setError(null)
-          startTransition(async () => {
-            const res = await action(id)
-            if (res?.error) {
-              setError(res.error)
-              return
-            }
-            await onDone()
-          })
-        }}
+        onClick={() => setOpen(true)}
       >
-        {isPending ? (
-          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-        ) : (
-          <Trash2 className="h-3.5 w-3.5" />
-        )}
+        {isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
       </Button>
-    </span>
+      <Dialog open={open} onOpenChange={(next) => { if (!next) close() }}>
+        <DialogClose onClick={close} />
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{confirmMessage}</DialogDescription>
+        </DialogHeader>
+        {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
+        <DialogFooter className="mt-6 gap-2">
+          <Button type="button" variant="outline" onClick={close} disabled={isPending}>Annuler</Button>
+          <Button
+            type="button"
+            variant="destructive"
+            disabled={isPending}
+            onClick={() => {
+              setError(null)
+              startTransition(async () => {
+                const res = await action(id)
+                if (res?.error) {
+                  setError(res.error)
+                  return
+                }
+                await onDone()
+                setOpen(false)
+              })
+            }}
+          >
+            {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirmer"}
+          </Button>
+        </DialogFooter>
+      </Dialog>
+    </>
   )
 }
 
-/**
- * Correction en ligne : le crayon ouvre un formulaire pré-rempli (mêmes champs
- * que la création + l'identifiant en champ caché). Le formulaire se referme
- * après un enregistrement réussi.
- */
-function InlineEdit({
+function EditDialog({
+  title,
   action,
   onDone,
   children,
 }: {
+  title: string
   action: (formData: FormData) => Promise<{ error?: string; data?: any } | void>
   onDone: () => Promise<void>
   children: React.ReactNode
 }) {
   const [open, setOpen] = useState(false)
 
-  if (!open) {
-    return (
+  return (
+    <>
       <Button size="sm" variant="ghost" title="Modifier" aria-label="Modifier" onClick={() => setOpen(true)}>
         <Pencil className="h-3.5 w-3.5" />
       </Button>
-    )
-  }
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogClose onClick={() => setOpen(false)} />
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>Corrigez les champs puis enregistrez.</DialogDescription>
+        </DialogHeader>
+        <ActionForm
+          action={async (formData) => {
+            const result = await action(formData)
+            if (!result?.error) {
+              await onDone()
+              setOpen(false)
+            }
+            return result
+          }}
+          className="mt-4 space-y-4"
+        >
+          <div className="grid gap-3 sm:grid-cols-2">{children}</div>
+          <DialogFooter className="gap-2">
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>Annuler</Button>
+            <Button type="submit">Enregistrer</Button>
+          </DialogFooter>
+        </ActionForm>
+      </Dialog>
+    </>
+  )
+}
+
+function CreateDialog({
+  title,
+  description,
+  action,
+  triggerLabel,
+  children,
+  open: openProp,
+  onOpenChange,
+}: {
+  title: string
+  description: string
+  action: (formData: FormData) => Promise<{ error?: string; data?: any } | void>
+  triggerLabel: string
+  children: React.ReactNode
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+}) {
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false)
+  const open = openProp ?? uncontrolledOpen
+  const setOpen = onOpenChange ?? setUncontrolledOpen
 
   return (
-    <div className="mt-2 w-full rounded-lg border bg-muted/30 p-3">
-      <ActionForm
-        action={async (formData) => {
-          const result = await action(formData)
-          if (!result?.error) {
-            await onDone()
-            setOpen(false)
-          }
-          return result
-        }}
-        className="flex flex-wrap items-end gap-3"
-      >
-        {children}
-        <Button type="submit" size="sm">Enregistrer</Button>
-        <Button type="button" size="sm" variant="ghost" onClick={() => setOpen(false)}>
-          Annuler
-        </Button>
-      </ActionForm>
-    </div>
+    <>
+      <Button type="button" onClick={() => setOpen(true)}>
+        <Plus className="h-4 w-4" />
+        {triggerLabel}
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogClose onClick={() => setOpen(false)} />
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
+        </DialogHeader>
+        <ActionForm
+          action={async (formData) => {
+            const result = await action(formData)
+            if (!result?.error) setOpen(false)
+            return result
+          }}
+          className="mt-4 space-y-4"
+        >
+          <div className="grid gap-3 sm:grid-cols-2">{children}</div>
+          <DialogFooter className="gap-2">
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>Annuler</Button>
+            <Button type="submit">Enregistrer</Button>
+          </DialogFooter>
+        </ActionForm>
+      </Dialog>
+    </>
   )
 }
 
@@ -186,6 +260,9 @@ export default function AcademicStructurePage() {
   const [teachers, setTeachers] = useState<Teacher[]>([])
   const [actionError, setActionError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+  const [activateTarget, setActivateTarget] = useState<{ id: string; label: string } | null>(null)
+  const [createYearOpen, setCreateYearOpen] = useState(false)
+  const [tab, setTab] = useState("years")
 
   const loadYears = async () => {
     const res = await getAcademicYears()
@@ -212,36 +289,19 @@ export default function AcademicStructurePage() {
     if (res.data) setTeachers(res.data)
   }
 
-  // Activation d'année : un seul chemin (RPC atomique). Confirmation seulement
-  // s'il faut clôturer l'année déjà en cours — sinon un clic suffit.
-  const handleActivateYear = (yearId: string, yearLabel: string) => {
-    const active = academicYears.find((y) => y.status === "en_cours")
-    if (active) {
-      const ok = window.confirm(
-        `« ${active.label} » sera clôturée.\n« ${yearLabel} » devient l'année en cours (notes, appels, facturation).\n\nContinuer ?`
-      )
-      if (!ok) return
-    }
+  const runActivateYear = (yearId: string) => {
     setActionError(null)
     startTransition(async () => {
       const res = await activateAcademicYear(yearId)
       if (res.error) { setActionError(res.error); return }
+      setActivateTarget(null)
       await loadYears()
     })
   }
 
-  const handleCreateSuggestedYear = () => {
-    const win = computeAcademicWindow()
-    const fd = new FormData()
-    fd.set("label", win.label)
-    fd.set("startDate", win.start_date)
-    fd.set("endDate", win.end_date)
+  const requestActivateYear = (yearId: string, yearLabel: string) => {
     setActionError(null)
-    startTransition(async () => {
-      const res = await createAcademicYear(fd)
-      if (res?.error) { setActionError(res.error); return }
-      await loadYears()
-    })
+    setActivateTarget({ id: yearId, label: yearLabel })
   }
 
   useEffect(() => {
@@ -257,15 +317,14 @@ export default function AcademicStructurePage() {
   const currentYear = academicYears.find(y => y.status === "en_cours")
   const plannedYear = academicYears.find(y => y.status === "planifiee")
   const suggestedYear = computeAcademicWindow()
-  const [tab, setTab] = useState("years")
 
   const handleMissingYearCta = () => {
     setTab("years")
     if (plannedYear) {
-      handleActivateYear(plannedYear.id, plannedYear.label)
+      requestActivateYear(plannedYear.id, plannedYear.label)
       return
     }
-    handleCreateSuggestedYear()
+    setCreateYearOpen(true)
   }
 
   return (
@@ -278,8 +337,8 @@ export default function AcademicStructurePage() {
                 <h3 className="font-semibold text-orange-800 dark:text-orange-200">Aucune année académique en cours</h3>
                 <p className="text-sm text-orange-600 dark:text-orange-300 mt-1">
                   {plannedYear
-                    ? `Un clic active « ${plannedYear.label} » et débloque notes et appels.`
-                    : `Un clic crée et active « ${suggestedYear.label} » (sept. → juil.).`}
+                    ? `Confirmez l'activation de « ${plannedYear.label} » pour débloquer notes et appels.`
+                    : `Ouvrez le formulaire prérempli « ${suggestedYear.label} » (sept. → juil.).`}
                 </p>
               </div>
               <Button
@@ -335,10 +394,19 @@ export default function AcademicStructurePage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <ActionForm action={withReload(createAcademicYear, loadYears)} className="flex gap-3 items-end flex-wrap">
-                <div className="space-y-1">
-                  <Label htmlFor="label">Label</Label>
-                  <Input name="label" defaultValue={suggestedYear.label} placeholder="Ex: 2025-2026" required className="max-w-[200px]" />
+              <CreateDialog
+                title="Nouvelle année académique"
+                description={academicYears.length === 0
+                  ? "La première année sera activée automatiquement (notes, appels, facturation)."
+                  : "Cette année restera planifiée jusqu'à ce que vous l'activiez."}
+                triggerLabel="Nouvelle année"
+                action={withReload(createAcademicYear, loadYears)}
+                open={createYearOpen}
+                onOpenChange={setCreateYearOpen}
+              >
+                <div className="space-y-1 sm:col-span-2">
+                  <Label htmlFor="label">Libellé</Label>
+                  <Input name="label" defaultValue={suggestedYear.label} placeholder="Ex: 2025-2026" required />
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor="startDate">Début</Label>
@@ -348,11 +416,7 @@ export default function AcademicStructurePage() {
                   <Label htmlFor="endDate">Fin</Label>
                   <Input name="endDate" type="date" defaultValue={suggestedYear.end_date} required />
                 </div>
-                {/* Pas de sélecteur de statut : la première année est activée
-                    automatiquement ; les suivantes naissent « planifiées » et
-                    passent en service via « Activer » (RPC atomique). */}
-                <Button type="submit" size="icon"><Plus className="h-4 w-4" /></Button>
-              </ActionForm>
+              </CreateDialog>
 
               {actionError && (
                 <div className="rounded-lg bg-destructive/10 border border-destructive/30 px-3 py-2 text-sm text-destructive">
@@ -363,7 +427,7 @@ export default function AcademicStructurePage() {
               <div className="space-y-2">
                 {academicYears.length === 0 && (
                   <p className="py-6 text-center text-sm text-muted-foreground">
-                    Aucune année. Utilisez le bandeau ci-dessus ou validez le formulaire déjà prérempli.
+                    Aucune année. Ouvrez « Nouvelle année » : le formulaire est déjà prérempli.
                   </p>
                 )}
                 {academicYears.map(year => (
@@ -378,7 +442,7 @@ export default function AcademicStructurePage() {
                           size="sm"
                           variant="outline"
                           disabled={isPending}
-                          onClick={() => handleActivateYear(year.id, year.label)}
+                          onClick={() => requestActivateYear(year.id, year.label)}
                         >
                           {isPending
                             ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -408,21 +472,25 @@ export default function AcademicStructurePage() {
               <CardDescription>Définissez les niveaux de votre établissement.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <ActionForm action={withReload(createGradeLevel, loadGradeLevels)} className="flex gap-3 items-end">
+              <CreateDialog
+                title="Nouveau niveau"
+                description="Le rang croît avec le cursus : 1 = première année, puis 2, 3… jusqu'aux sortants."
+                triggerLabel="Nouveau niveau"
+                action={withReload(createGradeLevel, loadGradeLevels)}
+              >
                 <div className="space-y-1">
                   <Label htmlFor="name">Nom</Label>
-                  <Input name="name" placeholder="Ex: 6ème" required className="max-w-[200px]" />
+                  <Input name="name" placeholder="Ex: 6ème" required />
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor="level">Niveau</Label>
-                  <Input name="level" type="number" required className="max-w-[120px]" />
+                  <Label htmlFor="level">Rang</Label>
+                  <Input name="level" type="number" required />
                 </div>
-                <div className="space-y-1">
+                <div className="space-y-1 sm:col-span-2">
                   <Label htmlFor="cycle">Cycle</Label>
-                  <Input name="cycle" placeholder="Collège" required className="max-w-[160px]" />
+                  <Input name="cycle" placeholder="Collège" required />
                 </div>
-                <Button type="submit" size="icon"><Plus className="h-4 w-4" /></Button>
-              </ActionForm>
+              </CreateDialog>
               {/* La bascule d'année promeut au RANG SUPÉRIEUR (rang + 1) : le
                   rang doit donc croître avec l'avancement dans le cursus, et non
                   suivre le numéro de la classe (sinon tous les élèves du dernier
@@ -446,21 +514,21 @@ export default function AcademicStructurePage() {
                         <p className="text-xs text-muted-foreground">Cycle: {level.cycle} · Rang: {level.level}</p>
                       </div>
                       <div className="flex items-center gap-1">
-                        <InlineEdit action={updateGradeLevel} onDone={loadGradeLevels}>
+                        <EditDialog title={`Modifier ${level.name}`} action={updateGradeLevel} onDone={loadGradeLevels}>
                           <input type="hidden" name="id" value={level.id} />
                           <div className="space-y-1">
                             <Label htmlFor={`level-name-${level.id}`}>Nom</Label>
-                            <Input id={`level-name-${level.id}`} name="name" defaultValue={level.name} required className="max-w-[160px]" />
+                            <Input id={`level-name-${level.id}`} name="name" defaultValue={level.name} required />
                           </div>
                           <div className="space-y-1">
                             <Label htmlFor={`level-rank-${level.id}`}>Rang</Label>
-                            <Input id={`level-rank-${level.id}`} name="level" type="number" defaultValue={String(level.level)} required className="max-w-[110px]" />
+                            <Input id={`level-rank-${level.id}`} name="level" type="number" defaultValue={String(level.level)} required />
                           </div>
-                          <div className="space-y-1">
+                          <div className="space-y-1 sm:col-span-2">
                             <Label htmlFor={`level-cycle-${level.id}`}>Cycle</Label>
-                            <Input id={`level-cycle-${level.id}`} name="cycle" defaultValue={level.cycle} required className="max-w-[160px]" />
+                            <Input id={`level-cycle-${level.id}`} name="cycle" defaultValue={level.cycle} required />
                           </div>
-                        </InlineEdit>
+                        </EditDialog>
                         <ArchiveButton
                           action={archiveGradeLevel}
                           id={level.id}
@@ -484,10 +552,15 @@ export default function AcademicStructurePage() {
               <CardDescription>Créez les classes de votre établissement.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <ActionForm action={withReload(createClass, loadClasses)} className="flex gap-3 items-end flex-wrap">
+              <CreateDialog
+                title="Nouvelle classe"
+                description="Rattachez la classe à un niveau, puis indiquez éventuellement le titulaire."
+                triggerLabel="Nouvelle classe"
+                action={withReload(createClass, loadClasses)}
+              >
                 <div className="space-y-1">
                   <Label htmlFor="gradeLevelId">Niveau</Label>
-                  <select name="gradeLevelId" required className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm">
+                  <select name="gradeLevelId" required className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
                     <option value="">Niveau</option>
                     {gradeLevels.map(level => (
                       <option key={level.id} value={level.id}>{level.name}</option>
@@ -496,26 +569,22 @@ export default function AcademicStructurePage() {
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor="name">Nom</Label>
-                  <Input name="name" placeholder="Ex: 6ème A" required className="max-w-[180px]" />
+                  <Input name="name" placeholder="Ex: 6ème A" required />
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor="capacity">Capacité</Label>
-                  <Input name="capacity" type="number" className="max-w-[120px]" />
+                  <Input name="capacity" type="number" />
                 </div>
-                {/* Le champ existait côté action (head_teacher_id) mais aucun
-                    formulaire ne l'alimentait : le titulaire de classe était
-                    impossible à renseigner. */}
                 <div className="space-y-1">
                   <Label htmlFor="headTeacherId">Titulaire</Label>
-                  <select name="headTeacherId" className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm">
+                  <select name="headTeacherId" className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
                     <option value="">—</option>
                     {teachers.map(teacher => (
                       <option key={teacher.id} value={teacher.id}>{teacher.full_name}</option>
                     ))}
                   </select>
                 </div>
-                <Button type="submit" size="icon"><Plus className="h-4 w-4" /></Button>
-              </ActionForm>
+              </CreateDialog>
               <div className="space-y-2">
                 {classes.length === 0 && (
                   <p className="py-6 text-center text-sm text-muted-foreground">
@@ -533,23 +602,23 @@ export default function AcademicStructurePage() {
                         </p>
                       </div>
                       <div className="flex items-center gap-1">
-                        <InlineEdit action={updateClass} onDone={loadClasses}>
+                        <EditDialog title={`Modifier ${cls.name}`} action={updateClass} onDone={loadClasses}>
                           <input type="hidden" name="id" value={cls.id} />
                           <div className="space-y-1">
                             <Label htmlFor={`class-name-${cls.id}`}>Nom</Label>
-                            <Input id={`class-name-${cls.id}`} name="name" defaultValue={cls.name} required className="max-w-[160px]" />
+                            <Input id={`class-name-${cls.id}`} name="name" defaultValue={cls.name} required />
                           </div>
                           <div className="space-y-1">
                             <Label htmlFor={`class-capacity-${cls.id}`}>Capacité</Label>
-                            <Input id={`class-capacity-${cls.id}`} name="capacity" type="number" defaultValue={cls.capacity === null ? "" : String(cls.capacity)} className="max-w-[110px]" />
+                            <Input id={`class-capacity-${cls.id}`} name="capacity" type="number" defaultValue={cls.capacity === null ? "" : String(cls.capacity)} />
                           </div>
-                          <div className="space-y-1">
+                          <div className="space-y-1 sm:col-span-2">
                             <Label htmlFor={`class-teacher-${cls.id}`}>Titulaire</Label>
                             <select
                               id={`class-teacher-${cls.id}`}
                               name="headTeacherId"
                               defaultValue={cls.head_teacher_id ?? ""}
-                              className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                              className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                             >
                               <option value="">—</option>
                               {teachers.map(teacher => (
@@ -557,7 +626,7 @@ export default function AcademicStructurePage() {
                               ))}
                             </select>
                           </div>
-                        </InlineEdit>
+                        </EditDialog>
                         <ArchiveButton
                           action={archiveClass}
                           id={cls.id}
@@ -581,21 +650,25 @@ export default function AcademicStructurePage() {
               <CardDescription>Définissez les matières enseignées et leurs coefficients.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <ActionForm action={withReload(createSubject, loadSubjects)} className="flex gap-3 items-end">
-                <div className="space-y-1">
+              <CreateDialog
+                title="Nouvelle matière"
+                description="Nom, code optionnel et coefficient utilisés pour les notes et bulletins."
+                triggerLabel="Nouvelle matière"
+                action={withReload(createSubject, loadSubjects)}
+              >
+                <div className="space-y-1 sm:col-span-2">
                   <Label htmlFor="name">Nom</Label>
-                  <Input name="name" placeholder="Mathématiques" required className="max-w-[200px]" />
+                  <Input name="name" placeholder="Mathématiques" required />
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor="code">Code</Label>
-                  <Input name="code" placeholder="MAT" className="max-w-[100px]" />
+                  <Input name="code" placeholder="MAT" />
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor="coefficient">Coefficient</Label>
-                  <Input name="coefficient" type="number" step="0.1" defaultValue="1" className="max-w-[100px]" />
+                  <Input name="coefficient" type="number" step="0.1" defaultValue="1" />
                 </div>
-                <Button type="submit" size="icon"><Plus className="h-4 w-4" /></Button>
-              </ActionForm>
+              </CreateDialog>
               <div className="space-y-2">
                 {subjects.length === 0 && (
                   <p className="py-6 text-center text-sm text-muted-foreground">
@@ -610,21 +683,21 @@ export default function AcademicStructurePage() {
                         <p className="text-xs text-muted-foreground">Code: {subject.code || "—"} · Coef: {subject.coefficient}</p>
                       </div>
                       <div className="flex items-center gap-1">
-                        <InlineEdit action={updateSubject} onDone={loadSubjects}>
+                        <EditDialog title={`Modifier ${subject.name}`} action={updateSubject} onDone={loadSubjects}>
                           <input type="hidden" name="id" value={subject.id} />
-                          <div className="space-y-1">
+                          <div className="space-y-1 sm:col-span-2">
                             <Label htmlFor={`subject-name-${subject.id}`}>Nom</Label>
-                            <Input id={`subject-name-${subject.id}`} name="name" defaultValue={subject.name} required className="max-w-[180px]" />
+                            <Input id={`subject-name-${subject.id}`} name="name" defaultValue={subject.name} required />
                           </div>
                           <div className="space-y-1">
                             <Label htmlFor={`subject-code-${subject.id}`}>Code</Label>
-                            <Input id={`subject-code-${subject.id}`} name="code" defaultValue={subject.code ?? ""} className="max-w-[100px]" />
+                            <Input id={`subject-code-${subject.id}`} name="code" defaultValue={subject.code ?? ""} />
                           </div>
                           <div className="space-y-1">
                             <Label htmlFor={`subject-coef-${subject.id}`}>Coefficient</Label>
-                            <Input id={`subject-coef-${subject.id}`} name="coefficient" type="number" step="0.1" defaultValue={String(subject.coefficient)} className="max-w-[100px]" />
+                            <Input id={`subject-coef-${subject.id}`} name="coefficient" type="number" step="0.1" defaultValue={String(subject.coefficient)} />
                           </div>
-                        </InlineEdit>
+                        </EditDialog>
                         <ArchiveButton
                           action={archiveSubject}
                           id={subject.id}
@@ -648,10 +721,15 @@ export default function AcademicStructurePage() {
               <CardDescription>Assignez les matières à chaque classe avec leur coefficient et professeur.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <ActionForm action={withReload(createClassSubjectAssignment, loadAssignments)} className="flex gap-3 items-end flex-wrap">
+              <CreateDialog
+                title="Affecter une matière"
+                description="Classe, matière, coefficient et professeur responsable."
+                triggerLabel="Nouvelle affectation"
+                action={withReload(createClassSubjectAssignment, loadAssignments)}
+              >
                 <div className="space-y-1">
                   <Label htmlFor="classId">Classe</Label>
-                  <select name="classId" required className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm">
+                  <select name="classId" required className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
                     <option value="">Classe</option>
                     {classes.map(cls => (
                       <option key={cls.id} value={cls.id}>{cls.name}</option>
@@ -660,7 +738,7 @@ export default function AcademicStructurePage() {
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor="subjectId">Matière</Label>
-                  <select name="subjectId" required className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm">
+                  <select name="subjectId" required className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
                     <option value="">Matière</option>
                     {subjects.map(subject => (
                       <option key={subject.id} value={subject.id}>{subject.name}</option>
@@ -669,22 +747,18 @@ export default function AcademicStructurePage() {
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor="coefficient">Coefficient</Label>
-                  <Input name="coefficient" type="number" step="0.1" defaultValue="1" className="max-w-[100px]" />
+                  <Input name="coefficient" type="number" step="0.1" defaultValue="1" />
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor="teacherId">Professeur</Label>
-                  {/* Sélecteur auparavant figé sur une option vide : la liste
-                      des enseignants de l'école n'était jamais chargée, toute
-                      affectation de professeur était donc impossible. */}
-                  <select name="teacherId" className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm">
+                  <select name="teacherId" className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
                     <option value="">—</option>
                     {teachers.map(teacher => (
                       <option key={teacher.id} value={teacher.id}>{teacher.full_name}</option>
                     ))}
                   </select>
                 </div>
-                <Button type="submit" size="icon"><Plus className="h-4 w-4" /></Button>
-              </ActionForm>
+              </CreateDialog>
               {teachers.length === 0 && (
                 <p className="text-xs text-muted-foreground">
                   Aucun professeur rattaché à l&apos;école : attribuez d&apos;abord le rôle
@@ -715,11 +789,15 @@ export default function AcademicStructurePage() {
                         <p className="text-xs text-muted-foreground">Coef: {assignment.coefficient} · Prof: {assignment.users?.full_name || "—"}</p>
                       </div>
                       <div className="flex items-center gap-1">
-                        <InlineEdit action={updateClassSubjectAssignment} onDone={loadAssignments}>
+                        <EditDialog
+                          title={`Modifier ${assignment.subjects?.name ?? "affectation"}`}
+                          action={updateClassSubjectAssignment}
+                          onDone={loadAssignments}
+                        >
                           <input type="hidden" name="id" value={assignment.id} />
                           <div className="space-y-1">
                             <Label htmlFor={`assign-coef-${assignment.id}`}>Coefficient</Label>
-                            <Input id={`assign-coef-${assignment.id}`} name="coefficient" type="number" step="0.1" defaultValue={String(assignment.coefficient)} className="max-w-[100px]" />
+                            <Input id={`assign-coef-${assignment.id}`} name="coefficient" type="number" step="0.1" defaultValue={String(assignment.coefficient)} />
                           </div>
                           <div className="space-y-1">
                             <Label htmlFor={`assign-teacher-${assignment.id}`}>Professeur</Label>
@@ -727,7 +805,7 @@ export default function AcademicStructurePage() {
                               id={`assign-teacher-${assignment.id}`}
                               name="teacherId"
                               defaultValue={assignment.teacher_id ?? ""}
-                              className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                              className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                             >
                               <option value="">—</option>
                               {teachers.map(teacher => (
@@ -735,7 +813,7 @@ export default function AcademicStructurePage() {
                               ))}
                             </select>
                           </div>
-                        </InlineEdit>
+                        </EditDialog>
                         <ArchiveButton
                           action={archiveClassSubjectAssignment}
                           id={assignment.id}
@@ -756,6 +834,39 @@ export default function AcademicStructurePage() {
           <YearRolloverPanel />
         </TabsContent>
       </Tabs>
+
+      <Dialog
+        open={Boolean(activateTarget)}
+        onOpenChange={(next) => { if (!next && !isPending) setActivateTarget(null) }}
+      >
+        <DialogClose onClick={() => { if (!isPending) setActivateTarget(null) }} />
+        <DialogHeader>
+          <DialogTitle>Activer {activateTarget?.label}</DialogTitle>
+          <DialogDescription>
+            {currentYear
+              ? `« ${currentYear.label} » sera clôturée. « ${activateTarget?.label} » devient l'année en cours (notes, appels, facturation).`
+              : `« ${activateTarget?.label} » devient l'année en cours (notes, appels, facturation).`}
+          </DialogDescription>
+        </DialogHeader>
+        {actionError && <p className="mt-3 text-sm text-destructive">{actionError}</p>}
+        <DialogFooter className="mt-6 gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            disabled={isPending}
+            onClick={() => setActivateTarget(null)}
+          >
+            Annuler
+          </Button>
+          <Button
+            type="button"
+            disabled={isPending || !activateTarget}
+            onClick={() => activateTarget && runActivateYear(activateTarget.id)}
+          >
+            {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Activer"}
+          </Button>
+        </DialogFooter>
+      </Dialog>
     </div>
   )
 }

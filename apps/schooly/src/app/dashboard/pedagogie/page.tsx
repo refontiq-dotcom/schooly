@@ -136,8 +136,8 @@ export default function PedagogieDashboard() {
                 <h3 className="font-semibold text-orange-800 dark:text-orange-200">Aucune année académique en cours</h3>
                 <p className="text-sm text-orange-600 dark:text-orange-300 mt-1">
                   {plannedYear
-                    ? `« ${plannedYear.label} » est prête : activez-la pour débloquer notes et appels.`
-                    : "Un clic ouvre la structure : la première année créée est activée automatiquement."}
+                    ? `« ${plannedYear.label} » est prête : ouvrez la structure pour l'activer.`
+                    : "Ouvrez la structure : un formulaire prérempli crée et active la première année."}
                 </p>
               </div>
               <Button asChild variant="outline" className="shrink-0 text-orange-700 border-orange-300 hover:bg-orange-100 dark:text-orange-200">
