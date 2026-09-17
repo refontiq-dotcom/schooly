@@ -1,5 +1,5 @@
 begin;
-select plan(47);
+select plan(48);
 create function public.movement_test_id(text) returns uuid language sql immutable as $$ select md5($1)::uuid $$;
 insert into auth.users(id,email) select public.movement_test_id(x), x || '@test.local'
  from unnest(array['direction','other','teacher']) x;
@@ -57,6 +57,7 @@ select lives_ok($$select public.movement_test_insert('school','student2','ORT')$
 select is((select status from public.student_movement_requests where kind='ORT'),'DRAFT','ORT reste non certifiée');
 select throws_ok($$update public.student_movement_requests set status='ISSUED'$$,'42501',null,'Aucune émission possible');
 select is((select tracking_code ~ '^ORT[0-9A-HJKMNP-TV-Z]{5}$' from public.student_movement_requests where kind='ORT'),true,'Code ORT de huit caractères enregistré');
+select is(public.movement_code_checksum('TRF0123'),'E','Checksum identique à la validation navigateur (TRF0123)');
 select is((select right(tracking_code,1) = public.movement_code_checksum(left(tracking_code,7)) from public.student_movement_requests where kind='ORT'),true,'Checksum du code enregistré valide');
 select is((select national_matricule from public.student_movement_requests where kind='ORT'),'MENA-TEST','Matricule national conservé dans la demande');
 reset role;

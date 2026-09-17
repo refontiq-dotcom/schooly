@@ -11,6 +11,7 @@ export default async function MovementsPage() {
     <Link href="/dashboard/direction/admissions" className="text-primary underline">Retour aux inscriptions</Link>
     <h1 className="text-2xl font-semibold">Préparer un mouvement TRF / ORT</h1>
     <p>Préparez une demande puis activez TRF administrativement pour 60 jours. Aucun quitus, aucune inscription d’accueil et aucun changement de tarif ne sont effectués. ORT reste à vérifier.</p>
+    <p>Pour inscrire un élève venant d’un autre établissement, utilisez <Link href="/dashboard/admissions/import" className="text-primary underline">l’import par code de transfert</Link>.</p>
     {result.error && <p role="alert">{result.error}</p>}
     {activations.error && <p role="alert">{activations.error}</p>}
     {data && <>

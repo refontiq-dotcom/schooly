@@ -6,7 +6,7 @@ Implémenté dans le commit 455a2a5, testé et validé :
   normalisation de barème, poids et pourcentages par catégorie, ABS ≠ 0 ≠
   manquant, moyennes matière/période/année (3 régimes), proposition de
   décision sans arrondi intermédiaire.
-- `packages/db/supabase/migrations/20260917040000_evaluation_rules_periods.sql`
+- `packages/db/supabase/migrations/20260917041000_evaluation_rules_periods.sql`
   — `evaluation_rules`, `evaluation_periods`, `grade_entries.period_id` et
   `absence_status`, vérification d'ouverture/verrouillage côté base, RLS durcie
   sur les notes (professeur limité à ses affectations classe × matière).

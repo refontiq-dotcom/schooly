@@ -91,8 +91,8 @@
 
 Les fichiers complets sont dans le dépôt, à exécuter **dans cet ordre** :
 
-1. `/home/dukoua/Projets/schooly/packages/db/supabase/migrations/20260917040000_evaluation_rules_periods.sql`
-2. `/home/dukoua/Projets/schooly/packages/db/supabase/migrations/20260917050000_evaluation_assessments.sql`
+1. `/home/dukoua/Projets/schooly/packages/db/supabase/migrations/20260917041000_evaluation_rules_periods.sql`
+2. `/home/dukoua/Projets/schooly/packages/db/supabase/migrations/20260917051000_evaluation_assessments.sql`
 3. `/home/dukoua/Projets/schooly/packages/db/supabase/migrations/20260917060000_grade_corrections.sql`
 4. `/home/dukoua/Projets/schooly/packages/db/supabase/migrations/20260917070000_annual_validation.sql`
 5. `/home/dukoua/Projets/schooly/packages/db/supabase/migrations/20260917080000_report_cards_publish.sql`
@@ -111,8 +111,8 @@ plutôt que mélanger exécution manuelle et historique CLI.
 Alternative psql (DATABASE_URL doit cibler explicitement la bonne base) :
 
 ```bash
-psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f /home/dukoua/Projets/schooly/packages/db/supabase/migrations/20260917040000_evaluation_rules_periods.sql
-psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f /home/dukoua/Projets/schooly/packages/db/supabase/migrations/20260917050000_evaluation_assessments.sql
+psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f /home/dukoua/Projets/schooly/packages/db/supabase/migrations/20260917041000_evaluation_rules_periods.sql
+psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f /home/dukoua/Projets/schooly/packages/db/supabase/migrations/20260917051000_evaluation_assessments.sql
 psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f /home/dukoua/Projets/schooly/packages/db/supabase/migrations/20260917060000_grade_corrections.sql
 psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f /home/dukoua/Projets/schooly/packages/db/supabase/migrations/20260917070000_annual_validation.sql
 psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f /home/dukoua/Projets/schooly/packages/db/supabase/migrations/20260917080000_report_cards_publish.sql

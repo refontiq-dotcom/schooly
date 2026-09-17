@@ -100,9 +100,22 @@ Garanties vérifiées par le banc : accès refusé avant autorisation nominative
 
 Le code de suivi doit être **saisi** par l’école d’accueil : celle-ci ne peut pas lire la demande source (isolation RLS), ce qui est le comportement attendu.
 
-Non couvert à ce stade : interface de saisie/scan côté accueil, quitus financier automatique, ventilation État/parent, QR, notifications, révocation et copie des bulletins.
+Non couvert à ce stade : quitus financier automatique, ventilation État/parent, QR, notifications, révocation et copie des bulletins.
 
-Validation reproductible : `bash /home/dukoua/Projets/schooly/scripts/tests/movements-db.sh` (base jetable ; 47 assertions).
+### Écran d’import (école d’accueil)
+
+`/dashboard/admissions/import`, réservé à la direction (`DECISION_ROLES`, cohérent avec la RPC) :
+
+- saisie du code en 8 caractères, normalisée (majuscules, espaces et tirets ignorés), avec contrôle local du **checksum** (`lib/movements/code.ts`) : une faute de frappe est signalée sans requête serveur ;
+- badge distinctif `Transfert privé` (TRF) ou `Affecté par l’État` (ORT) ; ORT reste bloqué, l’import d’une orientation officielle n’étant pas disponible ;
+- choix de la classe et de l’année d’accueil, puis appel de `consume_student_movement` avec l’école issue de la session (jamais du formulaire) ;
+- aucun aperçu du dossier avant import : l’école d’accueil ne peut pas lire la demande source (isolation RLS), et ce comportement est volontaire.
+
+L’algorithme de checksum est verrouillé des deux côtés : le banc SQL vérifie `movement_code_checksum('TRF0123') = 'E'`, valeur aussi testée côté TypeScript.
+
+Accès : [mouvements TRF/ORT](/dashboard/admissions/movements) prépare et active côté école de départ ; l’import se fait côté école d’accueil.
+
+Validation reproductible : `bash /home/dukoua/Projets/schooly/scripts/tests/movements-db.sh` (base jetable ; 48 assertions) et les tests d’écran du dossier `import`.
 
 
 ### Activation TRF — socle SQL local
