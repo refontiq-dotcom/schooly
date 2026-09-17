@@ -219,6 +219,14 @@
   .dashboard-content > div:has(a[href^="/dashboard/bulletin"]) {
     border-radius:12px !important;
   }
+
+  .dashboard-content > section:has(.grid.grid-cols-3) > :last-child {
+    box-shadow:0 5px 12px rgba(0,0,0,.035);
+  }
+
+  .dashboard-light .dashboard-content > section:has(.grid.grid-cols-3) > :last-child {
+    box-shadow:0 5px 12px rgba(72,50,94,.025);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
