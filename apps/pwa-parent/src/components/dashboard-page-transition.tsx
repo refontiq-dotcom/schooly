@@ -63,6 +63,10 @@ export function DashboardPageTransition({ children }: { children: React.ReactNod
       pendingHref.current = url.href
       setExiting(true)
 
+      window.dispatchEvent(new CustomEvent("schooly-dashboard-navigation", {
+        detail: { direction: nextDirection, phase: "start" },
+      }))
+
       timer.current = setTimeout(() => {
         const href = pendingHref.current
         pendingHref.current = null
