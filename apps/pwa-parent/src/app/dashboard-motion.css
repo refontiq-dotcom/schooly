@@ -1,6 +1,6 @@
 /* Dashboard transition system: direction is preserved; depth is layered on top. */
 .dashboard-page-transition { position: relative; min-height: 100%; isolation: isolate; overflow: clip; perspective: 1200px; }
-.dashboard-page-transition-content { position: relative; z-index: 1; transform-origin: 50% 8%; animation: dashboard-page-enter-forward .42s cubic-bezier(.22,1,.36,1) both; }
+.dashboard-page-transition-content { position: relative; z-index: 1; transform-origin: 50% 8%; animation: dashboard-page-enter-forward .48s cubic-bezier(.22,1,.36,1) both; }
 .dashboard-page-transition.direction-backward .dashboard-page-transition-content { animation-name: dashboard-page-enter-backward; }
 .dashboard-page-transition.is-exiting .dashboard-page-transition-content { pointer-events: none; animation-duration: .18s; animation-timing-function: cubic-bezier(.4,0,1,1); }
 .dashboard-page-transition.direction-forward.is-exiting .dashboard-page-transition-content { animation-name: dashboard-page-exit-forward; }
@@ -8,29 +8,33 @@
 .dashboard-page-transition-glow { position: fixed; z-index: 60; inset: 0; pointer-events: none; opacity: 0; background: radial-gradient(circle at 50% 8%, rgba(211,71,255,.08), transparent 38%); transition: opacity .18s ease; }
 .dashboard-page-transition.is-exiting .dashboard-page-transition-glow { opacity: 1; }
 
-/* Sidebar + header share one directional motion timeline. The header gets a
-   slightly softer depth response so it feels attached to the content plane. */
+/* Sidebar + header share one directional motion timeline. The header gets a slightly softer depth response so it feels attached to the content plane. */
 .dashboard-sidebar,
 .dashboard-topbar { will-change: width, min-width, transform, opacity, filter, box-shadow; transform-origin: center top; }
 .schooly-dashboard-shell.dashboard-nav-transition-forward .dashboard-sidebar { animation: dashboard-shell-exit-forward .18s cubic-bezier(.4,0,1,1) both; }
 .schooly-dashboard-shell.dashboard-nav-transition-backward .dashboard-sidebar { animation: dashboard-shell-exit-backward .18s cubic-bezier(.4,0,1,1) both; }
 .schooly-dashboard-shell.dashboard-nav-transition-forward .dashboard-topbar { animation: dashboard-header-exit-forward .18s cubic-bezier(.4,0,1,1) both; }
 .schooly-dashboard-shell.dashboard-nav-transition-backward .dashboard-topbar { animation: dashboard-header-exit-backward .18s cubic-bezier(.4,0,1,1) both; }
-
 .schooly-dashboard-shell.dashboard-nav-transition-forward .dashboard-sidebar,
 .schooly-dashboard-shell.dashboard-nav-transition-forward .dashboard-topbar,
 .schooly-dashboard-shell.dashboard-nav-transition-backward .dashboard-sidebar,
 .schooly-dashboard-shell.dashboard-nav-transition-backward .dashboard-topbar { z-index: 20; }
-
-/* Header internals follow the same motion with a tiny staggered lift, keeping
-   controls visually grouped instead of moving independently. */
 .schooly-dashboard-shell.dashboard-nav-transition-forward .dashboard-topbar-left,
 .schooly-dashboard-shell.dashboard-nav-transition-forward .dashboard-topbar-right { animation: dashboard-header-content-forward .18s cubic-bezier(.4,0,1,1) both; }
 .schooly-dashboard-shell.dashboard-nav-transition-backward .dashboard-topbar-left,
 .schooly-dashboard-shell.dashboard-nav-transition-backward .dashboard-topbar-right { animation: dashboard-header-content-backward .18s cubic-bezier(.4,0,1,1) both; }
 
-.dashboard-page-transition-content::after { content:""; position:absolute; inset:0; z-index:10; pointer-events:none; opacity:0; background:var(--sd-bg); transition:opacity .18s ease; }
-.dashboard-page-transition.is-exiting .dashboard-page-transition-content::after { opacity:.16; }
+/* Stronger content fade: the active page softly dissolves in/out while its directional transform remains untouched. */
+.dashboard-page-transition-content::after { content:""; position:absolute; inset:0; z-index:10; pointer-events:none; opacity:0; background:var(--sd-bg); transition:opacity .30s cubic-bezier(.22,1,.36,1); }
+.dashboard-page-transition.is-exiting .dashboard-page-transition-content::after { opacity:.34; transition-duration:.18s; }
+.dashboard-page-transition-content { isolation:isolate; }
+.dashboard-page-transition-content > * { animation: dashboard-active-content-fade-in .48s cubic-bezier(.22,1,.36,1) both; }
+.dashboard-page-transition.direction-backward .dashboard-page-transition-content > * { animation-name: dashboard-active-content-fade-in-backward; }
+.dashboard-page-transition.is-exiting .dashboard-page-transition-content > * { animation-duration:.18s; animation-timing-function:cubic-bezier(.4,0,1,1); }
+.dashboard-page-transition.direction-forward.is-exiting .dashboard-page-transition-content > * { animation-name: dashboard-active-content-fade-out-forward; }
+.dashboard-page-transition.direction-backward.is-exiting .dashboard-page-transition-content > * { animation-name: dashboard-active-content-fade-out-backward; }
+
+/* A restrained ambient shadow makes the three layers read as one depth stack. */
 .dashboard-page-transition::before { content:""; position:absolute; z-index:0; inset:10px 18px 0; pointer-events:none; opacity:0; border-radius:28px; box-shadow:0 26px 70px rgba(0,0,0,.12); transition:opacity .42s cubic-bezier(.22,1,.36,1),transform .42s cubic-bezier(.22,1,.36,1); }
 .dashboard-page-transition:not(.is-exiting)::before { opacity:.5; transform:translateZ(0) scale(1); }
 .dashboard-page-transition.is-exiting::before { opacity:.25; transform:translateZ(-12px) scale(.992); }
@@ -50,7 +54,6 @@
 .sidebar-toggle-icon.is-collapsed { transform:rotate(180deg); }
 .theme-icon-swap { display:grid; animation:dashboard-icon-pop .28s cubic-bezier(.22,1,.36,1); }
 .dashboard-nav-item.is-active::after { content:""; position:absolute; right:8px; width:4px; height:4px; border-radius:50%; background:var(--sd-accent); box-shadow:0 0 12px var(--sd-accent); animation:dashboard-active-dot .3s cubic-bezier(.22,1,.36,1) both; }
-
 .dashboard-dropdowns { display:flex; align-items:center; gap:6px; }
 .dashboard-dropdown { position:relative; }
 .dashboard-select-pill { position:relative; z-index:2; display:inline-flex; align-items:center; gap:6px; transform-origin:center; transition:background-color .2s ease,border-color .2s ease,color .2s ease,box-shadow .25s ease,transform .25s cubic-bezier(.22,1,.36,1); }
@@ -85,6 +88,10 @@
 @keyframes dashboard-page-enter-backward { from { opacity:0; transform:translate3d(-28px,10px,0) scale(.985); filter:blur(3px); } to { opacity:1; transform:translate3d(0,0,0) scale(1); filter:blur(0); } }
 @keyframes dashboard-page-exit-forward { from { opacity:1; transform:translate3d(0,0,0) scale(1); filter:blur(0); } to { opacity:0; transform:translate3d(-22px,-4px,0) scale(.992); filter:blur(2px); } }
 @keyframes dashboard-page-exit-backward { from { opacity:1; transform:translate3d(0,0,0) scale(1); filter:blur(0); } to { opacity:0; transform:translate3d(22px,-4px,0) scale(.992); filter:blur(2px); } }
+@keyframes dashboard-active-content-fade-in { from { opacity:0; } 65% { opacity:.72; } to { opacity:1; } }
+@keyframes dashboard-active-content-fade-in-backward { from { opacity:0; } 65% { opacity:.72; } to { opacity:1; } }
+@keyframes dashboard-active-content-fade-out-forward { from { opacity:1; } 55% { opacity:.45; } to { opacity:0; } }
+@keyframes dashboard-active-content-fade-out-backward { from { opacity:1; } 55% { opacity:.45; } to { opacity:0; } }
 @keyframes dashboard-icon-pop { from { opacity:0; transform:scale(.6) rotate(-25deg); } to { opacity:1; transform:scale(1) rotate(0); } }
 @keyframes dashboard-active-dot { from { opacity:0; transform:scale(0); } to { opacity:1; transform:scale(1); } }
 @keyframes dashboard-dropdown-option-enter { from { opacity:0; transform:translateY(-4px) scale(.98); } to { opacity:1; transform:translateY(0) scale(1); } }
@@ -92,6 +99,7 @@
 @media (max-width:640px) { .dashboard-dropdown-menu { left:auto; right:0; } }
 @media (prefers-reduced-motion:reduce) {
   .dashboard-page-transition-content,.dashboard-page-transition.is-exiting .dashboard-page-transition-content,
+  .dashboard-page-transition-content > *,.dashboard-page-transition.is-exiting .dashboard-page-transition-content > *,
   .schooly-dashboard-shell.dashboard-nav-transition-forward .dashboard-sidebar,.schooly-dashboard-shell.dashboard-nav-transition-backward .dashboard-sidebar,
   .schooly-dashboard-shell.dashboard-nav-transition-forward .dashboard-topbar,.schooly-dashboard-shell.dashboard-nav-transition-backward .dashboard-topbar,
   .schooly-dashboard-shell.dashboard-nav-transition-forward .dashboard-topbar-left,.schooly-dashboard-shell.dashboard-nav-transition-forward .dashboard-topbar-right,
