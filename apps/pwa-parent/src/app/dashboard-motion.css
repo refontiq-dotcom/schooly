@@ -124,6 +124,162 @@
   animation: dashboard-active-dot .3s cubic-bezier(.22,1,.36,1) both;
 }
 
+/* Dropdowns: shared motion for opening, closing and selection states. */
+.dashboard-dropdowns {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dashboard-dropdown {
+  position: relative;
+}
+
+.dashboard-select-pill {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transform-origin: center;
+  transition:
+    background-color .2s ease,
+    border-color .2s ease,
+    color .2s ease,
+    box-shadow .25s ease,
+    transform .25s cubic-bezier(.22,1,.36,1);
+}
+
+.dashboard-select-pill:hover {
+  transform: translateY(-1px);
+}
+
+.dashboard-select-pill:active {
+  transform: translateY(0) scale(.97);
+}
+
+.dashboard-select-pill.is-open {
+  border-color: color-mix(in srgb, var(--sd-accent) 45%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sd-accent) 9%, transparent), 0 8px 22px rgba(0, 0, 0, .12);
+}
+
+.dashboard-select-chevron {
+  transform-origin: center;
+  transition: transform .28s cubic-bezier(.22,1,.36,1), color .2s ease;
+}
+
+.dashboard-select-pill.is-open .dashboard-select-chevron {
+  transform: rotate(180deg);
+  color: var(--sd-accent);
+}
+
+.dashboard-dropdown-menu {
+  position: absolute;
+  z-index: 80;
+  top: calc(100% + 7px);
+  left: 0;
+  min-width: 100%;
+  padding: 5px;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(-7px) scale(.97);
+  transform-origin: top center;
+  filter: blur(2px);
+  transition:
+    opacity .18s ease,
+    transform .28s cubic-bezier(.22,1,.36,1),
+    filter .28s ease,
+    visibility 0s linear .28s;
+}
+
+.dashboard-dropdown-menu.is-open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateY(0) scale(1);
+  filter: blur(0);
+  transition:
+    opacity .18s ease,
+    transform .28s cubic-bezier(.22,1,.36,1),
+    filter .28s ease,
+    visibility 0s linear 0s;
+}
+
+.dashboard-dropdown-menu-inner {
+  display: grid;
+  gap: 3px;
+  min-width: max-content;
+  padding: 5px;
+  border: 1px solid color-mix(in srgb, var(--sd-accent) 14%, var(--sd-border));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--sd-surface) 94%, transparent);
+  box-shadow: 0 18px 45px rgba(0, 0, 0, .2), 0 2px 10px rgba(0, 0, 0, .08);
+  backdrop-filter: blur(16px) saturate(1.2);
+  -webkit-backdrop-filter: blur(16px) saturate(1.2);
+  transform-origin: top center;
+}
+
+.dashboard-dropdown-menu.is-open .dashboard-dropdown-option {
+  animation: dashboard-dropdown-option-enter .32s cubic-bezier(.22,1,.36,1) both;
+}
+
+.dashboard-dropdown-menu.is-open .dashboard-dropdown-option:nth-child(2) {
+  animation-delay: 25ms;
+}
+
+.dashboard-dropdown-menu.is-open .dashboard-dropdown-option:nth-child(3) {
+  animation-delay: 50ms;
+}
+
+.dashboard-dropdown-option {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 22px;
+  min-height: 32px;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color .18s ease, color .18s ease, transform .2s cubic-bezier(.22,1,.36,1);
+}
+
+.dashboard-dropdown-option:hover,
+.dashboard-dropdown-option:focus-visible {
+  background: color-mix(in srgb, var(--sd-accent) 10%, transparent);
+  outline: none;
+  transform: translateX(2px);
+}
+
+.dashboard-dropdown-option.is-selected {
+  color: var(--sd-accent);
+  font-weight: 650;
+}
+
+.dashboard-dropdown-check {
+  width: 14px;
+  text-align: center;
+  opacity: 0;
+  transform: scale(.5) rotate(-12deg);
+  transition: opacity .2s ease, transform .25s cubic-bezier(.22,1,.36,1);
+}
+
+.dashboard-dropdown-option.is-selected .dashboard-dropdown-check {
+  opacity: 1;
+  transform: scale(1) rotate(0);
+}
+
+.dashboard-dropdown-option:active {
+  transform: scale(.97);
+}
+
 .dashboard-icon-button:active,
 .dashboard-mobile-menu:active,
 .dashboard-nav-item:active {
@@ -150,11 +306,32 @@
   to { opacity: 1; transform: scale(1); }
 }
 
+@keyframes dashboard-dropdown-option-enter {
+  from { opacity: 0; transform: translateY(-4px) scale(.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (max-width: 640px) {
+  .dashboard-dropdown-menu {
+    left: auto;
+    right: 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .dashboard-page-transition-content,
   .dashboard-page-transition.is-exiting .dashboard-page-transition-content,
   .theme-icon-swap,
-  .dashboard-nav-item.is-active::after {
+  .dashboard-nav-item.is-active::after,
+  .dashboard-dropdown-menu.is-open .dashboard-dropdown-option {
     animation: none !important;
+  }
+
+  .dashboard-select-pill,
+  .dashboard-select-chevron,
+  .dashboard-dropdown-menu,
+  .dashboard-dropdown-option,
+  .dashboard-dropdown-check {
+    transition-duration: .01ms !important;
   }
 }
