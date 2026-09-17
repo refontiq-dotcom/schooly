@@ -13,7 +13,6 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
 import { CheckCircle2, Clock, CreditCard, FileText, Package } from "lucide-react"
 
@@ -41,12 +40,13 @@ type RequiredDocument = {
 
 type PaymentMethod = {
   id: string
-  type: "especes" | "mobile_money" | "virement_bancaire" | "cheque"
+  type: "especes" | "esperes" | "mobile_money" | "virement_bancaire" | "cheque"
   config_details: Record<string, unknown> | null
 }
 
 const PAYMENT_LABELS: Record<PaymentMethod["type"], string> = {
   especes: "Espèces (au guichet)",
+  esperes: "Espèces (au guichet)",
   mobile_money: "Mobile Money",
   virement_bancaire: "Virement bancaire",
   cheque: "Chèque",
@@ -73,8 +73,17 @@ export default function PreEnrollmentForm({
   const [providedDocuments, setProvidedDocuments] = useState<Record<string, boolean>>({})
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>("")
 
+  const selectedGrade = gradeLevels.find((level) => level.id === selectedGradeLevel)
+
   const applicableDocuments = requiredDocuments.filter(
     (doc) => !doc.applicable_to_level_id || doc.applicable_to_level_id === selectedGradeLevel
+  )
+
+  const requiredChecklistMissing = checklistItems.some(
+    (item) => item.obligatoire && !acceptedChecklist[item.id]
+  )
+  const requiredDocumentsMissing = applicableDocuments.some(
+    (doc) => doc.obligatoire && !providedDocuments[doc.id]
   )
 
   const formatFCFA = (amount: number | null) => {
@@ -83,6 +92,18 @@ export default function PreEnrollmentForm({
   }
 
   async function handleSubmit(formData: FormData) {
+    if (requiredChecklistMissing || requiredDocumentsMissing) {
+      toast.error("Cochez toutes les fournitures et pieces obligatoires.")
+      return
+    }
+    formData.set(
+      "acceptedChecklist",
+      JSON.stringify(Object.keys(acceptedChecklist).filter((id) => acceptedChecklist[id]))
+    )
+    formData.set(
+      "providedDocuments",
+      JSON.stringify(Object.keys(providedDocuments).filter((id) => providedDocuments[id]))
+    )
     setLoading(true)
     const result = await createPreEnrollment(formData)
     
@@ -136,22 +157,33 @@ export default function PreEnrollmentForm({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="firstName">Prénom *</Label>
-              <Input id="firstName" name="firstName" required disabled={loading} />
+               <Input id="firstName" name="firstName" required disabled={loading} className="min-h-11" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="lastName">Nom *</Label>
-              <Input id="lastName" name="lastName" required disabled={loading} />
+              <Input id="lastName" name="lastName" required disabled={loading} className="min-h-11" />
             </div>
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="dateOfBirth">Date de naissance *</Label>
-            <Input id="dateOfBirth" name="dateOfBirth" type="date" required disabled={loading} />
+            <Input id="dateOfBirth" name="dateOfBirth" type="date" required disabled={loading} className="min-h-11" />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="birthCertificateNumber">N acte de naissance</Label>
+            <Input id="birthCertificateNumber" name="birthCertificateNumber" disabled={loading} className="min-h-11" />
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="gradeLevelId">Niveau souhaité *</Label>
-            <Select value={selectedGradeLevel} onValueChange={setSelectedGradeLevel} name="gradeLevelId" required>
+            <Select
+              value={selectedGradeLevel}
+              onValueChange={setSelectedGradeLevel}
+              name="gradeLevelId"
+              required
+              displayLabel={selectedGrade ? `${selectedGrade.name} — ${selectedGrade.cycle}` : undefined}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Sélectionner un niveau" />
               </SelectTrigger>
@@ -273,6 +305,17 @@ export default function PreEnrollmentForm({
           <hr className="border-border" />
 
           <div className="space-y-2">
+            <Label htmlFor="guardianName">Nom du tuteur *</Label>
+            <Input
+              id="guardianName"
+              name="guardianName"
+              required
+              disabled={loading}
+              className="min-h-11"
+            />
+          </div>
+
+          <div className="space-y-2">
             <Label htmlFor="guardianPhone">Téléphone du tuteur *</Label>
             <Input
               id="guardianPhone"
@@ -281,13 +324,18 @@ export default function PreEnrollmentForm({
               placeholder="+225 07 00 00 00 00"
               required
               disabled={loading}
+              className="min-h-11"
             />
             <p className="text-xs text-muted-foreground">
               Ce numéro servira à identifier le tuteur et à envoyer les communications.
             </p>
           </div>
 
-          <Button type="submit" className="w-full" disabled={loading || !selectedGradeLevel}>
+          <Button
+            type="submit"
+            className="w-full min-h-11"
+            disabled={loading || !selectedGradeLevel || requiredChecklistMissing || requiredDocumentsMissing}
+          >
             {loading ? "Enregistrement..." : "Réserver ma place"}
           </Button>
         </form>
