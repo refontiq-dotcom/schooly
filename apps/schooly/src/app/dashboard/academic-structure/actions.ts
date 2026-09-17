@@ -230,6 +230,15 @@ export async function createGradeLevel(formData: FormData): Promise<ActionResult
     return { error: `Le rang ${level} est déjà utilisé par le niveau « ${sameLevel.name} ».` }
   }
 
+  const { data: sameName } = await admin
+    .from("grade_levels")
+    .select("id")
+    .eq("school_id", roleData.school_id)
+    .eq("name", name)
+    .is("deleted_at", null)
+    .maybeSingle()
+  if (sameName) return { error: `Le niveau « ${name} » existe déjà.` }
+
   const { error } = await admin.from("grade_levels").insert({
     school_id: roleData.school_id,
     name,
@@ -294,6 +303,16 @@ export async function createClass(formData: FormData): Promise<ActionResult> {
   if (!(await existsInSchool(admin, "grade_levels", gradeLevelId, roleData.school_id))) {
     return { error: "Niveau introuvable dans cet établissement." }
   }
+
+  const { data: duplicateClass } = await admin
+    .from("classes")
+    .select("id")
+    .eq("school_id", roleData.school_id)
+    .eq("name", name)
+    .is("deleted_at", null)
+    .maybeSingle()
+  if (duplicateClass) return { error: `Une classe « ${name} » existe déjà.` }
+
   if (headTeacherId && !(await isSchoolStaff(admin, headTeacherId, roleData.school_id))) {
     return { error: "Ce titulaire n'appartient pas au personnel de l'établissement." }
   }
@@ -353,6 +372,15 @@ export async function createSubject(formData: FormData): Promise<ActionResult> {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
+
+  const { data: duplicateSubject } = await admin
+    .from("subjects")
+    .select("id")
+    .eq("school_id", roleData.school_id)
+    .eq("name", name)
+    .is("deleted_at", null)
+    .maybeSingle()
+  if (duplicateSubject) return { error: `Une matière « ${name} » existe déjà.` }
 
   const { error } = await admin.from("subjects").insert({
     school_id: roleData.school_id,

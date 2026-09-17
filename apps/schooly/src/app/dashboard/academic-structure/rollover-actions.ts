@@ -77,6 +77,19 @@ export async function activateAcademicYear(yearId: string) {
   }
   const admin = getAdmin()
 
+  // Tenant AVANT le RPC : le client service_role appelle avec auth.uid() nul,
+  // donc le RPC saute sa propre garde de rôle. Sans ce contrôle, un UUID
+  // d'année d'une autre école activait (et clôturait) cette année-là.
+  const { data: year } = await admin
+    .from("academic_years")
+    .select("school_id")
+    .eq("id", yearId)
+    .is("deleted_at", null)
+    .maybeSingle()
+  if (!year || year.school_id !== schoolId) {
+    return { error: "Année introuvable." }
+  }
+
   // RPC atomique (migration 20260917000000) : clôture de l'ancienne année +
   // activation de la nouvelle en UNE transaction. Avant : deux updates séparés,
   // si le second échouait l'école restait sans aucune année active (notes et
@@ -93,17 +106,6 @@ export async function activateAcademicYear(yearId: string) {
       UNAUTHORIZED: "Action réservée à la direction.",
     }
     return { error: messages[code] ?? error.message }
-  }
-
-  // Vérifie que l'année activée appartient bien à l'école de la session
-  // (le RPC lui-même est cloisonné au school_id de l'année ciblée).
-  const { data: year } = await admin
-    .from("academic_years")
-    .select("school_id")
-    .eq("id", yearId)
-    .single()
-  if (year?.school_id && year.school_id !== schoolId) {
-    return { error: "Accès non autorisé." }
   }
 
   return { ok: true, status: typeof data === "string" ? data : undefined }
@@ -128,6 +130,7 @@ export async function getRolloverPreview(oldYearId: string) {
     `)
     .eq("school_id", schoolId)
     .eq("academic_year_id", oldYearId)
+    .in("status", ["confirmed", "active"])
     .is("deleted_at", null)
 
   if (enrollErr) return { error: enrollErr.message }
@@ -285,11 +288,12 @@ export async function executeRollover(oldYearId: string, newYearId: string) {
   const { data: enrollments, error: enrollErr } = await admin
     .from("enrollments")
     .select(`
-      id, student_id, guardian_id, financial_profile_id, grade_level_id, class_id,
+      id, student_id, guardian_id, financial_profile_id, grade_level_id, class_id, matricule,
       academic_decisions ( decision )
     `)
     .eq("school_id", schoolId)
     .eq("academic_year_id", oldYearId)
+    .in("status", ["confirmed", "active"])
     .is("deleted_at", null)
 
   if (enrollErr) return { error: enrollErr.message }
@@ -365,35 +369,22 @@ export async function executeRollover(oldYearId: string, newYearId: string) {
       class_id: target.classId,
       financial_profile_id: enr.financial_profile_id,
       academic_year_id: newYearId,
-      status: "confirmed",
+      // Réinscription : pas 'confirmed' (le trigger handle_enrollment_confirmed
+      // facturerait à nouveau la plateforme). 'active' est le défaut du schéma
+      // et est déjà accepté par les lectures (dashboard, Trouvetou, caisse).
+      status: "active",
       enrollment_date: new Date().toISOString().slice(0, 10),
-      // Matricule unique par inscription (contrainte school_id + matricule).
-      // Format : <PREFIX>-<ANNEE>-<ALEA> (même convention que createEnrollment).
-      matricule: `${schoolId.slice(0, 4).toUpperCase()}-${new Date().getFullYear()}-${crypto.randomUUID().replace(/-/g, "").slice(0, 10).toUpperCase()}`,
+      // Matricule d'État de l'élève : on le RECOPIE, on n'en invente pas un.
+      matricule: (enr as { matricule?: string | null }).matricule ?? null,
     })
   }
 
-  // Insérer les nouveaux enrollments par lots de 50, sans perte silencieuse.
-  // Les matricules sont désormais tirés d'un suffixe UUID — collisions intra-lot
-  // impossibles ; la reprise après échec partiel reste gérée par la garde
-  // anti-doublon rolledStudentIds, qui saute les élèves déjà réinscrits.
-  // Plus d'ignoreDuplicates : toute erreur est remontée, aucune écriture n'est
-  // avalée sans trace (avant, un matricule dupliqué disparaissait silencieusement).
+  // Un seul INSERT : une requête = une transaction Postgres. Les lots de 50
+  // laissaient une bascule partielle (lot 1 écrit, lot 2 en échec). La reprise
+  // après échec reste gérée par rolledStudentIds.
   if (newEnrollments.length > 0) {
-    for (let i = 0; i < newEnrollments.length; i += 50) {
-      const batchIndex = i / 50
-      const batch = newEnrollments.slice(i, i + 50).map((row, j) => ({
-        ...row,
-        matricule:
-          batchIndex === 0
-            ? row.matricule
-            : `${row.matricule}-B${String(batchIndex).padStart(2, "0")}-${String(j).padStart(3, "0")}`,
-      }))
-      const { error: insertErr } = await admin
-        .from("enrollments")
-        .upsert(batch, { onConflict: "school_id, matricule" })
-      if (insertErr) errors.push(insertErr.message)
-    }
+    const { error: insertErr } = await admin.from("enrollments").insert(newEnrollments)
+    if (insertErr) errors.push(insertErr.message)
   }
 
   // Log de la bascule

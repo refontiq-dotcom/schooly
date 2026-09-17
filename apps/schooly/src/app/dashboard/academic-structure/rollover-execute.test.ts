@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   sessionFrom: vi.fn(),
   createAdminClient: vi.fn(),
   alertRolloverCompleted: vi.fn(),
+  rpc: vi.fn(),
 }))
 
 vi.mock("@/utils/supabase/server", () => ({
@@ -138,8 +139,10 @@ beforeEach(() => {
   writes = []
   mocks.getUser.mockResolvedValue({ data: { user: { id: USER_ID } }, error: null })
   mocks.sessionFrom.mockImplementation((table: string) => builderFor(table))
+  mocks.rpc.mockResolvedValue({ data: "en_cours", error: null })
   mocks.createAdminClient.mockImplementation(() => ({
     from: (table: string) => builderFor(table),
+    rpc: mocks.rpc,
   }))
   // Session valide par défaut : direction de l'école courante.
   stub("user_school_roles", { data: { school_id: SCHOOL_ID, role_code: "direction" } })
@@ -149,13 +152,16 @@ beforeEach(() => {
 // Jeux de données
 // ---------------------------------------------------------------------------
 function enrollment(overrides: Record<string, unknown>) {
+  const studentId = (overrides.student_id as string) ?? "s0"
   return {
     id: "e0",
-    student_id: "s0",
+    student_id: studentId,
     guardian_id: "g0",
     financial_profile_id: "fp0",
     grade_level_id: LEVEL_6,
     class_id: null as string | null,
+    status: "confirmed",
+    matricule: `ETAT-${studentId}`,
     academic_decisions: [{ decision: "pending" }],
     ...overrides,
   }
@@ -168,8 +174,7 @@ function admitted(overrides: Record<string, unknown>) {
 /**
  * Programme un déroulement nominal complet : année de destination, inscriptions
  * de l'année source, élèves déjà réinscrits, référentiel des rangs, école (pour
- * l'alerte) et journal de bascule. `upserts` = nombre de lots attendus (50
- * inscriptions par lot).
+ * l'alerte) et journal de bascule. `upserts` = réponses d'écriture (1 INSERT).
  */
 function stubRollover({
   enrollments,
@@ -203,16 +208,10 @@ function stubRollover({
   stub("year_rollover_logs", { error: null })
 }
 
-function upsertRows(): Array<Record<string, any>> {
-  const upsert = writes.find((w) => w.table === "enrollments" && w.op === "upsert")
-  return (upsert?.payload ?? []) as Array<Record<string, any>>
-}
-
-/** Toutes les lignes upsertées, lots confondus. */
-function allUpsertRows(): Array<Record<string, any>> {
-  return writes
-    .filter((w) => w.table === "enrollments" && w.op === "upsert")
-    .flatMap((w) => w.payload as Array<Record<string, any>>)
+function insertRows(): Array<Record<string, any>> {
+  const ins = writes.find((w) => w.table === "enrollments" && w.op === "insert")
+  const payload = ins?.payload
+  return Array.isArray(payload) ? payload : payload ? [payload] : []
 }
 
 function logRow(): Record<string, any> {
@@ -269,7 +268,23 @@ describe("activateAcademicYear — refus lisible", () => {
     expect(await activateAcademicYear("y1")).toEqual({
       error: "Action réservée à la direction.",
     })
+    expect(mocks.rpc).not.toHaveBeenCalled()
     expect(writes).toHaveLength(0)
+  })
+
+  it("refuse une année d'une autre école AVANT le RPC", async () => {
+    stub("academic_years", { data: { school_id: "autre-ecole" }, error: null })
+    expect(await activateAcademicYear("y-etrangere")).toEqual({
+      error: "Année introuvable.",
+    })
+    expect(mocks.rpc).not.toHaveBeenCalled()
+  })
+
+  it("appelle le RPC seulement si l'année appartient à l'école de la session", async () => {
+    stub("academic_years", { data: { school_id: SCHOOL_ID }, error: null })
+    const res = await activateAcademicYear("y1")
+    expect(res).toEqual({ ok: true, status: "en_cours" })
+    expect(mocks.rpc).toHaveBeenCalledWith("activate_academic_year", { p_year_id: "y1" })
   })
 })
 
@@ -359,7 +374,7 @@ describe("executeRollover — décisions du conseil de classe", () => {
       summary: { promoted: 2, repeated: 1, excluded: 1, pending: 1, withoutClass: 0, total: 5 },
     })
 
-    const rows = upsertRows()
+    const rows = insertRows()
     expect(rows.map((r) => r.student_id).sort()).toEqual(["s1", "s2"])
 
     expect(rows.find((r) => r.student_id === "s1")).toMatchObject({
@@ -370,6 +385,7 @@ describe("executeRollover — décisions du conseil de classe", () => {
       academic_year_id: NEW_YEAR,
       status: "active",
       financial_profile_id: "fp0",
+      matricule: "ETAT-s1",
     })
     expect(rows.find((r) => r.student_id === "s2")).toMatchObject({
       grade_level_id: LEVEL_6, // redoublant : même rang
@@ -387,7 +403,7 @@ describe("executeRollover — décisions du conseil de classe", () => {
     const res = await executeRollover(OLD_YEAR, NEW_YEAR)
 
     expect(res).toMatchObject({ ok: true, summary: { promoted: 0, repeated: 0, pending: 1 } })
-    expect(writes.some((w) => w.op === "upsert")).toBe(false)
+    expect(writes.some((w) => w.table === "enrollments" && w.op === "insert")).toBe(false)
     expect(logRow()).toMatchObject({ students_pending: 1, status: "completed" })
   })
 })
@@ -414,47 +430,47 @@ describe("executeRollover — reprise et intégrité des inscriptions", () => {
 
     // s1 était déjà réinscrit : il n'est ni recompté, ni réinséré.
     expect(res).toMatchObject({ ok: true, summary: { promoted: 0, repeated: 1 } })
-    expect(upsertRows().map((r) => r.student_id)).toEqual(["s2"])
+    expect(insertRows().map((r) => r.student_id)).toEqual(["s2"])
   })
 
-  it("génère un matricule unique et sans ignoreDuplicates (plus d'écriture avalée)", async () => {
+  it("recopie le matricule d'État, sans le régénérer", async () => {
     stubRollover({
       enrollments: Array.from({ length: 12 }, (_, i) =>
-        admitted({ id: `e${i}`, student_id: `s${i}`, grade_level_id: LEVEL_6 })
+        admitted({
+          id: `e${i}`,
+          student_id: `s${i}`,
+          grade_level_id: LEVEL_6,
+          matricule: `ETAT-s${i}`,
+        })
       ),
     })
 
     await executeRollover(OLD_YEAR, NEW_YEAR)
 
-    const rows = upsertRows()
-    const matricules = rows.map((r) => r.matricule as string)
-    expect(new Set(matricules).size).toBe(matricules.length)
-    const format = new RegExp(
-      `^${SCHOOL_ID.slice(0, 4).toUpperCase()}-\\d{4}-[0-9A-F]{10}$`
+    const rows = insertRows()
+    expect(rows).toHaveLength(12)
+    expect(rows.map((r) => r.matricule)).toEqual(
+      Array.from({ length: 12 }, (_, i) => `ETAT-s${i}`)
     )
-    for (const matricule of matricules) expect(matricule).toMatch(format)
+    expect(rows.every((r) => r.status === "active")).toBe(true)
 
-    const upsert = writes.find((w) => w.table === "enrollments" && w.op === "upsert")
-    // `ignoreDuplicates` avalait silencieusement une inscription en collision.
-    expect(upsert?.options).toEqual({ onConflict: "school_id, matricule" })
+    const inserts = writes.filter((w) => w.table === "enrollments" && w.op === "insert")
+    expect(inserts).toHaveLength(1)
   })
 
-  it("découpe la promotion en lots de 50 sans collision de matricule entre lots", async () => {
+  it("écrit toutes les réinscriptions en un seul INSERT (pas de lots partiels)", async () => {
     stubRollover({
       enrollments: Array.from({ length: 51 }, (_, i) =>
         admitted({ id: `e${i}`, student_id: `s${i}`, grade_level_id: LEVEL_6 })
       ),
-      upserts: 2,
     })
 
     const res = await executeRollover(OLD_YEAR, NEW_YEAR)
 
     expect(res).toMatchObject({ ok: true, summary: { promoted: 51 } })
-    const batches = writes.filter((w) => w.table === "enrollments" && w.op === "upsert")
-    expect(batches.map((b) => (b.payload as unknown[]).length)).toEqual([50, 1])
-    const matricules = allUpsertRows().map((r) => r.matricule as string)
-    expect(matricules).toHaveLength(51)
-    expect(new Set(matricules).size).toBe(51)
+    const inserts = writes.filter((w) => w.table === "enrollments" && w.op === "insert")
+    expect(inserts).toHaveLength(1)
+    expect((inserts[0].payload as unknown[]).length).toBe(51)
   })
 
   it("remonte une erreur d'insertion au lieu de l'avaler, et journalise l'échec", async () => {
@@ -513,7 +529,7 @@ describe("executeRollover — affectation de classe", () => {
     const res = await executeRollover(OLD_YEAR, NEW_YEAR)
 
     expect(res).toMatchObject({ ok: true, summary: { promoted: 2, withoutClass: 0 } })
-    const rows = upsertRows()
+    const rows = insertRows()
     expect(rows.find((r) => r.student_id === "s1")?.class_id).toBe(CLASS_5A)
     expect(rows.find((r) => r.student_id === "s2")?.class_id).toBe(CLASS_5B)
   })
@@ -534,7 +550,7 @@ describe("executeRollover — affectation de classe", () => {
 
     expect(res).toMatchObject({ ok: true, summary: { promoted: 1, withoutClass: 1 } })
     // L'élève est bien réinscrit (aucune perte), mais sans affectation au hasard.
-    expect(upsertRows()[0]).toMatchObject({
+    expect(insertRows()[0]).toMatchObject({
       student_id: "s1",
       grade_level_id: LEVEL_7,
       class_id: null,
@@ -556,7 +572,7 @@ describe("executeRollover — affectation de classe", () => {
     const res = await executeRollover(OLD_YEAR, NEW_YEAR)
 
     expect(res).toMatchObject({ ok: true, summary: { withoutClass: 0 } })
-    expect(upsertRows()[0].class_id).toBe(CLASS_5A)
+    expect(insertRows()[0].class_id).toBe(CLASS_5A)
   })
 
   it("conserve la classe exacte d'un redoublant", async () => {
@@ -579,7 +595,7 @@ describe("executeRollover — affectation de classe", () => {
     const res = await executeRollover(OLD_YEAR, NEW_YEAR)
 
     expect(res).toMatchObject({ ok: true, summary: { repeated: 1, withoutClass: 0 } })
-    expect(upsertRows()[0].class_id).toBe(CLASS_6B)
+    expect(insertRows()[0].class_id).toBe(CLASS_6B)
   })
 })
 
@@ -722,6 +738,11 @@ describe("executeRollover — cloisonnement par école", () => {
       table: "enrollments",
       method: "eq",
       args: ["school_id", SCHOOL_ID],
+    })
+    expect(filters).toContainEqual({
+      table: "enrollments",
+      method: "in",
+      args: ["status", ["confirmed", "active"]],
     })
     // Suppression logique respectée à chaque lecture d'inscriptions.
     expect(

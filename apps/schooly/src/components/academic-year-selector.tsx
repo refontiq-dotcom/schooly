@@ -12,7 +12,6 @@ import {
   SelectTrigger,
 } from "@/components/ui/select"
 import { getAcademicYears, createAcademicYear } from "@/app/dashboard/academic-structure/actions"
-import { activateAcademicYear } from "@/app/dashboard/academic-structure/rollover-actions"
 
 type AcademicYear = {
   id: string
@@ -75,29 +74,20 @@ export function AcademicYearSelector({ schoolId }: { schoolId?: string | null })
     document.cookie = `${COOKIE_NAME}=${yearId}; Path=/; Max-Age=${COOKIE_MAX_AGE}; SameSite=Lax`
   }
 
-  async function handleChange(yearId: string) {
+  /**
+   * Changer d'année ici = changer le CONTEXTE DE LECTURE (cookie), jamais
+   * activer/clôturer en base. L'activation réelle reste le bouton « Activer »
+   * de l'onglet Années (RPC atomique). Un clic header clôturait N à tort.
+   */
+  function handleChange(yearId: string) {
     if (yearId === selectedId) return
     setSelectedId(yearId)
-    setLoading(true)
-    try {
-      const res = await activateAcademicYear(yearId)
-      if (res?.error) {
-        toast.error(res.error)
-        await load()
-        return
-      }
-      persistCookie(yearId)
-      toast.success("Année académique activée")
-      router.refresh()
-    } catch {
-      toast.error("Action réservée à la direction")
-      await load()
-    } finally {
-      setLoading(false)
-    }
+    persistCookie(yearId)
+    toast.success("Année affichée")
+    router.refresh()
   }
 
-  /** Crée automatiquement l'année scolaire courante (Sept N → Juil N+1) puis l'active. */
+  /** Crée l'année scolaire courante (Sept N → Juil N+1) et la pose en contexte de lecture. */
   async function handleCreateCurrent() {
     const win = computeAcademicWindow()
     setCreating(true)
@@ -109,18 +99,18 @@ export function AcademicYearSelector({ schoolId }: { schoolId?: string | null })
       fd.set("status", "planifiee")
       const res = await createAcademicYear(fd)
       if (res?.error) {
-        // Année déjà existante (ex: créée via Structure académique) → on l'active simplement.
+        // Année déjà existante (ex: créée via Structure académique) → on la sélectionne.
         const data = await load()
         const existing = data.find((y) => y.label === win.label)
         if (!existing) {
           toast.error(res.error)
           return
         }
-        await handleChange(existing.id)
+        handleChange(existing.id)
       } else {
         const data = await load()
         const created = data.find((y) => y.label === win.label)
-        if (created) await handleChange(created.id)
+        if (created) handleChange(created.id)
       }
     } finally {
       setCreating(false)

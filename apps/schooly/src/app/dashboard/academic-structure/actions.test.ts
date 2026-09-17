@@ -157,6 +157,7 @@ describe("createClass — validation et cloisonnement", () => {
   it("refuse un titulaire qui n'appartient pas au personnel de l'école", async () => {
     stub("user_school_roles", DIRECTION, { data: null, error: null })
     stub("grade_levels", { data: { id: "niveau-1" }, error: null })
+    stub("classes", { data: null, error: null })
 
     const res = await createClass(
       form({ gradeLevelId: "niveau-1", name: "6ème A", headTeacherId: "user-etranger" })
@@ -181,7 +182,7 @@ describe("createClass — validation et cloisonnement", () => {
 
   it("crée la classe quand le niveau appartient à l'école", async () => {
     stub("grade_levels", { data: { id: "niveau-1" }, error: null })
-    stub("classes", { error: null }) // résultat de l'insertion
+    stub("classes", { data: null, error: null }, { error: null })
 
     const res = await createClass(
       form({ gradeLevelId: "niveau-1", name: "6ème A", capacity: "45" })
@@ -201,6 +202,16 @@ describe("createClass — validation et cloisonnement", () => {
         }),
       },
     ])
+  })
+
+  it("refuse un nom de classe déjà utilisé", async () => {
+    stub("grade_levels", { data: { id: "niveau-1" }, error: null })
+    stub("classes", { data: { id: "classe-existante" }, error: null })
+
+    const res = await createClass(form({ gradeLevelId: "niveau-1", name: "6ème A" }))
+
+    expect(res).toEqual({ error: "Une classe « 6ème A » existe déjà." })
+    expect(writes).toHaveLength(0)
   })
 })
 
@@ -223,6 +234,15 @@ describe("createGradeLevel — rang unique et positif", () => {
     expect(res).toEqual({ error: "Le rang 6 est déjà utilisé par le niveau « 6ème »." })
     expect(writes).toHaveLength(0)
   })
+
+  it("refuse un nom de niveau déjà utilisé", async () => {
+    stub("grade_levels", { data: null, error: null }, { data: { id: "existant" }, error: null })
+
+    const res = await createGradeLevel(form({ name: "6ème", level: "1", cycle: "Collège" }))
+
+    expect(res).toEqual({ error: "Le niveau « 6ème » existe déjà." })
+    expect(writes).toHaveLength(0)
+  })
 })
 
 describe("createSubject — coefficient", () => {
@@ -233,13 +253,22 @@ describe("createSubject — coefficient", () => {
   })
 
   it("accepte un coefficient positif", async () => {
-    stub("subjects", { error: null }) // résultat de l'insertion
+    stub("subjects", { data: null, error: null }, { error: null })
 
     const res = await createSubject(
       form({ name: "Mathématiques", code: "MAT", coefficient: "4" })
     )
     expect(res).toEqual({})
     expect(writes[0].payload).toMatchObject({ name: "Mathématiques", coefficient: 4 })
+  })
+
+  it("refuse un nom de matière déjà utilisé", async () => {
+    stub("subjects", { data: { id: "matiere-1" }, error: null })
+
+    const res = await createSubject(form({ name: "Mathématiques", coefficient: "4" }))
+
+    expect(res).toEqual({ error: "Une matière « Mathématiques » existe déjà." })
+    expect(writes).toHaveLength(0)
   })
 })
 

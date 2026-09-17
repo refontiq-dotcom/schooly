@@ -318,6 +318,11 @@ export default function AcademicStructurePage() {
               )}
 
               <div className="space-y-2">
+                {academicYears.length === 0 && (
+                  <p className="py-6 text-center text-sm text-muted-foreground">
+                    Aucune année. Créez la première (ex. 2025-2026) puis activez-la.
+                  </p>
+                )}
                 {academicYears.map(year => (
                   <div key={year.id} className="flex items-center justify-between p-3 rounded-lg border">
                     <p className="font-medium">{year.label}</p>
@@ -385,6 +390,11 @@ export default function AcademicStructurePage() {
                 rang (le plus élevé), qui est celui des élèves sortants.
               </p>
               <div className="space-y-2">
+                {gradeLevels.length === 0 && (
+                  <p className="py-6 text-center text-sm text-muted-foreground">
+                    Aucun niveau. Le rang 1 est la première année de l&apos;établissement, puis 2, 3…
+                  </p>
+                )}
                 {gradeLevels.map(level => (
                   <div key={level.id} className="flex flex-col rounded-lg border p-3">
                     <div className="flex items-center justify-between gap-3">
@@ -464,6 +474,11 @@ export default function AcademicStructurePage() {
                 <Button type="submit" size="icon"><Plus className="h-4 w-4" /></Button>
               </ActionForm>
               <div className="space-y-2">
+                {classes.length === 0 && (
+                  <p className="py-6 text-center text-sm text-muted-foreground">
+                    Aucune classe. Créez d&apos;abord un niveau, puis une classe (ex. 6ème A).
+                  </p>
+                )}
                 {classes.map(cls => (
                   <div key={cls.id} className="flex flex-col rounded-lg border p-3">
                     <div className="flex items-center justify-between gap-3">
@@ -539,6 +554,11 @@ export default function AcademicStructurePage() {
                 <Button type="submit" size="icon"><Plus className="h-4 w-4" /></Button>
               </ActionForm>
               <div className="space-y-2">
+                {subjects.length === 0 && (
+                  <p className="py-6 text-center text-sm text-muted-foreground">
+                    Aucune matière. Ajoutez les enseignements (Mathématiques, Français…) et leurs coefficients.
+                  </p>
+                )}
                 {subjects.map(subject => (
                   <div key={subject.id} className="flex flex-col rounded-lg border p-3">
                     <div className="flex items-center justify-between gap-3">
@@ -632,6 +652,11 @@ export default function AcademicStructurePage() {
                 {/* Tri d'affichage local (classe puis matière) : le tri ne peut
                     pas être demandé à PostgREST sur une ressource embarquée
                     sans risquer un 400 qui vidait la matrice. */}
+                {assignments.length === 0 && (
+                  <p className="py-6 text-center text-sm text-muted-foreground">
+                    Matrice vide. Affectez une matière à une classe, avec son coefficient et son professeur.
+                  </p>
+                )}
                 {assignments
                   .slice()
                   .sort(
