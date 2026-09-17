@@ -4,6 +4,7 @@ import { createClient } from "@/utils/supabase/server"
 import { ROLLOVER_ROLES } from "@/utils/supabase/roles"
 import { createClient as createAdminClient } from "@supabase/supabase-js"
 import { alertRolloverCompleted } from "@/lib/telegram"
+import { resolveRolloverTarget } from "./class-assignment"
 
 const getAdmin = () =>
   createAdminClient(
@@ -29,48 +30,51 @@ async function getContext() {
   return { userId: user.id, schoolId: role.school_id }
 }
 
-// ─── Lire les années académiques ─────────────────────────────────────────────
+// ─── Lecture / création des années ─────────────────────────────────────────
+// Volontairement absentes de ce fichier : `getAcademicYears` et
+// `createAcademicYear` n'existent plus qu'à UN endroit — actions.ts, module
+// Structure académique. Le panneau de bascule en entretenait une seconde copie
+// divergente (champs `start_date`/`end_date` au lieu de `startDate`/`endDate`,
+// statut forcé, filtre deleted_at présent), donc deux formulaires de création
+// sur la même page écrivant la même table avec deux contrats différents.
 
-export async function getAcademicYears() {
-  const { schoolId } = await getContext()
-  const admin = getAdmin()
-  const { data, error } = await admin
-    .from("academic_years")
-    .select("*")
-    .eq("school_id", schoolId)
-    .is("deleted_at", null)
-    .order("start_date", { ascending: false })
-  if (error) return { error: error.message }
-  return { data: data || [] }
+/** Messages des gardes de session, côté lecture (aucune exception remontée). */
+const GUARD_MESSAGES: Record<string, string> = {
+  NOT_AUTHENTICATED: "Session expirée — reconnectez-vous.",
+  UNAUTHORIZED: "Action réservée à la direction.",
 }
 
-// ─── Créer une nouvelle année académique ─────────────────────────────────────
+function guardMessage(err: unknown) {
+  const raw = err instanceof Error ? err.message : ""
+  return GUARD_MESSAGES[raw] ?? (raw || "Action impossible.")
+}
 
-export async function createAcademicYear(formData: FormData) {
-  const { schoolId } = await getContext()
-  const admin = getAdmin()
-
-  const label = formData.get("label") as string
-  const startDate = formData.get("start_date") as string
-  const endDate = formData.get("end_date") as string
-
-  if (!label || !startDate || !endDate) return { error: "Champs requis manquants." }
-
-  const { error } = await admin.from("academic_years").insert({
-    school_id: schoolId,
-    label,
-    start_date: startDate,
-    end_date: endDate,
-    status: "planifiee",
-  })
-  if (error) return { error: error.message }
-  return { ok: true }
+/**
+ * Droit d'exécuter la bascule, testable sans exception.
+ * Le panneau l'interroge avant d'appeler les actions réservées à la direction
+ * (ROLLOVER_ROLES) : sans ce test, un membre du secrétariat — pourtant autorisé
+ * à consulter la page — voyait un écran vide, l'action rejetant en silence.
+ */
+export async function canRunRollover(): Promise<{ allowed: boolean; error?: string }> {
+  try {
+    await getContext()
+    return { allowed: true }
+  } catch (err) {
+    return { allowed: false, error: guardMessage(err) }
+  }
 }
 
 // ─── Activer une année (clôture l'année "en_cours", active la nouvelle) ──────
 
 export async function activateAcademicYear(yearId: string) {
-  const { schoolId } = await getContext()
+  // Pas d'exception ici : l'onglet « Années » est accessible au secrétariat,
+  // qui ne peut pas activer. Il doit lire pourquoi, pas rester devant rien.
+  let schoolId: string
+  try {
+    schoolId = (await getContext()).schoolId
+  } catch (err) {
+    return { error: guardMessage(err) }
+  }
   const admin = getAdmin()
 
   // RPC atomique (migration 20260917000000) : clôture de l'ancienne année +
@@ -116,7 +120,7 @@ export async function getRolloverPreview(oldYearId: string) {
   const { data: enrollments, error: enrollErr } = await admin
     .from("enrollments")
     .select(`
-      id, status,
+      id, status, class_id,
       students ( id, first_name, last_name ),
       classes ( name ),
       grade_levels ( id, name, level ),
@@ -127,6 +131,49 @@ export async function getRolloverPreview(oldYearId: string) {
     .is("deleted_at", null)
 
   if (enrollErr) return { error: enrollErr.message }
+
+  // Référentiels nécessaires au calcul de la DESTINATION (niveau + classe) :
+  // exactement les mêmes règles que l'exécution, via le module pur
+  // class-assignment — la prévisualisation ne peut donc pas annoncer autre
+  // chose que ce que la bascule fera.
+  const [{ data: gradeLevels }, { data: classes }] = await Promise.all([
+    admin.from("grade_levels").select("id, level").eq("school_id", schoolId).is("deleted_at", null),
+    admin.from("classes").select("id, name, grade_level_id").eq("school_id", schoolId).is("deleted_at", null),
+  ])
+
+  const classNames = new Map((classes ?? []).map((c) => [c.id, c.name]))
+
+  const rows = (enrollments || []).map((e) => {
+    const decision = (e.academic_decisions as any)?.[0]?.decision ?? "pending"
+    const target = resolveRolloverTarget(gradeLevels ?? [], classes ?? [], {
+      gradeLevelId: (e.grade_levels as any)?.id,
+      classId: (e as any).class_id ?? null,
+      decision,
+    })
+    return {
+      id: e.id,
+      studentName: `${(e.students as any)?.last_name} ${(e.students as any)?.first_name}`,
+      className: (e.classes as any)?.name ?? "—",
+      gradeLevelId: (e.grade_levels as any)?.id,
+      gradeLevelName: (e.grade_levels as any)?.name ?? "—",
+      gradeLevelOrder: (e.grade_levels as any)?.level ?? 0,
+      decision,
+      targetStatus: target.kind,
+      targetClassId: target.kind === "enrolled" ? target.classId : null,
+      targetClassName:
+        target.kind === "enrolled" && target.classId
+          ? classNames.get(target.classId) ?? null
+          : null,
+    }
+  })
+
+  // Combien d'élèves seront réinscrits SANS classe : annoncé AVANT la bascule,
+  // c'est l'information qui manquait (elle n'apparaissait nulle part, et sans
+  // classe un élève est invisible des listes de classe, moyennes et appels).
+  const withoutClass = rows.filter(
+    (r) => r.targetStatus === "enrolled" && r.targetClassId === null
+  ).length
+  const graduated = rows.filter((r) => r.targetStatus === "graduated").length
 
   const total = enrollments?.length ?? 0
   const admitted = enrollments?.filter(e => (e.academic_decisions as any)?.[0]?.decision === "admitted").length ?? 0
@@ -141,15 +188,9 @@ export async function getRolloverPreview(oldYearId: string) {
       repeated,
       excluded,
       pending,
-      enrollments: (enrollments || []).map(e => ({
-        id: e.id,
-        studentName: `${(e.students as any)?.last_name} ${(e.students as any)?.first_name}`,
-        className: (e.classes as any)?.name ?? "—",
-        gradeLevelId: (e.grade_levels as any)?.id,
-        gradeLevelName: (e.grade_levels as any)?.name ?? "—",
-        gradeLevelOrder: (e.grade_levels as any)?.level ?? 0,
-        decision: (e.academic_decisions as any)?.[0]?.decision ?? "pending",
-      })),
+      withoutClass,
+      graduated,
+      enrollments: rows,
     },
   }
 }
@@ -172,13 +213,22 @@ export async function setEnrollmentDecision(
 
   const { data: enrollment } = await admin
     .from("enrollments")
-    .select("id")
+    .select("id, academic_year_id")
     .eq("id", enrollmentId)
     .eq("school_id", schoolId)
     .is("deleted_at", null)
     .single()
 
   if (!enrollment) return { error: "Inscription introuvable." }
+
+  // L'année de la décision est celle de L'INSCRIPTION, jamais celle annoncée
+  // par le formulaire : `oldYearId` vient du client. Sans ce contrôle, une
+  // décision pouvait être écrite sur une autre année — or la bascule lit la
+  // décision via l'embed de l'inscription, donc une décision mal rattachée
+  // était quand même appliquée (promotion d'un élève sur la mauvaise décision).
+  if (enrollment.academic_year_id !== oldYearId) {
+    return { error: "Cette inscription n'appartient pas à l'année sélectionnée." }
+  }
 
   const { error } = await admin
     .from("academic_decisions")
@@ -217,13 +267,25 @@ export async function executeRollover(oldYearId: string, newYearId: string) {
 
   if (!newYear) return { error: "Nouvelle année introuvable." }
 
+  // Garde-fous sur le couple source/destination : rejouer la même année ferait
+  // « basculer » les élèves vers l'année où ils sont déjà (tout le monde serait
+  // ignoré par la garde anti-doublon, mais un journal « réussi » à 0 élève
+  // laisserait croire à une bascule effectuée), et réinscrire dans une année
+  // clôturée produit des inscriptions dans une année close.
+  if (oldYearId === newYearId) {
+    return { error: "L'année source et l'année de destination doivent être différentes." }
+  }
+  if (newYear.status === "cloturee") {
+    return { error: "Impossible de réinscrire dans une année clôturée." }
+  }
+
   // Récupérer tous les enrollments de l'ancienne année avec leurs décisions
   // (source de vérité : academic_decisions, partagée avec le module Pédagogie
   // et getRolloverPreview — PAS enrollment_decisions).
   const { data: enrollments, error: enrollErr } = await admin
     .from("enrollments")
     .select(`
-      id, student_id, guardian_id, financial_profile_id, grade_level_id,
+      id, student_id, guardian_id, financial_profile_id, grade_level_id, class_id,
       academic_decisions ( decision )
     `)
     .eq("school_id", schoolId)
@@ -244,7 +306,7 @@ export async function executeRollover(oldYearId: string, newYearId: string) {
 
   const rolledStudentIds = new Set((alreadyRolled || []).map(r => r.student_id))
 
-  // Récupérer tous les niveaux de l'école triés par ordre
+  // Référentiels nécessaires : niveaux (rang suivant) et CLASSES (destination).
   const { data: gradeLevels } = await admin
     .from("grade_levels")
     .select("id, level")
@@ -252,10 +314,16 @@ export async function executeRollover(oldYearId: string, newYearId: string) {
     .is("deleted_at", null)
     .order("level")
 
-  const levelById = new Map((gradeLevels || []).map(g => [g.id, g.level]))
-  const levelToId = new Map((gradeLevels || []).map(g => [g.level, g.id]))
+  // La classe est un objet d'école réutilisé d'année en année : sans ce
+  // renseignement, chaque élève basculé arrivait avec class_id null, donc
+  // invisible des listes de classe, des moyennes de classe et de l'appel.
+  const { data: classes } = await admin
+    .from("classes")
+    .select("id, name, grade_level_id")
+    .eq("school_id", schoolId)
+    .is("deleted_at", null)
 
-  let promoted = 0, repeated = 0, excluded = 0, pending = 0
+  let promoted = 0, repeated = 0, excluded = 0, pending = 0, withoutClass = 0
   const errors: string[] = []
   const newEnrollments: any[] = []
 
@@ -265,43 +333,36 @@ export async function executeRollover(oldYearId: string, newYearId: string) {
 
     const decision = ((enr as any).academic_decisions as any)?.[0]?.decision ?? "pending"
 
-    if (decision === "excluded") {
-      excluded++
-      continue
-    }
-    if (decision === "pending") {
-      pending++
+    // Une SEULE source de vérité pour la promotion (niveau + classe), partagée
+    // avec getRolloverPreview : module pur class-assignment.
+    const target = resolveRolloverTarget(gradeLevels ?? [], classes ?? [], {
+      gradeLevelId: enr.grade_level_id,
+      classId: (enr as any).class_id ?? null,
+      decision,
+    })
+
+    if (target.kind === "skipped") {
+      if (target.reason === "excluded") excluded++
+      else pending++
       continue
     }
 
-    let nextGradeLevelId = enr.grade_level_id
+    if (decision === "admitted") promoted++
+    else repeated++
 
-    if (decision === "admitted") {
-      // Promouvoir au niveau suivant
-      const currentLevel = levelById.get(enr.grade_level_id)
-      if (currentLevel !== undefined) {
-        const nextLevel = currentLevel + 1
-        const nextId = levelToId.get(nextLevel)
-        if (nextId) {
-          nextGradeLevelId = nextId
-        }
-        // Si plus de niveau suivant : diplômé, on ne réinscrit pas
-        if (!nextId) {
-          promoted++ // diplômé
-          continue
-        }
-      }
-      promoted++
-    } else {
-      // repeated : même niveau
-      repeated++
-    }
+    // Dernier rang de l'école : diplômé, aucune réinscription.
+    if (target.kind === "graduated") continue
+
+    // Appariement ambigu : réinscrit sans classe, compté dans le rapport — la
+    // direction le place ensuite, jamais d'affectation au hasard.
+    if (target.classId === null) withoutClass++
 
     newEnrollments.push({
       school_id: schoolId,
       student_id: enr.student_id,
       guardian_id: enr.guardian_id,
-      grade_level_id: nextGradeLevelId,
+      grade_level_id: target.gradeLevelId,
+      class_id: target.classId,
       financial_profile_id: enr.financial_profile_id,
       academic_year_id: newYearId,
       status: "active",
@@ -345,6 +406,7 @@ export async function executeRollover(oldYearId: string, newYearId: string) {
     students_repeated: repeated,
     students_excluded: excluded,
     students_pending: pending,
+    students_without_class: withoutClass,
     status: errors.length === 0 ? "completed" : "failed",
     error_message: errors.length > 0 ? errors.join("; ") : null,
     completed_at: new Date().toISOString(),
@@ -367,7 +429,7 @@ export async function executeRollover(oldYearId: string, newYearId: string) {
 
   return {
     ok: true,
-    summary: { promoted, repeated, excluded, pending, total: enrollments.length },
+    summary: { promoted, repeated, excluded, pending, withoutClass, total: enrollments.length },
   }
 }
 

@@ -120,7 +120,7 @@ describe("setEnrollmentDecision — garde de session (getContext)", () => {
 describe("setEnrollmentDecision — cloisonnement inter-écoles (verrou audit P1-3)", () => {
   it("filtre la recherche d'inscription par l'école de la session", async () => {
     // Le guard de l'audit : l'inscription doit être cherchée AVEC school_id.
-    enrollmentLookup = { data: { id: "enr-1" }, error: null }
+    enrollmentLookup = { data: { id: "enr-1", academic_year_id: "y1" }, error: null }
     await setEnrollmentDecision("enr-1", "y1", "admitted")
     expect(filters).toContainEqual({
       table: "enrollments",
@@ -143,7 +143,7 @@ describe("setEnrollmentDecision — validation et écriture", () => {
   it.each([["admitted"], ["repeated"], ["excluded"], ["pending"]] as const)(
     "accepte la décision valide %s et la borne à l'école de la session",
     async (decision) => {
-      enrollmentLookup = { data: { id: "enr-1" }, error: null }
+      enrollmentLookup = { data: { id: "enr-1", academic_year_id: "y1" }, error: null }
       const res = await setEnrollmentDecision("enr-1", "y1", decision)
       expect(res).toEqual({ ok: true })
       expect(writes).toEqual([
@@ -167,6 +167,18 @@ describe("setEnrollmentDecision — validation et écriture", () => {
     // getContext() a déjà lu le rôle (inévitable), mais AUCUNE recherche
     // d'inscription ni écriture ne doit avoir eu lieu.
     expect(filters.filter((f) => f.table === "enrollments")).toHaveLength(0)
+    expect(writes).toHaveLength(0)
+  })
+})
+
+describe("setEnrollmentDecision — année de la décision (verrou d'intégrité)", () => {
+  it("rattache la décision à l'année de l'inscription, pas à celle du formulaire", async () => {
+    // `oldYearId` vient du client : une décision posée sur une autre année
+    // serait quand même lue par la bascule (embed de l'inscription) et
+    // appliquée à l'élève. L'écriture doit être refusée.
+    enrollmentLookup = { data: { id: "enr-1", academic_year_id: "annee-reelle" }, error: null }
+    const res = await setEnrollmentDecision("enr-1", "annee-du-formulaire", "admitted")
+    expect(res).toEqual({ error: "Cette inscription n'appartient pas à l'année sélectionnée." })
     expect(writes).toHaveLength(0)
   })
 })

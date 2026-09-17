@@ -3,31 +3,31 @@
 import { useState, useEffect, useTransition } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
-import { ActionForm } from "@/components/action-form"
+// Années : UNE seule implémentation, celle du module Structure académique
+// (actions.ts). Le panneau entretenait sa propre paire getAcademicYears /
+// createAcademicYear, avec d'autres noms de champs (start_date vs startDate),
+// un statut forcé différent et un filtre deleted_at absent : deux vérités pour
+// la même table, deux formulaires de création sur la même page.
+import { getAcademicYears } from "./actions"
 import {
-  getAcademicYears,
-  createAcademicYear,
-  activateAcademicYear,
+  canRunRollover,
   getRolloverPreview,
   executeRollover,
   getRolloverLogs,
   setEnrollmentDecision,
 } from "./rollover-actions"
 import {
-  CalendarDays,
   Play,
+  CalendarDays,
   CheckCircle2,
   AlertTriangle,
   Loader2,
   RotateCcw,
-  Users,
   TrendingUp,
   XCircle,
   Clock,
-  Plus,
   ChevronRight,
   History,
 } from "lucide-react"
@@ -40,21 +40,30 @@ type AcademicYear = {
   status: string
 }
 
+type PreviewRow = {
+  id: string
+  studentName: string
+  className: string
+  gradeLevelId?: string
+  gradeLevelName: string
+  gradeLevelOrder: number
+  decision: string
+  /** Destination calculée par le même moteur que l'exécution. */
+  targetStatus: "skipped" | "graduated" | "enrolled"
+  targetClassId: string | null
+  targetClassName: string | null
+}
+
 type RolloverPreview = {
   total: number
   admitted: number
   repeated: number
   excluded: number
   pending: number
-  enrollments: Array<{
-    id: string
-    studentName: string
-    className: string
-    gradeLevelId?: string
-    gradeLevelName: string
-    gradeLevelOrder: number
-    decision: string
-  }>
+  /** Élèves qui seront réinscrits sans classe (appariement ambigu). */
+  withoutClass: number
+  graduated: number
+  enrollments: PreviewRow[]
 }
 
 type RolloverResult = {
@@ -62,7 +71,19 @@ type RolloverResult = {
   repeated: number
   excluded: number
   pending: number
+  withoutClass: number
   total: number
+}
+
+const ERROR_MESSAGES: Record<string, string> = {
+  NOT_AUTHENTICATED: "Session expirée — reconnectez-vous.",
+  UNAUTHORIZED: "La bascule d'année est réservée à la direction.",
+}
+
+/** Traduit une exception de garde en message affichable (jamais d'écran vide). */
+function messageFrom(err: unknown) {
+  const raw = err instanceof Error ? err.message : ""
+  return ERROR_MESSAGES[raw] ?? (raw || "Une erreur est survenue.")
 }
 
 const YEAR_STATUS_CONFIG: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
@@ -87,18 +108,36 @@ export function YearRolloverPanel() {
   const [selectedOldYear, setSelectedOldYear] = useState("");
   const [selectedNewYear, setSelectedNewYear] = useState("");
   const [step, setStep] = useState<"config" | "preview" | "done">("config")
-  const [showCreateForm, setShowCreateForm] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
 
   const [isPending, startTransition] = useTransition()
   const [isExecuting, setIsExecuting] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  // La bascule est réservée à la direction (ROLLOVER_ROLES). Le secretariat
+  // peut consulter la page : on teste le droit AVANT d'appeler les actions
+  // protégées, qui rejettent — sinon la page restait vide sans explication.
+  const [isAllowed, setIsAllowed] = useState(false)
+  const [accessMsg, setAccessMsg] = useState<string | null>(null)
 
   const load = () => {
     startTransition(async () => {
-      const [yearsRes, logsRes] = await Promise.all([getAcademicYears(), getRolloverLogs()])
-      if ("data" in yearsRes) setYears(yearsRes.data as AcademicYear[])
-      if ("data" in logsRes) setLogs(logsRes.data as any[])
+      try {
+        const yearsRes = await getAcademicYears()
+        if ("data" in yearsRes && yearsRes.data) setYears(yearsRes.data as AcademicYear[])
+
+        const access = await canRunRollover()
+        setIsAllowed(access.allowed)
+        if (!access.allowed) {
+          setAccessMsg(access.error ?? null)
+          return
+        }
+        setAccessMsg(null)
+
+        const logsRes = await getRolloverLogs()
+        if ("data" in logsRes && logsRes.data) setLogs(logsRes.data as any[])
+      } catch (err) {
+        setAccessMsg(messageFrom(err))
+      }
     })
   }
 
@@ -116,10 +155,14 @@ export function YearRolloverPanel() {
     if (!selectedOldYear) { setErrorMsg("Sélectionnez l'année source."); return }
     setErrorMsg(null)
     startTransition(async () => {
-      const res = await getRolloverPreview(selectedOldYear)
-      if ("error" in res) { setErrorMsg(res.error ?? "Erreur inconnue"); return }
-      setPreview(res.data)
-      setStep("preview")
+      try {
+        const res = await getRolloverPreview(selectedOldYear)
+        if ("error" in res) { setErrorMsg(res.error ?? "Erreur inconnue"); return }
+        setPreview(res.data)
+        setStep("preview")
+      } catch (err) {
+        setErrorMsg(messageFrom(err))
+      }
     })
   }
 
@@ -133,64 +176,39 @@ export function YearRolloverPanel() {
       setResult(res.summary)
       setStep("done")
       load()
+    } catch (err) {
+      setErrorMsg(messageFrom(err))
     } finally {
       setIsExecuting(false)
     }
   }
 
-  const handleActivate = async (yearId: string) => {
-    const res = await activateAcademicYear(yearId)
-    if ("error" in res) { setErrorMsg(res.error ?? "Erreur inconnue"); return }
-    load()
-  }
-
   return (
     <div className="space-y-6">
-      {/* Années académiques */}
+      {accessMsg && (
+        <Card>
+          <CardContent className="flex items-start gap-3 pt-6 text-sm text-muted-foreground">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+            <div>
+              <p className="font-medium text-foreground">Bascule non disponible</p>
+              <p className="mt-0.5">{accessMsg}</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Années académiques (lecture seule : la gestion est dans l'onglet « Années ») */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <CalendarDays className="h-5 w-5" /> Années académiques
-            </CardTitle>
-            <CardDescription>Gérez le cycle scolaire de votre établissement.</CardDescription>
-          </div>
-          <Button size="sm" onClick={() => setShowCreateForm(f => !f)}>
-            <Plus className="h-4 w-4 mr-1" /> Nouvelle année
-          </Button>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <History className="h-5 w-5" /> Années académiques
+          </CardTitle>
+          <CardDescription>
+            Cycle scolaire de l&apos;établissement. La création et l&apos;activation des années se
+            font depuis l&apos;onglet « Années ».
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {showCreateForm && (
-            <div className="rounded-lg border p-4 bg-muted/30">
-              <ActionForm
-                action={async (fd) => {
-                  const r = await createAcademicYear(fd)
-                  if (r && !("ok" in r)) return r as any
-                  load()
-                  setShowCreateForm(false)
-                }}
-                className="grid gap-3 sm:grid-cols-3"
-              >
-                <div className="space-y-1">
-                  <Label htmlFor="year-label">Libellé *</Label>
-                  <Input id="year-label" name="label" placeholder="2026-2027" required />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="year-start">Début *</Label>
-                  <Input id="year-start" name="start_date" type="date" required />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="year-end">Fin *</Label>
-                  <Input id="year-end" name="end_date" type="date" required />
-                </div>
-                <div className="sm:col-span-3 flex justify-end gap-2">
-                  <Button type="button" variant="outline" size="sm" onClick={() => setShowCreateForm(false)}>Annuler</Button>
-                  <Button type="submit" size="sm">Créer</Button>
-                </div>
-              </ActionForm>
-            </div>
-          )}
-
           {years.length === 0 ? (
             <p className="text-center py-6 text-muted-foreground text-sm">Aucune année configurée.</p>
           ) : (
@@ -211,15 +229,6 @@ export function YearRolloverPanel() {
                     </div>
                     <div className="flex items-center gap-2">
                       <Badge variant={cfg.variant}>{cfg.label}</Badge>
-                      {year.status === "planifiee" && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleActivate(year.id)}
-                        >
-                          <Play className="h-3.5 w-3.5 mr-1" /> Activer
-                        </Button>
-                      )}
                     </div>
                   </div>
                 )
@@ -230,6 +239,8 @@ export function YearRolloverPanel() {
       </Card>
 
       {/* Bascule d'année */}
+      {isAllowed && (
+        <>
       <Card className="border-primary/30">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -249,8 +260,7 @@ export function YearRolloverPanel() {
                   step === s ? "bg-primary text-primary-foreground"
                   : (["config", "preview", "done"].indexOf(step) > i) ? "bg-green-100 text-green-700"
                   : "bg-muted text-muted-foreground"
-                }`}>
-                  {s === "config" ? "1. Configuration" : s === "preview" ? "2. Prévisualisation" : "3. Résultat"}
+                }`}>                  {s === "config" ? "1. Configuration" : s === "preview" ? "2. Prévisualisation" : "3. Résultat"}
                 </span>
               </div>
             ))}
@@ -302,7 +312,8 @@ export function YearRolloverPanel() {
               {plannedYears.length === 0 && (
                 <div className="flex items-start gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-sm text-amber-800">
                   <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
-                  Aucune année planifiée. Créez d'abord la prochaine année académique ci-dessus avant de lancer la bascule.
+                  Aucune année planifiée. Créez d&apos;abord la prochaine année académique depuis
+                  l&apos;onglet « Années » avant de lancer la bascule.
                 </div>
               )}
 
@@ -347,7 +358,8 @@ export function YearRolloverPanel() {
                   <thead className="sticky top-0 bg-muted">
                     <tr className="border-b">
                       <th className="text-left py-2 px-3 font-medium">Élève</th>
-                      <th className="text-left py-2 px-3 font-medium">Classe</th>
+                      <th className="text-left py-2 px-3 font-medium">Classe actuelle</th>
+                      <th className="text-left py-2 px-3 font-medium">Destination</th>
                       <th className="text-left py-2 px-3 font-medium">Décision</th>
                     </tr>
                   </thead>
@@ -358,6 +370,19 @@ export function YearRolloverPanel() {
                         <tr key={e.id} className="border-b last:border-0">
                           <td className="py-2 px-3">{e.studentName}</td>
                           <td className="py-2 px-3 text-muted-foreground">{e.className}</td>
+                          <td className="py-2 px-3">
+                            {e.targetStatus === "graduated" ? (
+                              <span className="text-muted-foreground">Diplômé(e)</span>
+                            ) : e.targetStatus === "skipped" ? (
+                              <span className="text-muted-foreground">—</span>
+                            ) : e.targetClassName ? (
+                              <span>{e.targetClassName}</span>
+                            ) : (
+                              <span className="rounded bg-amber-100 px-1.5 py-0.5 font-medium text-amber-800">
+                                sans classe
+                              </span>
+                            )}
+                          </td>
                           <td className="py-2 px-3">
                             <div className="flex items-center gap-1.5">
                               <span className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium ${d?.color}`}>
@@ -430,6 +455,32 @@ export function YearRolloverPanel() {
                 </Button>
               </div>
 
+              {preview.graduated > 0 && (
+                <div className="flex items-start gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-sm text-amber-800">
+                  <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                  <span>
+                    <strong>{preview.graduated} élève(s)</strong> seront considérés comme{" "}
+                    <strong>diplômés</strong> (aucun rang supérieur au leur) et ne seront pas
+                    réinscrits. Vérifiez que le rang de leur niveau est bien le plus élevé de
+                    l&apos;école et que les niveaux sont numérotés du plus petit au plus grand.
+                  </span>
+                </div>
+              )}
+
+              {preview.withoutClass > 0 && (
+                <div className="flex items-start gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-sm text-amber-800">
+                  <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                  <span>
+                    <strong>{preview.withoutClass} élève(s)</strong> seront réinscrits{" "}
+                    <strong>sans classe</strong> : le parallèle n&apos;a pas pu être déterminé
+                    (niveau de destination sans parallèle correspondant, ou plusieurs
+                    candidats). Sans classe, un élève reste invisible des listes de classe, des
+                    moyennes de classe et de l&apos;appel — à affecter au secrétariat après la
+                    bascule.
+                  </span>
+                </div>
+              )}
+
               {preview.pending > 0 && (
                 <div className="flex items-start gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-sm text-amber-800">
                   <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
@@ -474,6 +525,12 @@ export function YearRolloverPanel() {
                     {result.promoted} promu(s) · {result.repeated} redoublant(s) ·{" "}
                     {result.excluded} exclu(s) · {result.pending} sans décision
                   </p>
+                  {result.withoutClass > 0 && (
+                    <p className="text-sm font-medium text-amber-700">
+                      {result.withoutClass} élève(s) sans classe — à affecter depuis l&apos;onglet
+                      Classes.
+                    </p>
+                  )}
                 </div>
               </div>
               <Button onClick={() => { setStep("config"); setPreview(null); setResult(null); setSelectedOldYear(""); setSelectedNewYear("") }}>
@@ -517,6 +574,9 @@ export function YearRolloverPanel() {
                       </Badge>
                       <p className="text-xs text-muted-foreground mt-1">
                         +{log.students_promoted} · ↺{log.students_repeated} · ✕{log.students_excluded}
+                        {(log.students_without_class ?? 0) > 0
+                          ? ` · ⚑${log.students_without_class} sans classe`
+                          : ""}
                       </p>
                     </div>
                   </div>
@@ -526,6 +586,8 @@ export function YearRolloverPanel() {
           </CardContent>
         )}
       </Card>
+        </>
+      )}
     </div>
   )
 }
