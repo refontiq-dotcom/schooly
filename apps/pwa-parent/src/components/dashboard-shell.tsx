@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation"
 import {
   BarChart3,
   ChevronDown,
+  ChevronRight,
   CircleDollarSign,
   CreditCard,
   Gauge,
@@ -29,9 +30,9 @@ const navItems = [
   { label: "Caisse", href: "/dashboard", icon: CircleDollarSign },
   { label: "Wallet", href: "/dashboard", icon: WalletCards },
   { label: "Notes", href: "/dashboard/bulletin", icon: GraduationCap },
-  { label: "Réglages", href: "/dashboard", icon: Settings },
 ]
 
+const settingsItems = ["Profil", "Sécurité", "Notifications"]
 const currencyOptions = ["FCFA", "EUR", "USD"]
 const languageOptions = ["FR", "EN"]
 
@@ -100,6 +101,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const [openDropdown, setOpenDropdown] = useState<"currency" | "language" | null>(null)
   const [currency, setCurrency] = useState("FCFA")
   const [language, setLanguage] = useState("FR")
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [activeSetting, setActiveSetting] = useState<string | null>(null)
   const [navigationDirection, setNavigationDirection] = useState<"forward" | "backward" | null>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
@@ -128,6 +131,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       if (event.key === "Escape") {
         setMobileOpen(false)
         setOpenDropdown(null)
+        setSettingsOpen(false)
       }
     }
     window.addEventListener("keydown", onKeyDown)
@@ -137,6 +141,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     setMobileOpen(false)
     setOpenDropdown(null)
+    setSettingsOpen(false)
     setNavigationDirection(null)
   }, [pathname])
 
@@ -216,6 +221,47 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               </Link>
             )
           })}
+
+          <div className={`dashboard-settings-menu ${settingsOpen ? "is-open" : ""}`}>
+            <button
+              type="button"
+              className={`dashboard-nav-item dashboard-settings-trigger ${settingsOpen ? "is-open" : ""}`}
+              onClick={() => setSettingsOpen((value) => !value)}
+              title={collapsed ? "Réglages" : undefined}
+              aria-haspopup="menu"
+              aria-expanded={settingsOpen}
+            >
+              <Settings size={15} strokeWidth={1.8} />
+              <span className={`dashboard-nav-label ${collapsed ? "is-hidden" : ""}`}>Réglages</span>
+              {!collapsed && <ChevronRight className="dashboard-settings-chevron" size={14} />}
+            </button>
+
+            <div
+              className="dashboard-settings-submenu"
+              role="menu"
+              aria-hidden={!settingsOpen}
+            >
+              <div className="dashboard-settings-submenu-inner">
+                {settingsItems.map((item) => {
+                  const selected = activeSetting === item
+                  return (
+                    <button
+                      key={item}
+                      type="button"
+                      role="menuitem"
+                      tabIndex={settingsOpen && !collapsed ? 0 : -1}
+                      aria-current={selected ? "page" : undefined}
+                      className={`dashboard-settings-subitem ${selected ? "is-selected" : ""}`}
+                      onClick={() => setActiveSetting(item)}
+                    >
+                      <span>{item}</span>
+                      <span className="dashboard-settings-subitem-indicator" aria-hidden="true" />
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
         </nav>
 
         <div className="dashboard-sidebar-bottom">
