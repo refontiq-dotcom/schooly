@@ -61,11 +61,26 @@ export async function createAcademicYear(formData: FormData): Promise<ActionResu
   if (!label || !startDate || !endDate) {
     return { error: "Label, date de début et date de fin sont requis." }
   }
+  if (endDate < startDate) {
+    return { error: "La date de fin doit suivre la date de début." }
+  }
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
+
+  // Une seule année "en_cours" par école (index unique partiel, migration
+  // 20260917000000) : si on crée une année directement active, on clôture
+  // d'abord l'existante — sinon l'insert échouerait sur la contrainte.
+  if (status === "en_cours") {
+    const { error: closeErr } = await admin
+      .from("academic_years")
+      .update({ status: "cloturee" })
+      .eq("school_id", roleData.school_id)
+      .eq("status", "en_cours")
+    if (closeErr) return { error: closeErr.message }
+  }
 
   const { error } = await admin.from("academic_years").insert({
     school_id: roleData.school_id,
@@ -250,6 +265,9 @@ export async function getClassSubjectAssignments() {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
 
+  // Tri par le nom de classe via l'embed PostgREST (ressource "classes") : la
+  // forme "classes ( name )" avec espaces était rejetée en 400 — la matrice
+  // restait vide. La syntaxe valide est "classes(name)" sans espaces.
   const { data, error } = await admin
     .from("class_subject_assignments")
     .select(`
@@ -259,7 +277,7 @@ export async function getClassSubjectAssignments() {
       users ( full_name )
     `)
     .eq("school_id", roleData.school_id)
-    .order("classes ( name )", { ascending: true })
+    .order("classes(name)", { ascending: true })
 
   if (error) return { error: error.message, data: [] }
   return { data: data || [] }

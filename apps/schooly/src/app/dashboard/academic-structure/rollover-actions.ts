@@ -73,24 +73,36 @@ export async function activateAcademicYear(yearId: string) {
   const { schoolId } = await getContext()
   const admin = getAdmin()
 
-  // Mettre toutes les autres années à "cloturee"
-  const { error: closeErr } = await admin
-    .from("academic_years")
-    .update({ status: "cloturee" })
-    .eq("school_id", schoolId)
-    .eq("status", "en_cours")
+  // RPC atomique (migration 20260917000000) : clôture de l'ancienne année +
+  // activation de la nouvelle en UNE transaction. Avant : deux updates séparés,
+  // si le second échouait l'école restait sans aucune année active (notes et
+  // appel bloqués). Le RPC garantit aussi une seule année "en_cours" par école.
+  const { data, error } = await admin.rpc("activate_academic_year", {
+    p_year_id: yearId,
+  })
 
-  if (closeErr) return { error: closeErr.message }
+  if (error) {
+    const code = String(error.message).split(":")[0]?.trim()
+    const messages: Record<string, string> = {
+      YEAR_NOT_FOUND: "Année introuvable.",
+      YEAR_CLOSED: "Une année clôturée ne peut pas être réactivée.",
+      UNAUTHORIZED: "Action réservée à la direction.",
+    }
+    return { error: messages[code] ?? error.message }
+  }
 
-  // Activer la nouvelle
-  const { error } = await admin
+  // Vérifie que l'année activée appartient bien à l'école de la session
+  // (le RPC lui-même est cloisonné au school_id de l'année ciblée).
+  const { data: year } = await admin
     .from("academic_years")
-    .update({ status: "en_cours" })
+    .select("school_id")
     .eq("id", yearId)
-    .eq("school_id", schoolId)
+    .single()
+  if (year?.school_id && year.school_id !== schoolId) {
+    return { error: "Accès non autorisé." }
+  }
 
-  if (error) return { error: error.message }
-  return { ok: true }
+  return { ok: true, status: typeof data === "string" ? data : undefined }
 }
 
 // ─── Prévisualisation de la bascule ──────────────────────────────────────────
@@ -296,20 +308,29 @@ export async function executeRollover(oldYearId: string, newYearId: string) {
       enrollment_date: new Date().toISOString().slice(0, 10),
       // Matricule unique par inscription (contrainte school_id + matricule).
       // Format : <PREFIX>-<ANNEE>-<ALEA> (même convention que createEnrollment).
-      matricule: `${schoolId.slice(0, 4).toUpperCase()}-${new Date().getFullYear()}-${Math.floor(Math.random() * 100000).toString().padStart(5, "0")}`,
+      matricule: `${schoolId.slice(0, 4).toUpperCase()}-${new Date().getFullYear()}-${crypto.randomUUID().replace(/-/g, "").slice(0, 10).toUpperCase()}`,
     })
   }
 
-  // Insérer les nouveaux enrollments par lots de 50.
-  // Note : onConflict (school_id, matricule) + ignoreDuplicates gère la
-  // reprise après échec partiel (idempotent) ; en cas de collision de
-  // matricule aléatoire, le doublon est ignoré puis compté dans newEnrollments.
+  // Insérer les nouveaux enrollments par lots de 50, sans perte silencieuse.
+  // Les matricules sont désormais tirés d'un suffixe UUID — collisions intra-lot
+  // impossibles ; la reprise après échec partiel reste gérée par la garde
+  // anti-doublon rolledStudentIds, qui saute les élèves déjà réinscrits.
+  // Plus d'ignoreDuplicates : toute erreur est remontée, aucune écriture n'est
+  // avalée sans trace (avant, un matricule dupliqué disparaissait silencieusement).
   if (newEnrollments.length > 0) {
     for (let i = 0; i < newEnrollments.length; i += 50) {
-      const batch = newEnrollments.slice(i, i + 50)
+      const batchIndex = i / 50
+      const batch = newEnrollments.slice(i, i + 50).map((row, j) => ({
+        ...row,
+        matricule:
+          batchIndex === 0
+            ? row.matricule
+            : `${row.matricule}-B${String(batchIndex).padStart(2, "0")}-${String(j).padStart(3, "0")}`,
+      }))
       const { error: insertErr } = await admin
         .from("enrollments")
-        .upsert(batch, { onConflict: "school_id, matricule", ignoreDuplicates: true })
+        .upsert(batch, { onConflict: "school_id, matricule" })
       if (insertErr) errors.push(insertErr.message)
     }
   }
@@ -355,13 +376,17 @@ export async function executeRollover(oldYearId: string, newYearId: string) {
 export async function getRolloverLogs() {
   const { schoolId } = await getContext()
   const admin = getAdmin()
+  // Embeds PostgREST avec hint de relation FK obligatoire : year_rollover_logs
+  // possède DEUX FK vers academic_years (old_year_id, new_year_id) — sans hint
+  // explicite (table!colonne), l'embed est ambigu et la requête échoue en 400.
+  // C'est le bug qui laissait l'historique de bascule vide en permanence.
   const { data, error } = await admin
     .from("year_rollover_logs")
     .select(`
       *,
-      old_year:old_year_id ( label ),
-      new_year:new_year_id ( label ),
-      initiator:initiated_by ( full_name )
+      old_year:academic_years!year_rollover_logs_old_year_id_fkey ( label ),
+      new_year:academic_years!year_rollover_logs_new_year_id_fkey ( label ),
+      initiator:users!year_rollover_logs_initiated_by_fkey ( full_name )
     `)
     .eq("school_id", schoolId)
     .order("initiated_at", { ascending: false })
