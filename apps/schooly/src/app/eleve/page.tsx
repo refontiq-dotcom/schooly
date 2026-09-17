@@ -148,6 +148,7 @@ export default async function ElevePortalPage() {
     .from("grade_entries")
     .select("id, label, grade_type, value, max_value, weight, comment, subjects ( name )")
     .eq("enrollment_id", enrollmentId)
+    .is("period_id", null)
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
 

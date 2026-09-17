@@ -316,6 +316,8 @@ export async function getDashboardData(
       .from("grade_entries")
       .select("id, label, value, max_value, weight, comment, subjects ( name )")
       .eq("enrollment_id", selected.enrollmentId)
+      // Les résultats périodiques seront exposés après publication officielle.
+      .is("period_id", null)
       .is("deleted_at", null)
       .order("created_at", { ascending: false })
 
@@ -431,6 +433,7 @@ export async function getBulletinData(enrollmentId: string): Promise<BulletinRes
       .from("grade_entries")
       .select("id, label, value, max_value, weight, comment, subjects ( name )")
       .eq("enrollment_id", enrollmentId)
+      .is("period_id", null)
       .is("deleted_at", null)
       .order("created_at", { ascending: true })
 

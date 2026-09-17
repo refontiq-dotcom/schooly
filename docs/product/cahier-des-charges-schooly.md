@@ -2,7 +2,7 @@
 
 *SaaS de gestion scolaire multi-établissements — Côte d'Ivoire / Afrique de l'Ouest*
 *Document de référence pour l'agent IA de développement*
-*Version 1.2 — généralisation du parcours d'inscription (configurable par établissement, virement bancaire, rappel MENAET)*
+*Version 1.3 — ajout des spécifications du module d'évaluation intelligente : configuration, calculs, temporalité, saisie temps réel et bulletins*
 
 > ⚠️ **À lire avant toute reprise de développement** : deux documents transverses ont été créés après la version initiale de ce cahier des charges — `refontiq-architecture-ecosysteme.md` et `refontiq-plan-de-travail-prompts.md`. Ils introduisent des composants partagés à l'échelle de tout l'écosystème Refontiq (pas seulement Schooly), qui remplacent ou complètent certaines sections ci-dessous. Les sections concernées sont annotées. En cas de doute, les documents d'écosystème font foi sur les questions transverses (facturation, identité, alertes internes).
 
@@ -163,10 +163,135 @@ Organiser les migrations par domaine, dans cet ordre (respecter les dépendances
 - Sous-groupes (TP/TD), matières optionnelles inter-classes.
 - Emplois du temps, gestion des salles, remplacements.
 
-### 7.3 Pédagogie & évaluation
-- Cahier de texte numérique (devoirs, supports téléchargeables).
-- Saisie de notes isolée par professeur (ne voit que ses cours), calcul automatique des moyennes pondérées.
-- Génération de bulletins PDF exportables, conseils de classe, décisions (Admis/Redouble/Exclu).
+### 7.3 Pédagogie & évaluation intelligente
+
+**Périmètre attendu** : les exigences ci-dessous constituent la cible fonctionnelle à implémenter et à valider, et non un inventaire de fonctionnalités déjà livrées. Le cahier de texte numérique (devoirs, supports téléchargeables) reste inclus dans ce module.
+
+#### 7.3.1 Configuration établissement & cycles — Direction / Censeur
+
+- Paramétrage guidé par l'administrateur/directeur ; le censeur intervient selon les permissions déléguées. Règles par établissement et année, avec surcharge explicite par cycle ; coefficients par classe et matière. Afficher les valeurs héritées et les exceptions.
+- **Mode d'évaluation**, choisi par cartes radio : `TRIMESTRE` (3 périodes), `SEMESTRE` (2 périodes), `COMPOSITION_PRIMAIRE` (compositions périodiques et composition de passage distincte).
+- **Calendrier** : DatePicker pour début, fin et verrouillage strict de saisie de chaque période ; dates comprises dans l'année, ordre cohérent et absence de chevauchement dans un même cycle. Préciser le fuseau de l'école et l'heure limite effective.
+- **Seuil de passage & barème** : champ numérique (ex. 10,00/20 au secondaire ou un total de points au primaire). Le seuil et les résultats comparés doivent utiliser la même échelle ; aucune conversion implicite entre points et /20.
+- **Matières & coefficients** : table classe × matière pour affectation et coefficient (ex. Mathématiques 4, Histoire-Géographie 2), en cohérence avec la matrice classe × matière × professeur (§7.2). Coefficients strictement positifs ; matière exclue explicitement plutôt que coefficient ambigu.
+- **Pondérations** : curseurs et champs numériques pour interrogations, devoirs et compositions. Distinguer les poids par évaluation des pourcentages fixes par catégorie ; afficher un exemple de calcul et vérifier que les pourcentages totalisent 100 %.
+- Versionner les paramètres appliqués aux calculs. Tout changement après saisie exige une confirmation et une trace d'audit ; les bulletins publiés conservent leurs règles et résultats historiques.
+
+#### 7.3.2 Moteur de calcul — matière, période, année
+
+**A. Moyenne matière sur une période**
+
+Pour un élève, une matière et une période, normaliser les notes sur un barème commun avant agrégation si les évaluations utilisent des barèmes différents :
+
+```text
+Note normalisée = Note brute / Barème évaluation × Barème de référence
+Moyenne matière = Σ(Note normalisée_i × Poids_i) / Σ(Poids_i)
+```
+
+La somme inclut les interrogations, devoirs **et compositions** comptabilisés. Un poids nul est exclu ; un dénominateur nul donne « Non calculable », jamais 0.
+
+Lorsque les curseurs représentent des **pourcentages par catégorie**, calculer d'abord la moyenne de chaque catégorie puis appliquer ses pourcentages : multiplier chaque note par le pourcentage ferait dépendre la répartition du nombre d'interrogations/devoirs. La politique de catégorie manquante (résultat incomplet ou redistribution explicite des poids disponibles) doit être configurée et visible ; aucune redistribution silencieuse.
+
+**B. Moyenne générale périodique**
+
+```text
+Moyenne période = Σ(Moyenne matière_m × Coefficient matière_m) / Σ(Coefficients matière_m)
+```
+
+Les coefficients sont ceux de la classe, de l'année et de l'établissement concernés. Les matières non calculables ne sont jamais assimilées à zéro ; afficher la couverture des matières et le statut provisoire/incomplet.
+
+**C. Moyenne annuelle & proposition automatique de passage**
+
+| Mode | Formule annuelle | Proposition automatique |
+|---|---|---|
+| `TRIMESTRE` | `(T1 + T2 + T3) / 3` | Admis si résultat ≥ seuil |
+| `SEMESTRE` | `(S1 + S2) / 2` | Admis si résultat ≥ seuil |
+| `COMPOSITION_PRIMAIRE` | `Moyenne compositions périodiques × 0,4 + Composition de passage × 0,6` | Admis si résultat ≥ seuil |
+
+- Au primaire, la moyenne des compositions périodiques exclut la composition de passage ; toutes sont exprimées sur la même échelle. Les compositions périodiques ont le même poids par défaut.
+- Une période ou composition obligatoire manquante donne un résultat annuel **provisoire/incomplet**, sans admission automatique définitive.
+- Sous le seuil : **Ajourné** ; afficher **Repêchable** dans une zone de rachat paramétrée (ex. 9,85 pour un seuil de 10). Cette zone ne constitue pas une admission automatique.
+- Conserver la précision de calcul ; arrondir pour l'affichage seulement. Comparer au seuil la valeur non arrondie et afficher clairement les cas limites (9,999 ne devient pas une admission par affichage à 10,00).
+- La proposition calculée ne remplace pas la décision validée par la direction/conseil de classe : Admis, Redouble ou Exclu. Une exclusion ne se déduit jamais d'une moyenne seule. La bascule annuelle (§7.9) utilise la décision validée.
+
+#### 7.3.3 Absences, modération & audit
+
+- Distinguer **note zéro**, **ABS justifiée** et **note non saisie**. Zéro compte dans les calculs ; ABS justifiée exclut la note et son poids du dénominateur ; note manquante signale une saisie incomplète. Toutes les notes ABS donnent « Non calculable ».
+- Prévoir une politique explicite pour les absences non justifiées et les évaluations de remplacement ; aucune transformation silencieuse d'une absence en zéro.
+- **Rachat manuel** : la direction peut admettre un élève ajourné avec motif obligatoire. Conserver moyenne, proposition initiale, décision finale, auteur et horodatage dans l'historique sans altérer les notes pour simuler le passage.
+- Tracer les modifications de notes, paramètres, clôtures et réouvertures avec ancienne/nouvelle valeur et contexte établissement/année/période.
+
+#### 7.3.4 Temporalité & verrouillage
+
+- États : **À venir**, **Ouverte**, **Verrouillée**, **Publiée**. La saisie est autorisée à partir du début inclus et avant l'échéance exclusive, sauf clôture manuelle anticipée.
+- Par défaut, la fin de période est l'échéance de saisie. Une date de verrouillage distincte définit une dérogation explicite et auditée (délai de correction), visible aux enseignants ; sans dérogation, aucune écriture après la fin.
+- Contrôler l'heure serveur, les permissions et l'état de période à chaque écriture, dans la transaction ; un écran ouvert avant l'échéance ne permet pas de la contourner. Le verrouillage reste effectif même si le traitement planifié est en retard.
+- Rappels automatiques aux enseignants à **X jours** de l'échéance, configurables, ciblés sur les saisies incomplètes et dédupliqués via `notification_outbox`.
+- Réouverture réservée à la direction, avec motif obligatoire. Après publication, toute correction produit une nouvelle version du bulletin et conserve l'ancienne dans l'historique.
+
+#### 7.3.5 Saisie professeur & synchronisation
+
+- Sélecteurs en cascade **Classe → Matière → Évaluation**, limités aux affectations de l'enseignant et à l'année sélectionnée.
+- Grille avec élèves en lignes, barème visible, saisie numérique contrôlée et navigation **Entrée**, **Tabulation**, **Flèche bas**. Contrôle ABS justifiée distinct de la note zéro et de la cellule vide ; utilisable au clavier et sur mobile.
+- Auto-save après validation de cellule, avec regroupement raisonnable des écritures. États visibles : **Brouillon** orange, **Enregistrement**, **Sauvegardé** avec coche verte, **Erreur / Réessayer**, **Verrouillé** avec cadenas. Ne jamais afficher « Sauvegardé » avant confirmation serveur.
+- L'auto-save réalise une écriture authentifiée ; **Supabase Realtime diffuse les changements validés, il ne remplace pas la sauvegarde**. Le serveur reste la source de vérité ; les calculs locaux éventuels sont provisoires.
+- Après sauvegarde, actualiser moyenne matière, moyenne périodique et cumul annuel provisoire ; la direction voit le taux de remplissage par classe/matière (notes ou absences renseignées / entrées attendues).
+- Gérer les éditions concurrentes par numéro de version et signaler les conflits sans écrasement silencieux. À la reconnexion, relire les données canoniques pour récupérer les événements manqués.
+- Hors réseau, conserver les brouillons localement sans les présenter comme enregistrés. Revalider droits et période à la reprise ; les notes arrivant après verrouillage sont refusées sans perdre le brouillon. Purger les données locales au changement de compte.
+
+#### 7.3.6 Direction, clôture & bulletins
+
+- Tableau de bord : couverture des saisies, élèves sous le seuil, moyennes par classe et comparaison des distributions par matière pour repérer les écarts de notation. Ces écarts sont des indicateurs à examiner, pas des sanctions automatiques.
+- Alertes précoces avec badge rouge et texte accessible ; éviter le clignotement continu et respecter la réduction des animations. Distinguer une moyenne provisoire d'un résultat complet.
+- Action **Clôturer la période** avec récapitulatif des notes manquantes, anomalies et décisions à valider. Bloquer la publication incomplète, sauf dérogation explicite, motivée et visible sur le bulletin.
+- Verrouiller et figer un instantané cohérent des notes, coefficients, règles et calculs avant génération. Générer les bulletins PDF en tâche de fond, avec progression, reprise sur erreur et idempotence ; n'envoyer aux parents qu'après publication réussie.
+- Bulletin : établissement, année, période, élève/classe, notes et absences, moyennes, coefficients, rangs, appréciations, résultats et décision annuelle validée lorsque pertinente. Les périodes intermédiaires n'affichent pas une admission définitive.
+- Rangs calculés sur les résultats non arrondis et comparables de la classe ; égalités au même rang selon la convention **1, 2, 2, 4**. Les résultats incomplets sont non classés, sauf règle explicite publiée.
+- PDF généré depuis l'instantané versionné, sans imposer d'archivage de fichiers lourds contraire au principe texte-only. QR Code signé pour vérifier l'authenticité et la version ; aucune note ni identité de mineur exposée publiquement par le QR. Téléchargement soumis aux droits habituels.
+- Envoi automatique via l'outbox existante, sans doublons pour un même destinataire et une même version. Un échec d'envoi ne doit ni rouvrir la période ni régénérer les décisions.
+
+#### 7.3.7 Portails parent / élève
+
+- Fil des notes et notifications push après enregistrement et selon la politique de publication de l'école ; notifications discrètes, sans détail sensible sur écran verrouillé, avec consentement et préférences de réception.
+- Consultation des seuls résultats autorisés de l'élève ou des enfants liés au parent, conformément au gating du §4.5 ; téléchargement du bulletin officiel et de sa version corrigée le cas échéant.
+- **Simulateur de performance** : déterminer la note minimale nécessaire aux évaluations restantes à partir des coefficients, pondérations et barèmes connus. Afficher les hypothèses, les données manquantes et les cas « objectif déjà atteint » ou « impossible avec les évaluations prévues ». Simulation indicative, sans écriture de notes et sans garantie d'admission en cas de changement des hypothèses ou de décision du conseil.
+
+#### 7.3.8 Architecture multi-tenant & contrats applicatifs
+
+- Toute donnée académique du module appartient à un `school_id` et, selon sa portée, à une année, un cycle, une classe, une matière et une période. Les relations doivent empêcher le rattachement d'une note à un élève ou une évaluation d'un autre établissement.
+- Isolation par RLS, permissions serveur et abonnements Realtime autorisés ; le `school_id` actif provient du contexte authentifié, jamais d'une valeur client acceptée sans contrôle. Professeur limité à ses affectations ; direction à son école ; parent à ses enfants autorisés.
+- **Modèle conceptuel à raccorder au schéma existant avant migration** : configuration académique versionnée, périodes datées, évaluations (type, barème, poids), notes (valeur ou statut d'absence, version), agrégats calculés, décisions/modérations auditées et instantanés de bulletins. Réutiliser les affectations classe/matière, `grades`, `report_cards` et `notification_outbox` lorsque compatibles, sans créer de tables concurrentes pour un même concept.
+- Contraintes : une note par inscription/évaluation, barème strictement positif, note entre zéro et barème, statut ABS incompatible avec une valeur numérique, poids non négatifs et décisions finales attribuées à un auteur autorisé.
+- **Contrats d'actions serveur/API à prévoir**, sans imposer de nouvelles routes : lire/configurer les règles ; créer une évaluation ; sauvegarder une note avec version attendue et identifiant d'opération ; consulter moyennes et couverture ; clôturer/réouvrir une période ; modérer une décision ; consulter/télécharger un bulletin autorisé.
+- Chaque mutation renvoie un état canonique ou une erreur métier explicite (hors barème, période verrouillée, conflit de version, droits insuffisants). Réessais idempotents ; aucune écriture partielle d'un lot annoncé comme atomique.
+- Recalcul ciblé sur l'élève/matière/période touché ; index tenant/année/classe/période et abonnements limités au contexte affiché. Traitements lourds de clôture, PDF et notifications en arrière-plan avec suivi et reprise ; pas de recalcul global de toutes les écoles à chaque note.
+- Valider la montée en charge avec un scénario représentatif de centaines d'écoles et de milliers d'enseignants simultanés ; mesurer latences de sauvegarde/recalcul, erreurs, retards de diffusion et saturation. Les objectifs chiffrés et capacités d'hébergement seront fixés puis vérifiés par des tests de charge, sans promettre « zéro bug ».
+
+#### 7.3.9 Workflow & critères de recette
+
+```text
+Direction : année → règles par cycle → calendrier → matières / coefficients
+    ↓
+Professeur : classe → matière → évaluation → notes / ABS → auto-save confirmé
+    ↓
+Moteur : moyenne matière → moyenne période → cumul annuel → proposition
+    ↓
+Direction : contrôle de complétude → modération → clôture → publication
+    ↓
+Parent / Élève : notification → bulletin officiel ; décision validée → bascule N+1
+```
+
+**Tests obligatoires avant livraison du module** :
+
+1. Calculs déterministes : notes 10 et 14 de poids 1 et 2 → `38/3` ; matières 12 coef 4 et 15 coef 2 → moyenne 13 ; trimestres 8, 10, 12 → annuel 10 ; semestres 9 et 11 → annuel 10 ; primaire 12 et passage 15 → global 13,8.
+2. Pourcentages fixes par catégorie : interros 10 et 14, devoir 18, répartition 40/60 → 15,6 (et non une pondération dépendant du nombre de notes). Inclure une composition dans les calculs et tester les catégories manquantes.
+3. Seuils : 10,00 admis au seuil 10 ; 9,85 ajourné/repêchable selon configuration ; 9,999 sous le seuil malgré l'arrondi. Vérifier également un barème primaire en points et une décision manuelle motivée sans modification des notes.
+4. Absences : 0 et 10 à poids égaux → 5 ; ABS justifiée et 10 → 10 ; toutes ABS → non calculable ; note manquante ou période obligatoire absente → incomplet, sans admission définitive.
+5. Temporalité : avant début, pendant ouverture, exactement à l'échéance, clôture anticipée, dérogation et réouverture ; une sauvegarde concurrente à la clôture ne doit jamais modifier un instantané publié.
+6. Synchronisation : navigation clavier, confirmation serveur, perte réseau, reprise après verrouillage, conflits simultanés, reconnexion Realtime et déduplication des écritures/notifications.
+7. Cloisonnement : école A sans accès aux notes, paramètres, canaux Realtime ou bulletins de B ; professeur non affecté refusé ; parent sans lien autorisé refusé. Vérifier séparément droits de configuration, clôture et modération.
+8. Publication : rangs ex æquo, appréciations, décision annuelle, instantané reproductible, QR vérifiable sans fuite de données, génération et envoi réessayables sans doublons ; correction publiée en nouvelle version et bascule fondée sur la décision validée.
+9. Simulateur : objectif réalisable, déjà atteint, impossible, hypothèses incomplètes ; aucune modification des résultats officiels.
 
 ### 7.4 Vie scolaire
 - **Appel/assiduité par cours et par professeur** (pas par scan global à l'entrée) : chaque enseignant marque sa propre liste à chaque créneau, ce qui capture le cas d'un élève présent en heure 1 avec un professeur et absent en heure 2 avec un autre. C'est la source de vérité, **indépendante de tout matériel de scan** — fonctionne pour toutes les écoles, y compris celles sans portail équipé.

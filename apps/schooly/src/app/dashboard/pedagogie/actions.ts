@@ -318,7 +318,9 @@ export type GradeEntryRow = {
   id: string
   grade_type: string
   label: string | null
-  value: number
+  value: number | null
+  period_id: string | null
+  absence_status: "graded" | "excused"
   max_value: number
   weight: number
   comment: string | null
@@ -337,10 +339,12 @@ export async function getGradeEntries(): Promise<ActionResult<GradeEntryRow[]>> 
   const guard = await requireSchoolRole(supabase, { allowedRoles: [...REF_ROLES] })
   if (!guard.ok) return denial(guard.reason, [])
 
-  const { data, error } = await adminClient()
+  const { data, error } = await supabase
     .from("grade_entries")
     .select(
       `id,
+       period_id,
+       absence_status,
        grade_type,
        label,
        value,
@@ -360,6 +364,7 @@ export async function getGradeEntries(): Promise<ActionResult<GradeEntryRow[]>> 
        subjects (id, name)`
     )
     .eq("school_id", guard.context.schoolId)
+    .is("deleted_at", null)
     .order("created_at", { ascending: false })
 
   if (error) return { error: error.message, data: [] }
@@ -377,17 +382,26 @@ export async function createGradeEntry(formData: FormData): Promise<ActionResult
   const subjectId = formData.get("subjectId") as string
   const academicYearId = formData.get("academicYearId") as string
   const gradeType = formData.get("gradeType") as string
-  const label = formData.get("label") as string
-  const value = parseFloat(formData.get("value") as string)
-  const maxValue = parseFloat(formData.get("maxValue") as string) || 20
-  const weight = parseFloat(formData.get("weight") as string) || 1
-  const comment = formData.get("comment") as string
+  const label = String(formData.get("label") ?? "").trim()
+  const periodId = String(formData.get("periodId") ?? "")
+  const absence = formData.get("absenceStatus") === "excused" ? "excused" : "graded"
+  const rawValue = String(formData.get("value") ?? "").trim()
+  const value = absence === "excused" ? null : rawValue === "" ? NaN : Number(rawValue)
+  const maxValue = Number(formData.get("maxValue") ?? 20)
+  const weight = Number(formData.get("weight") ?? 1)
+  const comment = String(formData.get("comment") ?? "")
 
-  if (!enrollmentId || !subjectId || !academicYearId || !gradeType || Number.isNaN(value)) {
-    return { error: "Élève, matière, année, type de note et valeur valide sont requis." }
+  if (!enrollmentId || !subjectId || !academicYearId || !periodId || !label ||
+    !["devoir", "controle", "interrogation", "composition", "project", "other"].includes(gradeType) ||
+    !Number.isFinite(maxValue) || maxValue <= 0 || !Number.isFinite(weight) || weight < 0 ||
+    (value !== null && (!Number.isFinite(value) || value < 0 || value > maxValue)) ||
+    (absence === "excused" && rawValue !== "")) {
+    return { error: "Période, inscription, matière, intitulé et note valides requis. ABS ne doit pas porter de valeur." }
   }
 
-  const { error } = await adminClient().from("grade_entries").insert({
+  const { error } = await supabase.from("grade_entries").insert({
+    period_id: periodId,
+    absence_status: absence,
     school_id: schoolId,
     enrollment_id: enrollmentId,
     subject_id: subjectId,
@@ -627,6 +641,7 @@ export async function calculateStudentAverage(
     .eq("enrollment_id", enrollmentId)
     .eq("subject_id", subjectId)
     .eq("academic_year_id", academicYearId)
+    .is("period_id", null) // Ancienne API : historique uniquement, jamais le nouveau régime.
     .is("deleted_at", null)
 
   if (error) return { error: error.message }
@@ -712,6 +727,7 @@ export async function calculateClassAverages(
         .eq("enrollment_id", enrollment.id)
         .eq("subject_id", subject.subject_id)
         .eq("academic_year_id", academicYearId)
+        .is("period_id", null) // Historique uniquement ; utiliser getPeriodResults pour les périodes.
         .is("deleted_at", null)
 
       if (avgError || !gradeRows) continue
