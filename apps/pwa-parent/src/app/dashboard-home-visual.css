@@ -172,13 +172,13 @@
     border-radius:12px !important;
     border:1px solid var(--sd-border) !important;
     background:rgba(37,43,54,.74) !important;
-    box-shadow:0 10px 24px rgba(0,0,0,.09);
+    box-shadow:0 8px 18px rgba(0,0,0,.065);
     overflow:hidden;
   }
 
   .dashboard-light .dashboard-content > section:has(.grid.grid-cols-3) > :last-child {
     background:rgba(255,255,255,.82) !important;
-    box-shadow:0 10px 24px rgba(72,50,94,.055);
+    box-shadow:0 8px 18px rgba(72,50,94,.04);
   }
 
   .dashboard-content > section:has(.grid.grid-cols-3) > :last-child .rounded-lg {
