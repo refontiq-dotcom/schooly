@@ -24,7 +24,7 @@
 .dashboard-page-transition.direction-forward.is-exiting .dashboard-page-transition-content > * { animation-name:dashboard-active-content-fade-out-forward; }
 .dashboard-page-transition.direction-backward.is-exiting .dashboard-page-transition-content > * { animation-name:dashboard-active-content-fade-out-backward; }
 
-/* Active label, icon and indicator share the same timeline without changing navigation direction. */
+/* Active tab quartet: identical duration/easing/timing points; navigation direction remains untouched. */
 .dashboard-nav-item.is-active .dashboard-nav-label { animation:dashboard-active-label-in .48s cubic-bezier(.22,1,.36,1) both; }
 .schooly-dashboard-shell.dashboard-nav-transition-forward .dashboard-nav-item.is-active .dashboard-nav-label { animation-name:dashboard-active-label-forward; }
 .schooly-dashboard-shell.dashboard-nav-transition-backward .dashboard-nav-item.is-active .dashboard-nav-label { animation-name:dashboard-active-label-backward; }
@@ -86,21 +86,23 @@
 @keyframes dashboard-page-enter-backward { from { opacity:0; transform:translate3d(-28px,10px,0) scale(.985); filter:blur(3px); } to { opacity:1; transform:translate3d(0,0,0) scale(1); filter:blur(0); } }
 @keyframes dashboard-page-exit-forward { from { opacity:1; transform:translate3d(0,0,0) scale(1); filter:blur(0); } to { opacity:0; transform:translate3d(-22px,-4px,0) scale(.992); filter:blur(2px); } }
 @keyframes dashboard-page-exit-backward { from { opacity:1; transform:translate3d(0,0,0) scale(1); filter:blur(0); } to { opacity:0; transform:translate3d(22px,-4px,0) scale(.992); filter:blur(2px); } }
-@keyframes dashboard-active-content-fade-in { from { opacity:0; filter:blur(2.5px); } 55% { opacity:.72; filter:blur(1px); } to { opacity:1; filter:blur(0); } }
-@keyframes dashboard-active-content-fade-in-backward { from { opacity:0; filter:blur(2.5px); } 55% { opacity:.72; filter:blur(1px); } to { opacity:1; filter:blur(0); } }
-@keyframes dashboard-active-content-fade-out-forward { from { opacity:1; filter:blur(0); } 55% { opacity:.45; filter:blur(1.2px); } to { opacity:0; filter:blur(2.5px); } }
-@keyframes dashboard-active-content-fade-out-backward { from { opacity:1; filter:blur(0); } 55% { opacity:.45; filter:blur(1.2px); } to { opacity:0; filter:blur(2.5px); } }
+@keyframes dashboard-active-content-fade-in { from { opacity:0; filter:blur(2.5px); } 60% { opacity:.72; filter:blur(1px); } to { opacity:1; filter:blur(0); } }
+@keyframes dashboard-active-content-fade-in-backward { from { opacity:0; filter:blur(2.5px); } 60% { opacity:.72; filter:blur(1px); } to { opacity:1; filter:blur(0); } }
+@keyframes dashboard-active-content-fade-out-forward { from { opacity:1; filter:blur(0); } 60% { opacity:.45; filter:blur(1.2px); } to { opacity:0; filter:blur(2.5px); } }
+@keyframes dashboard-active-content-fade-out-backward { from { opacity:1; filter:blur(0); } 60% { opacity:.45; filter:blur(1.2px); } to { opacity:0; filter:blur(2.5px); } }
 @keyframes dashboard-active-label-in { from { opacity:0; filter:blur(2px); transform:translateY(3px); } 60% { opacity:.72; filter:blur(.6px); transform:translateY(0); } to { opacity:1; filter:blur(0); transform:translateY(0); } }
 @keyframes dashboard-active-label-forward { from { opacity:0; filter:blur(2px); transform:translate3d(5px,0,0); } 60% { opacity:.72; filter:blur(.6px); transform:translate3d(0,0,0); } to { opacity:1; filter:blur(0); transform:translate3d(0,0,0); } }
 @keyframes dashboard-active-label-backward { from { opacity:0; filter:blur(2px); transform:translate3d(-5px,0,0); } 60% { opacity:.72; filter:blur(.6px); transform:translate3d(0,0,0); } to { opacity:1; filter:blur(0); transform:translate3d(0,0,0); } }
-@keyframes dashboard-active-label-out { from { opacity:1; filter:blur(0); } 55% { opacity:.45; filter:blur(.8px); } to { opacity:0; filter:blur(1.8px); } }
+@keyframes dashboard-active-label-out { from { opacity:1; filter:blur(0); } 60% { opacity:.45; filter:blur(.8px); } to { opacity:0; filter:blur(1.8px); } }
 @keyframes dashboard-active-icon-in { from { opacity:0; filter:blur(1.8px); transform:translateY(3px) scale(.72); } 60% { opacity:.72; filter:blur(.6px); transform:translateY(0) scale(1.06); } to { opacity:1; filter:blur(0); transform:translateY(0) scale(1); } }
 @keyframes dashboard-active-icon-forward { from { opacity:0; filter:blur(1.8px); transform:translate3d(5px,0,0) scale(.72); } 60% { opacity:.72; filter:blur(.6px); transform:translate3d(0,0,0) scale(1.06); } to { opacity:1; filter:blur(0); transform:translate3d(0,0,0) scale(1); } }
 @keyframes dashboard-active-icon-backward { from { opacity:0; filter:blur(1.8px); transform:translate3d(-5px,0,0) scale(.72); } 60% { opacity:.72; filter:blur(.6px); transform:translate3d(0,0,0) scale(1.06); } to { opacity:1; filter:blur(0); transform:translate3d(0,0,0) scale(1); } }
+@keyframes dashboard-active-icon-out-forward { from { opacity:1; filter:blur(0); transform:scale(1); } 60% { opacity:.45; filter:blur(.8px); transform:scale(.9); } to { opacity:0; filter:blur(1.8px); transform:scale(.72); } }
+@keyframes dashboard-active-icon-out-backward { from { opacity:1; filter:blur(0); transform:scale(1); } 60% { opacity:.45; filter:blur(.8px); transform:scale(.9); } to { opacity:0; filter:blur(1.8px); transform:scale(.72); } }
 @keyframes dashboard-active-indicator-in { from { opacity:0; filter:blur(1.8px); transform:translateY(3px) scale(.55); } 60% { opacity:.7; filter:blur(.6px); transform:translateY(0) scale(1.08); } to { opacity:1; filter:blur(0); transform:translateY(0) scale(1); } }
 @keyframes dashboard-active-indicator-forward { from { opacity:0; filter:blur(1.8px); transform:translate3d(6px,0,0) scale(.55); } 60% { opacity:.7; filter:blur(.6px); transform:translate3d(0,0,0) scale(1.08); } to { opacity:1; filter:blur(0); transform:translate3d(0,0,0) scale(1); } }
 @keyframes dashboard-active-indicator-backward { from { opacity:0; filter:blur(1.8px); transform:translate3d(-6px,0,0) scale(.55); } 60% { opacity:.7; filter:blur(.6px); transform:translate3d(0,0,0) scale(1.08); } to { opacity:1; filter:blur(0); transform:translate3d(0,0,0) scale(1); } }
-@keyframes dashboard-active-indicator-out { from { opacity:1; filter:blur(0); transform:scale(1); } 55% { opacity:.45; filter:blur(.8px); transform:scale(.9); } to { opacity:0; filter:blur(1.8px); transform:scale(.55); } }
+@keyframes dashboard-active-indicator-out { from { opacity:1; filter:blur(0); transform:scale(1); } 60% { opacity:.45; filter:blur(.8px); transform:scale(.9); } to { opacity:0; filter:blur(1.8px); transform:scale(.55); } }
 @keyframes dashboard-icon-pop { from { opacity:0; transform:scale(.6) rotate(-25deg); } to { opacity:1; transform:scale(1) rotate(0); } }
 @keyframes dashboard-dropdown-option-enter { from { opacity:0; transform:translateY(-4px) scale(.98); } to { opacity:1; transform:translateY(0) scale(1); } }
 @media (max-width:640px) { .dashboard-dropdown-menu { left:auto; right:0; } }
