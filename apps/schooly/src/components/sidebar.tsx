@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useState } from "react"
-import { ChevronLeft, LogOut } from "lucide-react"
+import { ChevronLeft, LogOut, Sparkles } from "lucide-react"
 import { NAV_BY_ROLE, type NavItem } from "@/lib/nav"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -32,16 +32,16 @@ export function Sidebar({ role, schoolName, userName }: SidebarProps) {
   return (
     <aside
       className={cn(
-        "gemini-glass flex flex-col h-screen border-r border-border/60 transition-all duration-300 ease-in-out",
+        "schooly-sidebar flex flex-col h-screen border-r transition-[width] duration-300 ease-[cubic-bezier(.2,.8,.2,1)]",
         collapsed ? "w-16" : "w-64"
       )}
     >
       {/* En-tête */}
-      <div className="flex items-center justify-between p-4 border-b border-border min-h-[64px]">
+      <div className="flex items-center justify-between p-4 border-b border-white/10 min-h-[72px]">
         {!collapsed && (
           <div className="flex flex-col min-w-0">
-            <span className="text-base font-semibold truncate">{schoolName}</span>
-            <img src="/schooly_logo_vector.svg" alt="Schooly" className="h-4 w-auto mt-0.5 opacity-70" />
+            <span className="text-base font-semibold tracking-tight text-white truncate">{schoolName}</span>
+            <span className="mt-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[.16em] text-white/55"><Sparkles className="h-3 w-3 text-primary" /> Schooly</span>
           </div>
         )}
         {collapsed && (
@@ -50,7 +50,7 @@ export function Sidebar({ role, schoolName, userName }: SidebarProps) {
         <Button
           variant="ghost"
           size="icon"
-          className={cn("h-8 w-8 shrink-0", !collapsed && "ml-auto")}
+          className={cn("h-8 w-8 shrink-0 text-white/70 hover:bg-white/10 hover:text-white", !collapsed && "ml-auto")}
           onClick={() => setCollapsed(!collapsed)}
           aria-label={collapsed ? "Ouvrir la sidebar" : "Réduire la sidebar"}
         >
@@ -63,7 +63,7 @@ export function Sidebar({ role, schoolName, userName }: SidebarProps) {
       {/* Badge rôle */}
       {!collapsed && (
         <div className="px-4 pt-3 pb-1">
-          <Badge variant="secondary" className="text-xs w-full justify-center py-1">
+          <Badge variant="secondary" className="w-full justify-center border border-white/10 bg-white/8 py-1 text-[10px] font-semibold uppercase tracking-wider text-white/75">
             {roleLabels[role] ?? role}
           </Badge>
         </div>
@@ -79,11 +79,11 @@ export function Sidebar({ role, schoolName, userName }: SidebarProps) {
               href={item.href}
               aria-current={isActive ? "page" : undefined}
               className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150",
-                "hover:bg-accent hover:text-accent-foreground",
+                "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 ease-out",
+                "hover:bg-white/10 hover:text-white hover:translate-x-0.5",
                 isActive
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-foreground/80",
+                  ? "bg-primary text-primary-foreground shadow-[0_8px_18px_oklch(0.53_0.17_35_/_0.23)]"
+                  : "text-white/65",
                 collapsed && "justify-center px-0"
               )}
               title={collapsed ? item.label : undefined}
@@ -96,11 +96,11 @@ export function Sidebar({ role, schoolName, userName }: SidebarProps) {
       </nav>
 
       {/* Pied de page utilisateur */}
-      <div className="border-t border-border p-3">
+      <div className="border-t border-white/10 p-3">
         {!collapsed && (
           <div className="px-2 pb-2">
-            <p className="text-xs font-medium truncate">{userName}</p>
-            <p className="text-xs text-muted-foreground capitalize">{roleLabels[role]}</p>
+            <p className="text-xs font-medium text-white truncate">{userName}</p>
+            <p className="mt-0.5 text-[11px] text-white/50 capitalize">{roleLabels[role]}</p>
           </div>
         )}
         <form action="/api/auth/signout" method="post">
@@ -108,7 +108,7 @@ export function Sidebar({ role, schoolName, userName }: SidebarProps) {
             type="submit"
             variant="ghost"
             className={cn(
-              "w-full text-foreground/80 hover:text-destructive hover:bg-destructive/10",
+              "w-full text-white/60 hover:bg-white/10 hover:text-primary",
               collapsed ? "justify-center px-0" : "justify-start gap-2"
             )}
             size="sm"

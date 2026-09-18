@@ -30,7 +30,7 @@ export const Dialog = ({ open, onOpenChange, children, className, label }: Dialo
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div
-        className="fixed inset-0 bg-black/80"
+        className="fixed inset-0 animate-in fade-in duration-200 bg-[#0e2d52]/55 backdrop-blur-[2px]"
         onClick={() => onOpenChange(false)}
         aria-hidden="true"
       />
@@ -41,7 +41,7 @@ export const Dialog = ({ open, onOpenChange, children, className, label }: Dialo
         aria-describedby={descId}
         aria-label={label}
         className={cn(
-          "relative bg-background p-6 rounded-lg shadow-lg max-w-lg w-full max-h-[90vh] overflow-y-auto",
+          "relative w-full max-w-lg max-h-[90vh] animate-in fade-in zoom-in-95 slide-in-from-bottom-2 duration-200 overflow-y-auto rounded-2xl border border-white/70 bg-card p-6 shadow-[0_24px_70px_oklch(0.2_0.05_252_/_0.25)]",
           className
         )}
       >
@@ -68,7 +68,7 @@ export const DialogHeader = ({ className, ...props }: React.HTMLAttributes<HTMLD
 );
 
 export const DialogFooter = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn("flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2", className)} {...props} />
+  <div className={cn("mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end", className)} {...props} />
 );
 
 export const DialogTitle = ({ className, id, ...props }: React.HTMLAttributes<HTMLHeadingElement>) => {

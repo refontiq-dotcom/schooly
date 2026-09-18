@@ -49,38 +49,39 @@
 }
 
 :root {
-  --background: oklch(0.99 0.01 250);
-  --foreground: oklch(0.15 0.02 250);
+  /* Palette Schooly : bleu nuit du logo, corail chaleureux et bleu ciel. */
+  --background: oklch(0.975 0.008 245);
+  --foreground: oklch(0.24 0.045 252);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.15 0.02 250);
+  --card-foreground: oklch(0.24 0.045 252);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.15 0.02 250);
-  --primary: oklch(0.48 0.13 150); /* Vert Émeraude (Succès/Principal) — assombri pour contraste AA avec texte blanc */
+  --primary: oklch(0.53 0.17 35);
   --primary-foreground: oklch(0.98 0 0);
-  --secondary: oklch(0.95 0.02 250);
-  --secondary-foreground: oklch(0.2 0.02 250);
-  --muted: oklch(0.95 0.02 250);
-  --muted-foreground: oklch(0.42 0.02 250); /* assombri pour contraste AA (sidebar, descriptions) */
-  --accent: oklch(0.95 0.02 250);
-  --accent-foreground: oklch(0.2 0.02 250);
+  --secondary: oklch(0.94 0.015 245);
+  --secondary-foreground: oklch(0.25 0.04 252);
+  --muted: oklch(0.945 0.012 245);
+  --muted-foreground: oklch(0.46 0.035 252);
+  --accent: oklch(0.925 0.035 243);
+  --accent-foreground: oklch(0.25 0.04 252);
   --destructive: oklch(0.5 0.2 25); /* Rouge Corail (Erreur/Impayé) — assombri pour contraste AA sur fond clair */
   --destructive-foreground: oklch(0.98 0 0);
-  --border: oklch(0.9 0.02 250);
-  --input: oklch(0.9 0.02 250);
-  --ring: oklch(0.48 0.13 150);
-  --radius: 0.75rem;
+  --border: oklch(0.87 0.02 245);
+  --input: oklch(0.87 0.02 245);
+  --ring: oklch(0.53 0.17 35);
+  --radius: 1rem;
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
+  --sidebar: oklch(0.225 0.052 252);
+  --sidebar-foreground: oklch(0.94 0.015 245);
+  --sidebar-primary: oklch(0.66 0.18 35);
+  --sidebar-primary-foreground: oklch(0.2 0.04 252);
+  --sidebar-accent: oklch(0.29 0.055 252);
+  --sidebar-accent-foreground: oklch(0.98 0 0);
+  --sidebar-border: oklch(0.4 0.045 252 / 70%);
   --sidebar-ring: oklch(0.708 0 0);
 }
 
@@ -125,37 +126,30 @@
   }
   body {
     @apply bg-background text-foreground;
+    min-width: 320px;
+    text-rendering: optimizeLegibility;
   }
   html {
     @apply font-sans;
   }
 }
 
-/* ═══════════════════════════════════════════════════════════════════════
-   Thème « façon Gemini » — décor animé & typographie dégradée
-   (page d'accueil / + portail élève /eleve — cf. src/components/gemini.tsx)
-   Dérive des blobs en CSS pur (GPU) : framer-motion ne s'applique qu'aux
-   entrées d'éléments, pas au fond continu.
-   ═══════════════════════════════════════════════════════════════════════ */
-
 @layer components {
+  /* Fond discret commun à toutes les pages : aucune texture derrière le texte. */
   .gemini-backdrop {
     position: fixed;
     inset: 0;
     z-index: 0;
     overflow: hidden;
     pointer-events: none;
-    background:
-      radial-gradient(ellipse 80% 60% at 50% -10%, oklch(0.96 0.03 165 / 0.9), transparent 60%),
-      radial-gradient(ellipse 60% 50% at 90% 110%, oklch(0.96 0.03 280 / 0.8), transparent 60%),
-      var(--background);
+    background: radial-gradient(ellipse 58% 40% at 97% 0%, oklch(0.9 0.055 245 / .72), transparent 70%), var(--background);
   }
 
   .gemini-blob {
     position: absolute;
     border-radius: 9999px;
-    filter: blur(90px);
-    opacity: 0.5;
+    filter: blur(100px);
+    opacity: .18;
     will-change: transform;
   }
 
@@ -166,7 +160,7 @@
     min-height: 320px;
     top: -12%;
     left: -8%;
-    background: radial-gradient(circle at 30% 30%, oklch(0.85 0.09 160 / 0.8), transparent 70%);
+    background: radial-gradient(circle at 30% 30%, oklch(0.66 0.18 35), transparent 70%);
     animation: gemini-drift 26s ease-in-out infinite alternate;
   }
 
@@ -177,7 +171,7 @@
     min-height: 280px;
     top: 30%;
     right: -12%;
-    background: radial-gradient(circle at 60% 40%, oklch(0.88 0.07 220 / 0.8), transparent 70%);
+    background: radial-gradient(circle at 60% 40%, oklch(0.63 0.13 244), transparent 70%);
     animation: gemini-drift 32s ease-in-out infinite alternate-reverse;
   }
 
@@ -188,19 +182,14 @@
     min-height: 240px;
     bottom: -14%;
     left: 25%;
-    background: radial-gradient(circle at 50% 50%, oklch(0.9 0.07 300 / 0.7), transparent 70%);
+    background: radial-gradient(circle at 50% 50%, oklch(0.66 0.18 35), transparent 70%);
     animation: gemini-drift 38s ease-in-out infinite alternate;
   }
 
-  /* Titre à dégradé animé (balayage lent type Gemini) */
   .gemini-text-gradient {
     background-image: linear-gradient(
       100deg,
-      oklch(0.55 0.14 160) 0%,
-      oklch(0.65 0.12 200) 30%,
-      oklch(0.6 0.14 280) 55%,
-      oklch(0.65 0.12 200) 75%,
-      oklch(0.55 0.14 160) 100%
+      oklch(0.43 0.09 252) 0%, oklch(0.56 0.17 35) 45%, oklch(0.43 0.09 252) 100%
     );
     background-size: 220% 100%;
     -webkit-background-clip: text;
@@ -209,24 +198,32 @@
     animation: gemini-shimmer 7s ease-in-out infinite;
   }
 
-  /* Carte « verre » posée sur le décor */
   .gemini-glass {
-    background: oklch(1 0 0 / 0.72);
+    background: oklch(1 0 0 / .82);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
-    border: 1px solid oklch(1 0 0 / 0.65);
-    box-shadow: 0 8px 32px oklch(0.3 0.05 250 / 0.1);
+    border-color: oklch(1 0 0 / .7);
+    box-shadow: 0 12px 34px oklch(0.2 0.05 252 / .1);
   }
 
-  /* Cartes shadcn du dashboard : translucides + floutées, elles laissent
-     deviner le décor Gemini derrière (aucune retouche page par page). */
-  [data-slot="card"] {
-    background: oklch(1 0 0 / 0.82);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    border-color: oklch(1 0 0 / 0.55);
-    box-shadow: 0 2px 12px oklch(0.3 0.05 250 / 0.07);
+  .schooly-sidebar {
+    background: linear-gradient(160deg, oklch(0.255 0.056 252 / .98), oklch(0.2 0.045 252 / .98));
+    border-color: oklch(0.48 0.055 252 / .58);
+    box-shadow: 16px 0 44px oklch(0.18 0.04 252 / .18);
   }
+
+  [data-slot="card"] {
+    background: oklch(1 0 0 / .88);
+    backdrop-filter: blur(14px);
+    border-color: oklch(0.9 0.02 245 / .8);
+    box-shadow: 0 10px 30px oklch(0.25 0.05 252 / .055);
+    transition: transform 220ms cubic-bezier(.2,.8,.2,1), box-shadow 220ms ease, border-color 220ms ease;
+  }
+
+  [data-slot="card"]:hover { box-shadow: 0 16px 34px oklch(0.25 0.05 252 / .09); border-color: oklch(0.76 0.05 245); }
+  [data-slot="input"], textarea, select { background: oklch(1 0 0 / .76); box-shadow: inset 0 1px 1px oklch(0.25 0.05 252 / .03); }
+  [data-slot="input"]:focus, textarea:focus, select:focus { box-shadow: 0 0 0 4px oklch(0.53 0.17 35 / .14); }
+  .cn-toast { border-radius: 1rem !important; box-shadow: 0 16px 40px oklch(0.2 0.05 252 / .18) !important; backdrop-filter: blur(18px); }
 
   .dark .gemini-backdrop {
     background:
@@ -288,4 +285,5 @@
   .gemini-text-gradient {
     animation: none;
   }
+  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; }
 }
