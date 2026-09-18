@@ -67,14 +67,20 @@ export type DirectoryPreEnrollment = {
   enrollment_type?: string | null
 }
 
+export type DirectoryTeacher = {
+  id: string
+  full_name: string
+}
+
 export type DirectorySnapshot = {
   students: DirectoryStudent[]
   guardians: DirectoryGuardian[]
   enrollments: DirectoryEnrollment[]
   preEnrollments: DirectoryPreEnrollment[]
+  teachers: DirectoryTeacher[]
 }
 
-export type SearchKind = "student" | "guardian" | "pre-enrollment" | "enrollment"
+export type SearchKind = "student" | "guardian" | "pre-enrollment" | "enrollment" | "teacher"
 
 export type SearchHit = {
   id: string
@@ -179,11 +185,16 @@ export function enrollmentHaystack(enrollment: DirectoryEnrollment): DirectoryHa
   }
 }
 
+export function teacherHaystack(teacher: DirectoryTeacher): DirectoryHaystack {
+  return { texts: [teacher.full_name] }
+}
+
 const TAB_HREF: Record<SearchKind, string> = {
   student: "/dashboard/direction/admissions?tab=students",
   guardian: "/dashboard/direction/admissions?tab=guardians",
   "pre-enrollment": "/dashboard/direction/admissions?tab=pre-enrollments",
   enrollment: "/dashboard/direction/admissions?tab=enrollments",
+  teacher: "/dashboard/academic-structure",
 }
 
 export function buildSearchHits(snapshot: DirectorySnapshot, query: string, limitPerKind = 5): SearchHit[] {
@@ -246,6 +257,17 @@ export function buildSearchHits(snapshot: DirectorySnapshot, query: string, limi
     })
   }
 
+  const teachers = rankDirectory(snapshot.teachers, query, teacherHaystack).slice(0, limitPerKind)
+  for (const teacher of teachers) {
+    hits.push({
+      id: teacher.id,
+      kind: "teacher",
+      title: teacher.full_name,
+      subtitle: "Professeur",
+      href: TAB_HREF.teacher,
+    })
+  }
+
   return hits
 }
 
@@ -254,4 +276,5 @@ export const SEARCH_KIND_LABELS: Record<SearchKind, string> = {
   guardian: "Tuteurs",
   "pre-enrollment": "Pré-inscriptions",
   enrollment: "Inscriptions",
+  teacher: "Professeurs",
 }

@@ -1012,12 +1012,34 @@ export async function getDirectorySnapshot() {
     getEnrollments(schoolId),
   ])
 
+  const admin = createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+  const { data: teacherRoles } = await admin
+    .from("user_school_roles")
+    .select("user_id")
+    .eq("school_id", schoolId)
+    .eq("role_code", "professeur")
+    .eq("is_active", true)
+
+  const teacherIds = teacherRoles?.map((role) => role.user_id) ?? []
+  const { data: teachers } = teacherIds.length
+    ? await admin
+        .from("users")
+        .select("id, full_name")
+        .in("id", teacherIds)
+        .is("deleted_at", null)
+        .order("full_name", { ascending: true })
+    : { data: [] }
+
   return {
     data: {
       students: stuRes.data ?? [],
       guardians: guardRes.data ?? [],
       enrollments: enrollRes.data ?? [],
       preEnrollments: preRes.data ?? [],
+      teachers: teachers ?? [],
     },
   }
 }

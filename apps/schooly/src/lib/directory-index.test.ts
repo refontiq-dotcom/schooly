@@ -38,6 +38,7 @@ const snapshot: DirectorySnapshot = {
       guardian_phone: "0102030405",
     },
   ],
+  teachers: [{ id: "t1", full_name: "Koffi Bamba" }],
 }
 
 describe("buildSearchHits", () => {
@@ -56,6 +57,11 @@ describe("buildSearchHits", () => {
   it("retrouve une inscription par matricule", () => {
     const hits = buildSearchHits(snapshot, "61CC-2026-0042")
     expect(hits.some((h) => h.kind === "enrollment" && h.id === "e1")).toBe(true)
+  })
+
+  it("retrouve un professeur par son nom", () => {
+    const hits = buildSearchHits(snapshot, "bamba")
+    expect(hits).toContainEqual(expect.objectContaining({ id: "t1", kind: "teacher", title: "Koffi Bamba" }))
   })
 
   it("ne renvoie rien si vide", () => {

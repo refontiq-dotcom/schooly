@@ -20,6 +20,7 @@ const KIND_ICON: Record<SearchKind, typeof GraduationCap> = {
   guardian: Users,
   "pre-enrollment": Clock,
   enrollment: FileText,
+  teacher: GraduationCap,
 }
 
 const EMPTY_SNAPSHOT: DirectorySnapshot = {
@@ -27,6 +28,7 @@ const EMPTY_SNAPSHOT: DirectorySnapshot = {
   guardians: [],
   enrollments: [],
   preEnrollments: [],
+  teachers: [],
 }
 
 export function GlobalSearch() {
@@ -132,8 +134,8 @@ export function GlobalSearch() {
             void load()
           }}
           onKeyDown={onKeyDown}
-          placeholder="Nom, téléphone, matricule, classe…"
-          aria-label="Recherche élèves, tuteurs, inscriptions"
+          placeholder="Élève, tuteur, professeur, matricule…"
+          aria-label="Recherche élèves, tuteurs, professeurs et inscriptions"
           autoComplete="off"
           spellCheck={false}
           className="h-10 min-h-10 pl-9 pr-16 text-base md:text-sm"
