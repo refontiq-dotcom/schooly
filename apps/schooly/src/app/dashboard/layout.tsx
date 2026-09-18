@@ -3,6 +3,7 @@ import { createClient as createAdminClient } from "@supabase/supabase-js"
 import { redirect } from "next/navigation"
 import { Sidebar } from "@/components/sidebar"
 import { AcademicYearSelector } from "@/components/academic-year-selector"
+import { GlobalSearch } from "@/components/global-search"
 import { OnboardingWizard } from "@/components/onboarding-wizard"
 import { GeminiBackdrop } from "@/components/gemini"
 
@@ -76,8 +77,9 @@ export default async function DashboardLayout({
         userName={profile?.full_name ?? user.email ?? "Utilisateur"}
       />
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Bannière supérieure avec sélecteur d'année académique */}
-        <header className="flex h-[72px] shrink-0 items-center justify-between border-b border-border/70 bg-background/72 px-5 backdrop-blur-xl sm:px-8">
+        {/* Bannière supérieure avec recherche globale + sélecteur d'année académique */}
+        <header className="flex h-[72px] shrink-0 items-center gap-3 border-b border-border/70 bg-background/72 px-5 backdrop-blur-xl sm:gap-4 sm:px-8">
+          <GlobalSearch />
           <AcademicYearSelector schoolId={schoolId} />
           <div className="hidden rounded-full border border-border bg-card/70 px-3 py-1.5 text-xs font-medium text-muted-foreground sm:block">
             {schoolName}
