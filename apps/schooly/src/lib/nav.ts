@@ -6,6 +6,7 @@ import {
   CreditCard,
   BookOpen,
   CalendarDays,
+  Clock,
   ShieldCheck,
   Settings,
   LogOut,
