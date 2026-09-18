@@ -4,8 +4,9 @@
   "private": true,
   "description": "Schooly — SaaS de gestion scolaire multi-établissements (Côte d'Ivoire / Afrique de l'Ouest). Refontiq.",
   "workspaces": [
-    "apps/*",
-    "packages/*"
+    "apps/schooly",
+    "apps/pwa-parent",
+    "packages/billing"
   ],
   "engines": {
     "node": ">=20"
