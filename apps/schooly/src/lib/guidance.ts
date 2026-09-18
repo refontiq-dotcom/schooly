@@ -6,6 +6,8 @@ export type GuidanceItem = {
   description: string
   severity: GuidanceSeverity
   actionLabel?: string
+  /** Lien de navigation optionnel — sinon onAction est utilisé. */
+  href?: string
   onAction?: () => void
 }
 
