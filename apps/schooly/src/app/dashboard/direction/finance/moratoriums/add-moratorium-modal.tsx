@@ -14,7 +14,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { ActionForm } from "@/components/action-form"
-import { createMoratorium } from "@/app/dashboard/finance/moratoriums/actions"
+import { createMoratorium, getMoratoriumContext } from "@/app/dashboard/finance/moratoriums/actions"
 import { toast } from "sonner"
 import { Plus } from "lucide-react"
 
@@ -29,9 +29,9 @@ export function AddMoratoriumModal({
   enrollments: Array<{ id: string; matricule: string | null; label: string }>
   onSuccess?: () => void
 }) {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(false)\n  const [context, setContext] = useState<{ balance:number; active:boolean } | null>(null)
 
-  async function handleSubmit(formData: FormData) {
+  async function handleSelect(enrollmentId: string) {\n    if (!enrollmentId) { setContext(null); return }\n    const result = await getMoratoriumContext(enrollmentId)\n    if (result.error) { toast.error(result.error); setContext(null); return }\n    setContext({ balance: Number(result.data?.enrollment?.fee_balance ?? 0), active: Boolean(result.data?.active) })\n  }\n\n  async function handleSubmit(formData: FormData) {
     const result = await createMoratorium(formData)
     if (result?.error) {
       toast.error(result.error)
@@ -60,7 +60,7 @@ export function AddMoratoriumModal({
             <div className="space-y-4">
               <div className="space-y-1">
                 <Label htmlFor="mor-enrollment">Élève *</Label>
-                <select id="mor-enrollment" name="enrollmentId" required className="w-full rounded-md border px-3 py-2 text-sm">
+                <select id="mor-enrollment" name="enrollmentId" required onChange={(e) => { void handleSelect(e.target.value) }} className="w-full rounded-md border px-3 py-2 text-sm">
                   <option value="">Sélectionner</option>
                   {enrollments.map((e) => (
                     <option key={e.id} value={e.id}>{e.label}</option>
