@@ -36,6 +36,7 @@ import {
   type AcademicDecisionRow,
 } from "./actions"
 import { useSupabaseUser } from "@/hooks/use-supabase-user"
+import { IntelligentGuidance } from "@/components/intelligent-guidance"
 
 // Les types de lignes (CourseSessionRow, HomeworkRow, AcademicDecisionRow)
 // sont importés de ./actions : source unique, fidèle au schéma (champs
@@ -149,6 +150,13 @@ export default function PedagogieDashboard() {
           </CardContent>
         </Card>
       )}
+
+      <IntelligentGuidance items={[
+        ...(!currentYear ? [{ id: "year", title: "Aucune année académique n’est active", description: plannedYear ? `« ${plannedYear.label} » est prête à être activée.` : "Une année académique doit être créée et activée avant les opérations pédagogiques.", severity: "critical" as const, actionLabel: plannedYear ? `Activer ${plannedYear.label}` : "Ouvrir la structure", onAction: () => { window.location.href = "/dashboard/academic-structure" } }] : []),
+        ...(classes.length === 0 ? [{ id: "classes", title: "Aucune classe pédagogique n’est prête", description: "Créez ou vérifiez la structure académique avant de programmer des cours.", severity: "critical" as const, actionLabel: "Préparer les classes", onAction: () => { window.location.href = "/dashboard/academic-structure" } }] : []),
+        ...(subjects.length === 0 ? [{ id: "subjects", title: "Aucune matière n’est configurée", description: "Les matières sont nécessaires pour construire les cours et les évaluations.", severity: "action" as const, actionLabel: "Configurer les matières", onAction: () => { window.location.href = "/dashboard/academic-structure" } }] : []),
+        ...(sessions.length === 0 && currentYear && classes.length > 0 && subjects.length > 0 ? [{ id: "schedule", title: "Aucun cours n’est encore programmé", description: "La structure est prête : la prochaine étape logique est de programmer un premier cours.", severity: "action" as const, actionLabel: "Programmer un cours", onAction: () => window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" }) }] : []),
+      ]} />
 
       <Tabs defaultValue="sessions" className="space-y-4">
         <TabsList>
