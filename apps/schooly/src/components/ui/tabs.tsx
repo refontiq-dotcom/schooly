@@ -1,4 +1,7 @@
+"use client"
+
 import * as React from "react"
+import { motion, useReducedMotion } from "framer-motion"
 import { cn } from "@/lib/utils"
 
 const TabsContext = React.createContext<{
@@ -32,7 +35,7 @@ function Tabs({ value, defaultValue, onValueChange, children, className }: {
 
 function TabsList({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={cn("inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground", className)}>
+    <div className={cn("inline-flex h-11 items-center justify-center rounded-xl border border-border/70 bg-muted/70 p-1 text-muted-foreground shadow-sm", className)}>
       {children}
     </div>
   )
@@ -45,18 +48,20 @@ function TabsTrigger({ value, children, className }: {
 }) {
   const ctx = React.useContext(TabsContext)
   const isActive = ctx.value === value
+  const reduceMotion = useReducedMotion()
 
   return (
     <button
       type="button"
       onClick={() => ctx.onValueChange(value)}
       className={cn(
-        "inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
-        isActive ? "bg-background text-foreground shadow-sm" : "hover:text-foreground",
+        "relative isolate inline-flex items-center justify-center whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium ring-offset-background transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+        isActive ? "text-foreground" : "hover:text-foreground",
         className
       )}
     >
-      {children}
+      {isActive && <motion.span layoutId="schooly-tab-indicator" aria-hidden="true" className="absolute inset-0 -z-10 rounded-lg bg-card shadow-[0_4px_12px_oklch(0.25_0.05_252_/_0.12)]" transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 460, damping: 32, mass: .65 }} />}
+      <span className="relative z-10">{children}</span>
     </button>
   )
 }
