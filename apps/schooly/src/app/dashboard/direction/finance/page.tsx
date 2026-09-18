@@ -4,10 +4,11 @@ import { redirect } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ActionForm } from "@/components/action-form"
-import { getFinanceOverview, getFinanceConfig, generateMissingFeeItems } from "@/app/dashboard/finance/actions"
+import { getFinanceOverview, getFinanceConfig, generateMissingFeeItems, applySiblingDiscounts, generateDueReminders } from "@/app/dashboard/finance/actions"
 import { FeeScheduleManager, type ScheduleRow } from "./fee-schedule-manager"
 import { AlertTriangle, CalendarClock, Landmark, PieChart, Wallet } from "lucide-react"
 
@@ -199,6 +200,43 @@ export default async function FinancePage() {
             <p className="text-sm text-destructive">{configRes.error}</p>
           </CardContent>
         </Card>
+      )}
+
+      {/* Réductions & relances intelligentes */}
+      {config && config.years.length > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Remises fratrie (en masse)</CardTitle>
+              <CardDescription>
+                Détecte les parents de 2+ enfants et applique la remise au 2e et suivants (par matricule). Idempotent.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ActionForm action={applySiblingDiscounts} className="flex flex-wrap items-end gap-3">
+                <input type="hidden" name="academicYearId" value={config.years[0]?.id ?? ""} />
+                <div className="space-y-1">
+                  <Label htmlFor="siblingRate">Taux (%)</Label>
+                  <Input id="siblingRate" name="rate" type="number" min="1" max="50" defaultValue={10} className="w-24" />
+                </div>
+                <Button type="submit" variant="secondary">Appliquer les remises fratrie</Button>
+              </ActionForm>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Relances automatiques (WhatsApp)</CardTitle>
+              <CardDescription>
+                File notification_outbox : J-5 préventif, J0 le jour même, J+1 formel, J+7 avertissement. Anti-doublon par échéance et palier.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ActionForm action={generateDueReminders}>
+                <Button type="submit" variant="secondary">Générer les relances du jour</Button>
+              </ActionForm>
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       {/* Rattrapage : générer les échéanciers des inscriptions sans tarif */}

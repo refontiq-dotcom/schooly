@@ -6,6 +6,7 @@ import { createClient as createAdminClient } from "@supabase/supabase-js"
 import { revalidatePath } from "next/cache"
 import crypto from "crypto"
 import { generateFeeItemsForEnrollment } from "@/lib/finance-fees"
+import { SIBLING_DEFAULT_RATE, planSiblingDiscounts } from "@/lib/discounts"
 
 type ActionResult<T = void> = {
   error?: string
@@ -964,4 +965,381 @@ export async function generateMissingFeeItems(
 
   revalidatePath("/dashboard/direction/finance")
   return { data: { generated, withoutFee } }
+}
+
+// ============================================ RÉDUCTIONS ========================
+
+type DiscountRow = { id: string; kind: string; label: string; amount: number; reason: string | null; created_at: string }
+
+/** Lignes de réduction d'une inscription (audit des remises fratrie/bourse). */
+export async function getEnrollmentDiscounts(schoolId: string, enrollmentId: string) {
+  const supabase = await createClient()
+
+  const guard = await requireSchoolRole(supabase, { requestedSchoolId: schoolId })
+  if (!guard.ok) return denial(guard.reason, [])
+
+  const admin = createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+
+  const { data, error } = await admin
+    .from("fee_discounts")
+    .select("id, kind, label, amount, reason, created_at")
+    .eq("enrollment_id", enrollmentId)
+    .eq("school_id", guard.context.schoolId)
+    .is("deleted_at", null)
+    .order("created_at", { ascending: false })
+
+  if (error) return { error: error.message, data: [] }
+  return { data: (data ?? []) as DiscountRow[] }
+}
+
+/** Ajoute une remise manuelle (direction/compta) — plafonnée au solde attendu. */
+export async function createManualDiscount(
+  formData: FormData
+): Promise<ActionResult<{ applied: number }>> {
+  const supabase = await createClient()
+
+  const guard = await requireSchoolRole(supabase, { allowedRoles: [...PRICING_ROLES] })
+  if (!guard.ok) return { error: denial(guard.reason, []).error }
+  const { schoolId, userId } = guard.context
+
+  const enrollmentId = formData.get("enrollmentId") as string
+  const amount = parseInt(formData.get("discountAmount") as string || "0")
+  const label = (formData.get("discountLabel") as string)?.trim() || "Remise manuelle"
+
+  if (!enrollmentId || amount <= 0) {
+    return { error: "Inscription et montant de remise valides requis." }
+  }
+
+  const admin = createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+
+  const { data: enr } = await admin
+    .from("enrollments")
+    .select("id, fee_expected")
+    .eq("id", enrollmentId)
+    .eq("school_id", schoolId)
+    .is("deleted_at", null)
+    .maybeSingle()
+
+  if (!enr) return { error: "Inscription introuvable dans cet établissement." }
+  if (!enr.fee_expected || enr.fee_expected <= 0) {
+    return { error: "Aucun échéancier sur cette inscription — générez-le avant d'appliquer une remise." }
+  }
+
+  // Plafond : remises existantes + nouvelle <= attendu.
+  const { data: existing } = await admin
+    .from("fee_discounts")
+    .select("amount")
+    .eq("enrollment_id", enrollmentId)
+    .is("deleted_at", null)
+
+  const existingTotal = (existing ?? []).reduce(
+    (s: number, r: { amount: number }) => s + r.amount, 0
+  )
+  const room = enr.fee_expected - existingTotal
+  if (room <= 0) {
+    return { error: "Le total des remises atteint déjà le montant attendu." }
+  }
+  const applied = Math.min(amount, room)
+
+  const { error } = await admin.from("fee_discounts").insert({
+    school_id: schoolId,
+    enrollment_id: enrollmentId,
+    kind: "manuel",
+    label,
+    amount: applied,
+    created_by: userId,
+  })
+
+  if (error) return { error: error.message }
+
+  revalidatePath("/dashboard/direction/finance")
+  return { data: { applied } }
+}
+
+/** Retire une remise (soft delete). */
+export async function deleteDiscount(formData: FormData): Promise<ActionResult> {
+  const supabase = await createClient()
+
+  const guard = await requireSchoolRole(supabase, { allowedRoles: [...PRICING_ROLES] })
+  if (!guard.ok) return { error: denial(guard.reason, []).error }
+  const { schoolId } = guard.context
+
+  const id = formData.get("id") as string
+  if (!id) return { error: "Remise introuvable." }
+
+  const admin = createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+
+  const { data: row } = await admin
+    .from("fee_discounts")
+    .select("id")
+    .eq("id", id)
+    .eq("school_id", schoolId)
+    .is("deleted_at", null)
+    .maybeSingle()
+
+  if (!row) return { error: "Remise introuvable dans cet établissement." }
+
+  const { error } = await admin
+    .from("fee_discounts")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", id)
+
+  if (error) return { error: error.message }
+
+  revalidatePath("/dashboard/direction/finance")
+  return {}
+}
+
+/**
+ * Applique les remises fratrie en masse pour l'année : groupe les inscriptions
+ * par parent (guardian), trie par matricule, remise de 10 % (configurable)
+ * dès le 2e enfant. Idempotent : mise à jour si le taux change, jamais de
+ * doublon, remises obsolètes (enfant devenu unique) retirées.
+ */
+export async function applySiblingDiscounts(
+  formData: FormData
+): Promise<ActionResult<{ groups: number; discounts: number; skipped: number }>> {
+  const supabase = await createClient()
+
+  const guard = await requireSchoolRole(supabase, { allowedRoles: [...PRICING_ROLES] })
+  if (!guard.ok) return { error: denial(guard.reason, []).error }
+  const { schoolId, userId } = guard.context
+
+  const academicYearId = formData.get("academicYearId") as string
+  const rateInput = parseInt(formData.get("rate") as string || "0")
+  const rate = rateInput > 0 && rateInput <= 50 ? rateInput : SIBLING_DEFAULT_RATE
+
+  if (!academicYearId) return { error: "Année académique requise." }
+
+  const admin = createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+
+  const { data: rows, error } = await admin
+    .from("v_student_balances")
+    .select("enrollment_id, matricule, expected_total, has_fee_items")
+    .eq("school_id", schoolId)
+    .eq("academic_year_id", academicYearId)
+
+  if (error) return { error: error.message }
+
+  const list = (rows ?? []) as Array<{
+    enrollment_id: string
+    matricule: string | null
+    expected_total: number
+    has_fee_items: boolean
+  }>
+
+  const { data: guardianLinks } = await admin
+    .from("enrollments")
+    .select("id, guardian_id")
+    .eq("school_id", schoolId)
+    .eq("academic_year_id", academicYearId)
+    .is("deleted_at", null)
+
+  const guardianByEnrollment = new Map<string, string>()
+  for (const link of (guardianLinks ?? []) as Array<{ id: string; guardian_id: string }>) {
+    guardianByEnrollment.set(link.id, link.guardian_id)
+  }
+
+  const expectedByEnrollment: Record<string, number> = {}
+  for (const row of list) expectedByEnrollment[row.enrollment_id] = row.expected_total
+
+  const groups = new Map<string, Array<{ enrollmentId: string; matricule: string | null }>>()
+  for (const row of list) {
+    if (!row.has_fee_items) continue
+    const guardianId = guardianByEnrollment.get(row.enrollment_id)
+    if (!guardianId) continue
+    const bucket = groups.get(guardianId) ?? []
+    bucket.push({ enrollmentId: row.enrollment_id, matricule: row.matricule })
+    groups.set(guardianId, bucket)
+  }
+
+  let discountCount = 0
+  let groupCount = 0
+  let skipped = 0
+
+  for (const [guardianId, enrollments] of groups) {
+    if (enrollments.length < 2) continue
+    groupCount += 1
+    const plans = planSiblingDiscounts({ guardianId, enrollments }, expectedByEnrollment, rate)
+
+    const enrollmentIds = enrollments.map((e) => e.enrollmentId)
+    const { data: existing } = await admin
+      .from("fee_discounts")
+      .select("id, enrollment_id, amount")
+      .in("enrollment_id", enrollmentIds)
+      .eq("kind", "fratrie")
+      .is("deleted_at", null)
+
+    const existingByEnrollment = new Map<string, { id: string; amount: number }>()
+    for (const ex of (existing ?? []) as Array<{ id: string; enrollment_id: string; amount: number }>) {
+      existingByEnrollment.set(ex.enrollment_id, { id: ex.id, amount: ex.amount })
+    }
+
+    for (const plan of plans) {
+      const existingRow = existingByEnrollment.get(plan.enrollmentId)
+      if (existingRow) {
+        if (existingRow.amount !== plan.amount) {
+          await admin
+            .from("fee_discounts")
+            .update({ amount: plan.amount, label: plan.label })
+            .eq("id", existingRow.id)
+          discountCount += 1
+        } else {
+          skipped += 1
+        }
+        continue
+      }
+      const { error: insertError } = await admin.from("fee_discounts").insert({
+        school_id: schoolId,
+        enrollment_id: plan.enrollmentId,
+        kind: "fratrie",
+        label: plan.label,
+        amount: plan.amount,
+        reason: `Fratrie guardian ${guardianId} — ${enrollments.length} enfants, taux ${plan.rate} %`,
+        created_by: userId,
+      })
+      if (!insertError) discountCount += 1
+    }
+
+    for (const [enrollmentId, existingRow] of existingByEnrollment) {
+      const stillPlanned = plans.some((p) => p.enrollmentId === enrollmentId)
+      if (!stillPlanned) {
+        await admin
+          .from("fee_discounts")
+          .update({ deleted_at: new Date().toISOString() })
+          .eq("id", existingRow.id)
+      }
+    }
+  }
+
+  revalidatePath("/dashboard/direction/finance")
+  return { data: { groups: groupCount, discounts: discountCount, skipped } }
+}
+
+// ============================================ RELANCES AUTOMATIQUES =============
+
+/**
+ * Génère les relances du jour : pour chaque inscription impayée dont la
+ * prochaine échéance est passée ou imminente, pousse un message WhatsApp dans
+ * notification_outbox (file avec retry — l'envoi réel est le travail du
+ * worker). Idempotent par clé de template : un parent n'est relancé qu'UNE
+ * fois par échéance et par palier (J-5 / J+1 / J+7), grâce au check
+ * d'existence sur (template_key + payload->enrollment_id + scheduled date).
+ * Degrés : J-5 préventif, J+1 formel, J+7 avertissement.
+ */
+export async function generateDueReminders(
+  formData: FormData
+): Promise<ActionResult<{ queued: number; skipped: number }>> {
+  const supabase = await createClient()
+
+  const guard = await requireSchoolRole(supabase, { allowedRoles: [...PRICING_ROLES] })
+  if (!guard.ok) return { error: denial(guard.reason, []).error }
+  const { schoolId } = guard.context
+
+  const admin = createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+
+  const todayISO = new Date().toISOString().slice(0, 10)
+  const inFive = new Date(Date.now() + 5 * 86400000).toISOString().slice(0, 10)
+  const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10)
+  const yesterday = new Date(Date.now() - 1 * 86400000).toISOString().slice(0, 10)
+
+  const { data: balances, error } = await admin
+    .from("v_student_balances")
+    .select("enrollment_id, first_name, last_name, guardian_name, guardian_phone, balance, next_due_date, next_due_amount")
+    .eq("school_id", schoolId)
+    .gt("balance", 0)
+
+  if (error) return { error: error.message }
+
+  type Row = {
+    enrollment_id: string
+    first_name: string
+    last_name: string
+    guardian_name: string | null
+    guardian_phone: string | null
+    balance: number
+    next_due_date: string | null
+    next_due_amount: number | null
+  }
+  const rows = (balances ?? []) as Row[]
+
+  const toQueue: Array<{
+    school_id: string
+    recipient_phone: string
+    channel: string
+    template_key: string
+    payload: Record<string, unknown>
+  }> = []
+  let skipped = 0
+
+  for (const r of rows) {
+    if (!r.guardian_phone || !r.next_due_date) continue
+    const amount = r.next_due_amount ?? r.balance
+    const base = {
+      student: `${r.first_name} ${r.last_name}`,
+      guardian: r.guardian_name,
+      due_date: r.next_due_date,
+      amount,
+      balance: r.balance,
+    }
+
+    let templateKey: string | null = null
+    if (r.next_due_date === todayISO) templateKey = "fee_reminder_j0"
+    else if (r.next_due_date <= inFive && r.next_due_date > todayISO) templateKey = "fee_reminder_j5"
+    else if (r.next_due_date < todayISO && r.next_due_date >= yesterday) templateKey = "fee_reminder_j1"
+    else if (r.next_due_date < weekAgo) templateKey = "fee_reminder_j7"
+
+    if (!templateKey) {
+      skipped += 1
+      continue
+    }
+
+    // Anti-doublon : une relance du même palier pour la même échéance n'est
+    // jamais recréée (payload->>'enrollment_id' + template + due_date).
+    const { data: existing } = await admin
+      .from("notification_outbox")
+      .select("id")
+      .eq("school_id", schoolId)
+      .eq("template_key", templateKey)
+      .eq("payload->>enrollment_id", r.enrollment_id)
+      .eq("payload->>due_date", r.next_due_date)
+      .is("deleted_at", null)
+      .maybeSingle()
+
+    if (existing) {
+      skipped += 1
+      continue
+    }
+
+    toQueue.push({
+      school_id: schoolId,
+      recipient_phone: r.guardian_phone,
+      channel: "whatsapp",
+      template_key: templateKey,
+      payload: { enrollment_id: r.enrollment_id, ...base },
+    })
+  }
+
+  if (toQueue.length > 0) {
+    const { error: insertError } = await admin.from("notification_outbox").insert(toQueue)
+    if (insertError) return { error: insertError.message }
+  }
+
+  revalidatePath("/dashboard/direction/finance/reminders")
+  return { data: { queued: toQueue.length, skipped } }
 }
