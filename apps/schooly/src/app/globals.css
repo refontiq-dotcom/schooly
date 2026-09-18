@@ -55,19 +55,19 @@
   --card-foreground: oklch(0.15 0.02 250);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.15 0.02 250);
-  --primary: oklch(0.6 0.15 150); /* Vert Émeraude (Succès/Principal) */
+  --primary: oklch(0.48 0.13 150); /* Vert Émeraude (Succès/Principal) — assombri pour contraste AA avec texte blanc */
   --primary-foreground: oklch(0.98 0 0);
   --secondary: oklch(0.95 0.02 250);
   --secondary-foreground: oklch(0.2 0.02 250);
   --muted: oklch(0.95 0.02 250);
-  --muted-foreground: oklch(0.5 0.02 250);
+  --muted-foreground: oklch(0.42 0.02 250); /* assombri pour contraste AA (sidebar, descriptions) */
   --accent: oklch(0.95 0.02 250);
   --accent-foreground: oklch(0.2 0.02 250);
-  --destructive: oklch(0.6 0.2 25); /* Rouge Corail (Erreur/Impayé) */
+  --destructive: oklch(0.5 0.2 25); /* Rouge Corail (Erreur/Impayé) — assombri pour contraste AA sur fond clair */
   --destructive-foreground: oklch(0.98 0 0);
   --border: oklch(0.9 0.02 250);
   --input: oklch(0.9 0.02 250);
-  --ring: oklch(0.6 0.15 150);
+  --ring: oklch(0.48 0.13 150);
   --radius: 0.75rem;
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);

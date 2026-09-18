@@ -64,16 +64,22 @@ function Select({ value, onValueChange, children, disabled, name, required, id, 
   )
 }
 
-function SelectTrigger({ children, className, disabled }: {
+function SelectTrigger({ children, className, disabled, id, ariaLabel }: {
   children: React.ReactNode
   className?: string
   disabled?: boolean
+  id?: string
+  ariaLabel?: string
 }) {
   const ctx = React.useContext(SelectContext)
   
   return (
     <button
       type="button"
+      id={id}
+      aria-label={ariaLabel}
+      aria-haspopup="listbox"
+      aria-expanded={ctx.open}
       disabled={disabled}
       onClick={() => ctx.setOpen(!ctx.open)}
       className={cn(
@@ -82,7 +88,7 @@ function SelectTrigger({ children, className, disabled }: {
       )}
     >
       {children}
-      <ChevronDown className={cn("h-4 w-4 opacity-50 transition-transform", ctx.open && "rotate-180")} />
+      <ChevronDown aria-hidden="true" className={cn("h-4 w-4 opacity-50 transition-transform", ctx.open && "rotate-180")} />
     </button>
   )
 }

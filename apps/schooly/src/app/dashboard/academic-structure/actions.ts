@@ -7,6 +7,7 @@ import { redirect } from "next/navigation"
 import {
   ERROR_BY_REASON,
   requireSchoolRole,
+  type DeniedReason,
   type SupabaseUserClient,
 } from "@/utils/supabase/require-role"
 import { STRUCTURE_ADMIN_ROLES } from "@/utils/supabase/roles"
@@ -18,14 +19,19 @@ export type ActionResult<T = void> = {
 
 export type { SchoolRoleResult }
 
-type SchoolRoleResult = { school_id: string | null; error: Error | null }
+type SchoolRoleResult = { school_id: string | null; error: Error | null; reason?: DeniedReason }
+
+/** Libellé exact du refus de garde (fini le message générique trompeur). */
+function guardError(reason?: DeniedReason): string {
+  return reason ? ERROR_BY_REASON[reason] : ERROR_BY_REASON.NO_SCHOOL
+}
 
 async function getSchoolId(supabase: SupabaseUserClient): Promise<SchoolRoleResult> {
   // Audit P2-2 : garde partagée requireSchoolRole + source unique des rôles.
   // La structure académique (années, niveaux, classes, matières, affectations)
   // est un acte de direction ou de secrétariat — pas une opération enseignante.
   const guard = await requireSchoolRole(supabase, { allowedRoles: [...STRUCTURE_ADMIN_ROLES] })
-  if (!guard.ok) return { school_id: null, error: new Error(guard.reason) }
+  if (!guard.ok) return { school_id: null, error: new Error(guard.reason), reason: guard.reason }
   return { school_id: guard.context.schoolId, error: null }
 }
 
@@ -101,7 +107,7 @@ async function isSchoolTeacher(
 export async function getAcademicYears(): Promise<ActionResult<{ id: string; label: string; status: string; start_date: string; end_date: string }[]>> {
   const supabase = await createClient()
   const roleData = await getSchoolId(supabase)
-  if (!roleData?.school_id) return { error: "Aucune école rattachée" }
+  if (!roleData?.school_id) return { error: guardError(roleData?.reason) }
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -122,7 +128,7 @@ export async function getAcademicYears(): Promise<ActionResult<{ id: string; lab
 export async function createAcademicYear(formData: FormData): Promise<ActionResult> {
   const supabase = await createClient()
   const roleData = await getSchoolId(supabase)
-  if (!roleData?.school_id) return { error: "Aucune école rattachée" }
+  if (!roleData?.school_id) return { error: guardError(roleData?.reason) }
 
   const label = formData.get("label") as string
   const startDate = formData.get("startDate") as string
@@ -185,7 +191,7 @@ export async function createAcademicYear(formData: FormData): Promise<ActionResu
 export async function getGradeLevels() {
   const supabase = await createClient()
   const roleData = await getSchoolId(supabase)
-  if (!roleData?.school_id) return { error: "Aucune école rattachée", data: [] }
+  if (!roleData?.school_id) return { error: guardError(roleData?.reason), data: [] }
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -206,7 +212,7 @@ export async function getGradeLevels() {
 export async function createGradeLevel(formData: FormData): Promise<ActionResult> {
   const supabase = await createClient()
   const roleData = await getSchoolId(supabase)
-  if (!roleData?.school_id) return { error: "Aucune école rattachée" }
+  if (!roleData?.school_id) return { error: guardError(roleData?.reason) }
 
   const name = formData.get("name") as string
   const level = parseInt((formData.get("level") as string) || "0", 10)
@@ -264,7 +270,7 @@ export async function createGradeLevel(formData: FormData): Promise<ActionResult
 export async function getClasses() {
   const supabase = await createClient()
   const roleData = await getSchoolId(supabase)
-  if (!roleData?.school_id) return { error: "Aucune école rattachée", data: [] }
+  if (!roleData?.school_id) return { error: guardError(roleData?.reason), data: [] }
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -289,7 +295,7 @@ export async function getClasses() {
 export async function createClass(formData: FormData): Promise<ActionResult> {
   const supabase = await createClient()
   const roleData = await getSchoolId(supabase)
-  if (!roleData?.school_id) return { error: "Aucune école rattachée" }
+  if (!roleData?.school_id) return { error: guardError(roleData?.reason) }
 
   const gradeLevelId = formData.get("gradeLevelId") as string
   const name = formData.get("name") as string
@@ -343,7 +349,7 @@ export async function createClass(formData: FormData): Promise<ActionResult> {
 export async function getSubjects() {
   const supabase = await createClient()
   const roleData = await getSchoolId(supabase)
-  if (!roleData?.school_id) return { error: "Aucune école rattachée", data: [] }
+  if (!roleData?.school_id) return { error: guardError(roleData?.reason), data: [] }
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -364,7 +370,7 @@ export async function getSubjects() {
 export async function createSubject(formData: FormData): Promise<ActionResult> {
   const supabase = await createClient()
   const roleData = await getSchoolId(supabase)
-  if (!roleData?.school_id) return { error: "Aucune école rattachée" }
+  if (!roleData?.school_id) return { error: guardError(roleData?.reason) }
 
   const name = formData.get("name") as string
   const code = formData.get("code") as string | null
@@ -407,7 +413,7 @@ export async function createSubject(formData: FormData): Promise<ActionResult> {
 export async function getClassSubjectAssignments() {
   const supabase = await createClient()
   const roleData = await getSchoolId(supabase)
-  if (!roleData?.school_id) return { error: "Aucune école rattachée", data: [] }
+  if (!roleData?.school_id) return { error: guardError(roleData?.reason), data: [] }
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -438,7 +444,7 @@ export async function getClassSubjectAssignments() {
 export async function createClassSubjectAssignment(formData: FormData): Promise<ActionResult> {
   const supabase = await createClient()
   const roleData = await getSchoolId(supabase)
-  if (!roleData?.school_id) return { error: "Aucune école rattachée" }
+  if (!roleData?.school_id) return { error: guardError(roleData?.reason) }
 
   const classId = formData.get("classId") as string
   const subjectId = formData.get("subjectId") as string
@@ -506,7 +512,7 @@ export async function createClassSubjectAssignment(formData: FormData): Promise<
 export async function getTeachersForSchool(): Promise<ActionResult<{ id: string; full_name: string }[]>> {
   const supabase = await createClient()
   const roleData = await getSchoolId(supabase)
-  if (!roleData?.school_id) return { error: "Aucune école rattachée", data: [] }
+  if (!roleData?.school_id) return { error: guardError(roleData?.reason), data: [] }
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

@@ -93,10 +93,10 @@ const YEAR_STATUS_CONFIG: Record<string, { label: string; variant: "default" | "
 }
 
 const DECISION_LABELS: Record<string, { label: string; color: string; icon: React.ElementType }> = {
-  admitted: { label: "Admis", color: "text-green-600 bg-green-50", icon: CheckCircle2 },
-  repeated: { label: "Redouble", color: "text-orange-600 bg-orange-50", icon: RotateCcw },
-  excluded: { label: "Exclu", color: "text-red-600 bg-red-50", icon: XCircle },
-  pending: { label: "En attente", color: "text-gray-600 bg-gray-50", icon: Clock },
+  admitted: { label: "Admis", color: "text-green-800 bg-green-50", icon: CheckCircle2 },
+  repeated: { label: "Redouble", color: "text-orange-900 bg-orange-50", icon: RotateCcw },
+  excluded: { label: "Exclu", color: "text-red-700 bg-red-50", icon: XCircle },
+  pending: { label: "En attente", color: "text-gray-700 bg-gray-50", icon: Clock },
 }
 
 export function YearRolloverPanel() {
@@ -334,10 +334,10 @@ export function YearRolloverPanel() {
               {/* Résumé statistique */}
               <div className="grid gap-3 sm:grid-cols-4">
                 {[
-                  { key: "admitted", value: preview.admitted, icon: TrendingUp, color: "text-green-600 bg-green-50 border-green-200" },
-                  { key: "repeated", value: preview.repeated, icon: RotateCcw, color: "text-orange-600 bg-orange-50 border-orange-200" },
-                  { key: "excluded", value: preview.excluded, icon: XCircle, color: "text-red-600 bg-red-50 border-red-200" },
-                  { key: "pending", value: preview.pending, icon: Clock, color: "text-gray-600 bg-gray-50 border-gray-200" },
+                  { key: "admitted", value: preview.admitted, icon: TrendingUp, color: "text-green-800 bg-green-50 border-green-800/30" },
+                  { key: "repeated", value: preview.repeated, icon: RotateCcw, color: "text-orange-900 bg-orange-50 border-orange-800/30" },
+                  { key: "excluded", value: preview.excluded, icon: XCircle, color: "text-red-700 bg-red-50 border-red-800/30" },
+                  { key: "pending", value: preview.pending, icon: Clock, color: "text-gray-700 bg-gray-50 border-gray-400" },
                 ].map(({ key, value, icon: Icon, color }) => {
                   const d = DECISION_LABELS[key]
                   return (
@@ -518,10 +518,10 @@ export function YearRolloverPanel() {
           {step === "done" && result && (
             <div className="space-y-4">
               <div className="flex items-center gap-3 rounded-lg bg-green-50 border border-green-200 px-4 py-3">
-                <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0" />
+                <CheckCircle2 className="h-5 w-5 text-green-800 shrink-0" />
                 <div>
-                  <p className="font-semibold text-green-800">Bascule réussie !</p>
-                  <p className="text-sm text-green-700">
+                  <p className="font-semibold text-green-900">Bascule réussie !</p>
+                  <p className="text-sm text-green-900">
                     {result.promoted} promu(s) · {result.repeated} redoublant(s) ·{" "}
                     {result.excluded} exclu(s) · {result.pending} sans décision
                   </p>

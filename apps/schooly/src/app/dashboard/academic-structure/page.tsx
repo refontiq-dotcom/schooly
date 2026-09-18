@@ -267,6 +267,7 @@ export default function AcademicStructurePage() {
   const loadYears = async () => {
     const res = await getAcademicYears()
     if (res.data) setAcademicYears(res.data)
+    if (res.error && academicYears.length === 0) setActionError(res.error)
   }
   const loadGradeLevels = async () => {
     const res = await getGradeLevels()
@@ -330,12 +331,12 @@ export default function AcademicStructurePage() {
   return (
     <div className="space-y-6">
       {!currentYear && (
-        <Card className="border-orange-200 bg-orange-50 dark:border-orange-900 dark:bg-orange-950/20">
+        <Card className="border-orange-800/30 bg-orange-50 dark:border-orange-900 dark:bg-orange-950/20">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between gap-4">
               <div>
-                <h3 className="font-semibold text-orange-800 dark:text-orange-200">Aucune année académique en cours</h3>
-                <p className="text-sm text-orange-600 dark:text-orange-300 mt-1">
+                <h3 className="font-semibold text-orange-900 dark:text-orange-200">Aucune année académique en cours</h3>
+                <p className="text-sm text-orange-900 dark:text-orange-300 mt-1">
                   {plannedYear
                     ? `Confirmez l'activation de « ${plannedYear.label} » pour débloquer notes et appels.`
                     : `Ouvrez le formulaire prérempli « ${suggestedYear.label} » (sept. → juil.).`}
@@ -344,7 +345,7 @@ export default function AcademicStructurePage() {
               <Button
                 type="button"
                 variant="outline"
-                className="shrink-0 text-orange-700 border-orange-300 hover:bg-orange-100 dark:text-orange-200"
+                className="shrink-0 border-orange-800/30 text-orange-900 hover:bg-orange-100 dark:text-orange-200"
                 disabled={isPending}
                 onClick={handleMissingYearCta}
               >
@@ -360,16 +361,16 @@ export default function AcademicStructurePage() {
       )}
 
       {currentYear && (
-        <Card className="border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950/20">
+        <Card className="border-green-800/30 bg-green-50 dark:border-green-900 dark:bg-green-950/20">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="font-semibold text-green-800 dark:text-green-200">Année en cours : {currentYear.label}</h3>
-                <p className="text-sm text-green-600 dark:text-green-300 mt-1">
+                <h3 className="font-semibold text-green-900 dark:text-green-200">Année en cours : {currentYear.label}</h3>
+                <p className="text-sm text-green-900 dark:text-green-300 mt-1">
                   Toutes les opérations pédagogiques et financières se réfèrent à cette année.
                 </p>
               </div>
-              <Badge className="bg-green-600 text-white">Active</Badge>
+              <Badge className="bg-green-800 text-white">Active</Badge>
             </div>
           </CardContent>
         </Card>
@@ -405,21 +406,21 @@ export default function AcademicStructurePage() {
                 onOpenChange={setCreateYearOpen}
               >
                 <div className="space-y-1 sm:col-span-2">
-                  <Label htmlFor="label">Libellé</Label>
-                  <Input name="label" defaultValue={suggestedYear.label} placeholder="Ex: 2025-2026" required />
+                  <Label htmlFor="year-label">Libellé</Label>
+                  <Input id="year-label" name="label" defaultValue={suggestedYear.label} placeholder="Ex: 2025-2026" required />
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor="startDate">Début</Label>
-                  <Input name="startDate" type="date" defaultValue={suggestedYear.start_date} required />
+                  <Label htmlFor="year-start">Début</Label>
+                  <Input id="year-start" name="startDate" type="date" defaultValue={suggestedYear.start_date} required />
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor="endDate">Fin</Label>
-                  <Input name="endDate" type="date" defaultValue={suggestedYear.end_date} required />
+                  <Label htmlFor="year-end">Fin</Label>
+                  <Input id="year-end" name="endDate" type="date" defaultValue={suggestedYear.end_date} required />
                 </div>
               </CreateDialog>
 
               {actionError && (
-                <div className="rounded-lg bg-destructive/10 border border-destructive/30 px-3 py-2 text-sm text-destructive">
+                <div role="alert" className="rounded-lg bg-destructive/10 border border-destructive/40 px-3 py-2 text-sm font-medium text-destructive">
                   {actionError}
                 </div>
               )}
@@ -479,16 +480,16 @@ export default function AcademicStructurePage() {
                 action={withReload(createGradeLevel, loadGradeLevels)}
               >
                 <div className="space-y-1">
-                  <Label htmlFor="name">Nom</Label>
-                  <Input name="name" placeholder="Ex: 6ème" required />
+                  <Label htmlFor="level-name">Nom</Label>
+                  <Input id="level-name" name="name" placeholder="Ex: 6ème" required />
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor="level">Rang</Label>
-                  <Input name="level" type="number" required />
+                  <Label htmlFor="level-rank">Rang</Label>
+                  <Input id="level-rank" name="level" type="number" required />
                 </div>
                 <div className="space-y-1 sm:col-span-2">
-                  <Label htmlFor="cycle">Cycle</Label>
-                  <Input name="cycle" placeholder="Collège" required />
+                  <Label htmlFor="level-cycle">Cycle</Label>
+                  <Input id="level-cycle" name="cycle" placeholder="Collège" required />
                 </div>
               </CreateDialog>
               {/* La bascule d'année promeut au RANG SUPÉRIEUR (rang + 1) : le
@@ -559,8 +560,8 @@ export default function AcademicStructurePage() {
                 action={withReload(createClass, loadClasses)}
               >
                 <div className="space-y-1">
-                  <Label htmlFor="gradeLevelId">Niveau</Label>
-                  <select name="gradeLevelId" required className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                  <Label htmlFor="class-grade">Niveau</Label>
+                  <select id="class-grade" name="gradeLevelId" required className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
                     <option value="">Niveau</option>
                     {gradeLevels.map(level => (
                       <option key={level.id} value={level.id}>{level.name}</option>
@@ -568,16 +569,16 @@ export default function AcademicStructurePage() {
                   </select>
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor="name">Nom</Label>
-                  <Input name="name" placeholder="Ex: 6ème A" required />
+                  <Label htmlFor="class-name">Nom</Label>
+                  <Input id="class-name" name="name" placeholder="Ex: 6ème A" required />
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor="capacity">Capacité</Label>
-                  <Input name="capacity" type="number" />
+                  <Label htmlFor="class-capacity">Capacité</Label>
+                  <Input id="class-capacity" name="capacity" type="number" />
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor="headTeacherId">Titulaire</Label>
-                  <select name="headTeacherId" className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                  <Label htmlFor="class-teacher">Titulaire</Label>
+                  <select id="class-teacher" name="headTeacherId" className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
                     <option value="">—</option>
                     {teachers.map(teacher => (
                       <option key={teacher.id} value={teacher.id}>{teacher.full_name}</option>
@@ -657,16 +658,16 @@ export default function AcademicStructurePage() {
                 action={withReload(createSubject, loadSubjects)}
               >
                 <div className="space-y-1 sm:col-span-2">
-                  <Label htmlFor="name">Nom</Label>
-                  <Input name="name" placeholder="Mathématiques" required />
+                  <Label htmlFor="subject-name">Nom</Label>
+                  <Input id="subject-name" name="name" placeholder="Mathématiques" required />
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor="code">Code</Label>
-                  <Input name="code" placeholder="MAT" />
+                  <Label htmlFor="subject-code">Code</Label>
+                  <Input id="subject-code" name="code" placeholder="MAT" />
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor="coefficient">Coefficient</Label>
-                  <Input name="coefficient" type="number" step="0.1" defaultValue="1" />
+                  <Label htmlFor="subject-coef">Coefficient</Label>
+                  <Input id="subject-coef" name="coefficient" type="number" step="0.1" defaultValue="1" />
                 </div>
               </CreateDialog>
               <div className="space-y-2">
@@ -728,8 +729,8 @@ export default function AcademicStructurePage() {
                 action={withReload(createClassSubjectAssignment, loadAssignments)}
               >
                 <div className="space-y-1">
-                  <Label htmlFor="classId">Classe</Label>
-                  <select name="classId" required className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                  <Label htmlFor="assign-class">Classe</Label>
+                  <select id="assign-class" name="classId" required className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
                     <option value="">Classe</option>
                     {classes.map(cls => (
                       <option key={cls.id} value={cls.id}>{cls.name}</option>
@@ -737,8 +738,8 @@ export default function AcademicStructurePage() {
                   </select>
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor="subjectId">Matière</Label>
-                  <select name="subjectId" required className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                  <Label htmlFor="assign-subject">Matière</Label>
+                  <select id="assign-subject" name="subjectId" required className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
                     <option value="">Matière</option>
                     {subjects.map(subject => (
                       <option key={subject.id} value={subject.id}>{subject.name}</option>
@@ -746,12 +747,12 @@ export default function AcademicStructurePage() {
                   </select>
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor="coefficient">Coefficient</Label>
-                  <Input name="coefficient" type="number" step="0.1" defaultValue="1" />
+                  <Label htmlFor="assign-coef">Coefficient</Label>
+                  <Input id="assign-coef" name="coefficient" type="number" step="0.1" defaultValue="1" />
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor="teacherId">Professeur</Label>
-                  <select name="teacherId" className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                  <Label htmlFor="assign-teacher">Professeur</Label>
+                  <select id="assign-teacher" name="teacherId" className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
                     <option value="">—</option>
                     {teachers.map(teacher => (
                       <option key={teacher.id} value={teacher.id}>{teacher.full_name}</option>

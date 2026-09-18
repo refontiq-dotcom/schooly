@@ -28,7 +28,7 @@ export function ActionForm({
     <form action={handleSubmit} className={className}>
       {children}
       {state.error && (
-        <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-destructive text-sm font-medium">
+        <div role="alert" className="p-3 rounded-lg bg-destructive/10 border border-destructive/40 text-destructive text-sm font-medium">
           {state.error}
         </div>
       )}

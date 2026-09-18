@@ -146,13 +146,14 @@ export function AcademicYearSelector({ schoolId }: { schoolId?: string | null })
 
   return (
     <div className="flex items-center gap-3">
-      <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+      <CalendarIcon aria-hidden="true" className="h-4 w-4 text-muted-foreground" />
+      <label htmlFor="academic-year" className="sr-only">Année académique affichée</label>
       <Select
         value={selectedId}
         onValueChange={handleChange}
         disabled={loading || creating}
       >
-        <SelectTrigger className="w-[220px] h-8 text-sm">
+        <SelectTrigger id="academic-year" ariaLabel="Année académique affichée" className="w-[220px] h-8 text-sm">
           {/* Le SelectValue maison rend la valeur brute (uuid) : on affiche le label. */}
           <span className={selectedId ? "" : "text-muted-foreground"}>
             {activeYear?.label ?? "Année académique"}

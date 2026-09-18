@@ -129,18 +129,18 @@ export default function PedagogieDashboard() {
       </div>
 
       {!currentYear && (
-        <Card className="border-orange-200 bg-orange-50 dark:border-orange-900 dark:bg-orange-950/20">
+        <Card className="border-orange-800/30 bg-orange-50 dark:border-orange-900 dark:bg-orange-950/20">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between gap-4">
               <div>
-                <h3 className="font-semibold text-orange-800 dark:text-orange-200">Aucune année académique en cours</h3>
-                <p className="text-sm text-orange-600 dark:text-orange-300 mt-1">
+                <h3 className="font-semibold text-orange-900 dark:text-orange-200">Aucune année académique en cours</h3>
+                <p className="text-sm text-orange-900 dark:text-orange-300 mt-1">
                   {plannedYear
                     ? `« ${plannedYear.label} » est prête : ouvrez la structure pour l'activer.`
                     : "Ouvrez la structure : un formulaire prérempli crée et active la première année."}
                 </p>
               </div>
-              <Button asChild variant="outline" className="shrink-0 text-orange-700 border-orange-300 hover:bg-orange-100 dark:text-orange-200">
+              <Button asChild variant="outline" className="shrink-0 border-orange-800/30 text-orange-900 hover:bg-orange-100 dark:text-orange-200">
                 <Link href="/dashboard/academic-structure">
                   {plannedYear ? `Activer ${plannedYear.label}` : "Créer l'année"}
                 </Link>
