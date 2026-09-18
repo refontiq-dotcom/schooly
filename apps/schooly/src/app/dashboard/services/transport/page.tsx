@@ -15,6 +15,7 @@ import {
   createTransportSubscription,
 } from "../actions"
 import { Bus, Plus, Users, MapPin, AlertCircle } from "lucide-react"
+import { IntelligentGuidance } from "@/components/intelligent-guidance"
 
 type Route = {
   id: string
@@ -75,6 +76,13 @@ export default function TransportPage() {
 
   return (
     <div className="space-y-6">
+      <IntelligentGuidance items={[
+        ...(routes.length === 0 ? [{ id: "route", title: "Aucune ligne de transport n’est configurée", description: "Créez une ligne avant de pouvoir proposer un abonnement à un élève.", severity: "critical" as const, actionLabel: "Créer une ligne", onAction: () => setShowRouteForm(true) }] : []),
+        ...(routes.length > 0 && enrollments.length === 0 ? [{ id: "enrollments", title: "Aucune inscription élève disponible", description: "Les abonnements ne peuvent être rattachés qu’à des élèves inscrits dans l’établissement.", severity: "critical" as const, actionLabel: "Ouvrir les inscriptions", onAction: () => { window.location.href = "/dashboard/direction/admissions" } }] : []),
+        ...(routes.some(r => (r.capacity ?? 0) > 0 && subs.filter(s => s.status === "active" && s.bus_routes?.id === r.id).length >= (r.capacity ?? Infinity)) ? [{ id: "capacity", title: "Une capacité de transport semble atteinte", description: "Vérifiez les abonnements actifs avant d’ajouter de nouveaux élèves.", severity: "warning" as const }] : []),
+        ...(routes.length > 0 && enrollments.length > 0 && subs.length === 0 ? [{ id: "subscription", title: "Le transport est prêt à recevoir son premier abonnement", description: "Une ligne et des élèves inscrits sont disponibles.", severity: "action" as const, actionLabel: "Nouvel abonnement", onAction: () => setShowSubForm(true) }] : []),
+      ]} />
+
       {/* Stats */}
       <div className="grid gap-4 sm:grid-cols-3">
         <Card>
