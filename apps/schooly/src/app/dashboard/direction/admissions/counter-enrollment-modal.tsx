@@ -380,16 +380,35 @@ export function CounterEnrollmentModal({
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="paymentReference">Reference (cheque, MM, virement)</Label>
-                  <Input
-                    id="paymentReference"
-                    name="paymentReference"
-                    defaultValue={prefill?.paymentReference ?? ""}
-                    disabled={loading}
-                    className="min-h-11"
-                  />
-                </div>
+                {paymentMethod !== "cash" && (
+                  <div className="space-y-2">
+                    <Label htmlFor="paymentReference">
+                      {paymentMethod === "check"
+                        ? "N° de cheque *"
+                        : paymentMethod === "mobile_money"
+                          ? "N° de transaction Mobile Money"
+                          : "Reference du virement"}
+                    </Label>
+                    <Input
+                      id="paymentReference"
+                      name="paymentReference"
+                      required={paymentMethod === "check"}
+                      placeholder={
+                        paymentMethod === "check"
+                          ? "Numero figurant sur le cheque"
+                          : "Optionnel — pour le rapprochement"
+                      }
+                      defaultValue={prefill?.paymentReference ?? ""}
+                      disabled={loading}
+                      className="min-h-11"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      {paymentMethod === "check"
+                        ? "La reference du cheque est requise pour l'encaissement."
+                        : "Utile pour retrouver la transaction lors du rapprochement."}
+                    </p>
+                  </div>
+                )}
               </>
             )}
           </div>

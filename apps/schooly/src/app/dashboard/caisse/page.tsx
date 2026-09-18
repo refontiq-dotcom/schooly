@@ -198,10 +198,26 @@ export default function CaissePage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-1">
-                  <Label htmlFor="reference">Référence (optionnel)</Label>
-                  <Input name="reference" placeholder="N° chèque, transaction..." />
-                </div>
+                {selectedPaymentMethod !== "cash" && selectedPaymentMethod !== "" && (
+                  <div className="space-y-1">
+                    <Label htmlFor="reference">
+                      {selectedPaymentMethod === "check"
+                        ? "N° de chèque *"
+                        : selectedPaymentMethod === "mobile_money"
+                          ? "N° de transaction (optionnel)"
+                          : "Référence du virement (optionnel)"}
+                    </Label>
+                    <Input
+                      name="reference"
+                      required={selectedPaymentMethod === "check"}
+                      placeholder={
+                        selectedPaymentMethod === "check"
+                          ? "Numéro figurant sur le chèque"
+                          : "Optionnel — pour le rapprochement"
+                      }
+                    />
+                  </div>
+                )}
                 <Button type="submit" className="w-full">
                   <Wallet className="h-4 w-4 mr-2" /> Encaisser
                 </Button>
