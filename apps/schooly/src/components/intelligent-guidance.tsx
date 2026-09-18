@@ -3,6 +3,7 @@
 import { ArrowRight, BrainCircuit, CircleAlert, Lightbulb, ShieldAlert } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import Link from "next/link"
 import type { GuidanceItem } from "@/lib/guidance"
 
 export function IntelligentGuidance({ items, title = "Schooly vous guide" }: { items: GuidanceItem[]; title?: string }) {
@@ -21,7 +22,7 @@ export function IntelligentGuidance({ items, title = "Schooly vous guide" }: { i
             <div className="min-w-0 flex-1">
               <p className="font-medium">{next.title}</p>
               <p className="mt-1 text-sm text-muted-foreground">{next.description}</p>
-              {next.actionLabel && next.onAction && <Button size="sm" className="mt-3" onClick={next.onAction}>{next.actionLabel}<ArrowRight className="ml-2 h-4 w-4" /></Button>}
+              {next.actionLabel && next.href && <Button asChild size="sm" className="mt-3"><Link href={next.href}>{next.actionLabel}<ArrowRight className="ml-2 h-4 w-4" /></Link></Button>}{next.actionLabel && !next.href && next.onAction && <Button size="sm" className="mt-3" onClick={next.onAction}>{next.actionLabel}<ArrowRight className="ml-2 h-4 w-4" /></Button>}
             </div>
           </div>
         </div>
