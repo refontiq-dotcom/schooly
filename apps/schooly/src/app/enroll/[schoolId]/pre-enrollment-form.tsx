@@ -55,6 +55,16 @@ const PAYMENT_LABELS: Record<PaymentMethod["type"], string> = {
 
 const GUARDIAN_RELATIONS = ["Père", "Mère", "Tuteur légal", "Autre parent", "Autre"] as const
 
+const ENROLLMENT_TYPES = [
+  { value: "nouvelle", label: "Nouvelle inscription" },
+  { value: "reinscription", label: "Réinscription" },
+] as const
+
+const STATE_ORIENTATIONS = [
+  { value: "oriente_etat", label: "Orienté(e) par l'État" },
+  { value: "non_oriente", label: "Non orienté(e)" },
+] as const
+
 export default function PreEnrollmentForm({
   schoolId,
   gradeLevels,
@@ -96,6 +106,10 @@ export default function PreEnrollmentForm({
   const [previousSchool, setPreviousSchool] = useState("")
   const [previousClass, setPreviousClass] = useState("")
   const [previousClassTouched, setPreviousClassTouched] = useState(false)
+  const [enrollmentType, setEnrollmentType] = useState("nouvelle")
+  const [stateOrientation, setStateOrientation] = useState("non_oriente")
+  const [orientationNumber, setOrientationNumber] = useState("")
+  const [previousMatricule, setPreviousMatricule] = useState("")
 
   const DRAFT_KEY = `schooly-preenroll-draft-${schoolId}`
 
@@ -140,6 +154,10 @@ export default function PreEnrollmentForm({
         setPreviousSchool(str(d.previousSchool))
         setPreviousClass(str(d.previousClass))
         setPreviousClassTouched(Boolean(str(d.previousClass)))
+        setEnrollmentType(str(d.enrollmentType) || "nouvelle")
+        setStateOrientation(str(d.stateOrientation) || "non_oriente")
+        setOrientationNumber(str(d.orientationNumber))
+        setPreviousMatricule(str(d.previousMatricule))
         setSelectedGradeLevel(str(d.gradeLevelId))
         setDraftRestored(true)
       }
@@ -187,6 +205,10 @@ export default function PreEnrollmentForm({
           firstEnrollment,
           previousSchool,
           previousClass,
+          enrollmentType,
+          stateOrientation,
+          orientationNumber,
+          previousMatricule,
           gradeLevelId: selectedGradeLevel,
         })
       )
@@ -210,6 +232,10 @@ export default function PreEnrollmentForm({
     firstEnrollment,
     previousSchool,
     previousClass,
+    enrollmentType,
+    stateOrientation,
+    orientationNumber,
+    previousMatricule,
     selectedGradeLevel,
   ])
 
@@ -233,6 +259,10 @@ export default function PreEnrollmentForm({
     setPreviousSchool("")
     setPreviousClass("")
     setPreviousClassTouched(false)
+    setEnrollmentType("nouvelle")
+    setStateOrientation("non_oriente")
+    setOrientationNumber("")
+    setPreviousMatricule("")
     setSelectedGradeLevel("")
     setDraftRestored(false)
     try {
@@ -446,6 +476,90 @@ export default function PreEnrollmentForm({
             </Select>
           </div>
 
+          <div className="space-y-4 rounded-lg border p-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="enrollmentType">Type d'inscription *</Label>
+                <Select
+                  value={enrollmentType}
+                  onValueChange={setEnrollmentType}
+                  name="enrollmentType"
+                  required
+                  displayLabel={ENROLLMENT_TYPES.find((type) => type.value === enrollmentType)?.label}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sélectionner" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ENROLLMENT_TYPES.map((type) => (
+                      <SelectItem key={type.value} value={type.value}>
+                        {type.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="stateOrientation">Orientation *</Label>
+                <Select
+                  value={stateOrientation}
+                  onValueChange={setStateOrientation}
+                  name="stateOrientation"
+                  required
+                  displayLabel={STATE_ORIENTATIONS.find((o) => o.value === stateOrientation)?.label}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sélectionner" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STATE_ORIENTATIONS.map((orientation) => (
+                      <SelectItem key={orientation.value} value={orientation.value}>
+                        {orientation.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  L'élève vous a été affecté par l'État (notification d'orientation) ?
+                </p>
+              </div>
+            </div>
+
+            {enrollmentType === "reinscription" && (
+              <div className="space-y-2">
+                <Label htmlFor="previousMatricule">Matricule de l'élève (si connu)</Label>
+                <Input
+                  id="previousMatricule"
+                  name="previousMatricule"
+                  disabled={loading}
+                  placeholder="Ex. : 61CC-2026-0001"
+                  value={previousMatricule}
+                  onChange={(e) => setPreviousMatricule(e.target.value.toUpperCase())}
+                  className="min-h-11"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Figurant sur les anciens reçus ou bulletins — permet de retrouver l'élève et de réinscrire sans créer de doublon.
+                </p>
+              </div>
+            )}
+
+            {stateOrientation === "oriente_etat" && (
+              <div className="space-y-2">
+                <Label htmlFor="orientationNumber">N° de notification d'orientation (optionnel)</Label>
+                <Input
+                  id="orientationNumber"
+                  name="orientationNumber"
+                  disabled={loading}
+                  placeholder="Ex. : DECO-2026-1234"
+                  value={orientationNumber}
+                  onChange={(e) => setOrientationNumber(e.target.value)}
+                  className="min-h-11"
+                />
+              </div>
+            )}
+          </div>
+
+          {enrollmentType !== "reinscription" && (
           <div className="space-y-3 rounded-lg border p-4">
             <label className="flex items-start gap-3 cursor-pointer">
               <input
@@ -510,6 +624,7 @@ export default function PreEnrollmentForm({
               </div>
             )}
           </div>
+          )}
 
           {checklistItems.length > 0 && (
             <div className="space-y-3">

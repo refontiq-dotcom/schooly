@@ -132,9 +132,29 @@ describe("createPreEnrollment", () => {
         guardianRelation: "Mère",
         emergencyContactName: "Ibrahim Kone",
         emergencyContactPhone: "+2250600000000",
+        enrollmentType: "nouvelle",
+        stateOrientation: "non_oriente",
       })
     )
     expect(res).toEqual({ error: "Établissement introuvable." })
+    expect(writes).toHaveLength(0)
+  })
+
+  it("exige le type d'inscription et l'orientation", async () => {
+    const res = await createPreEnrollment(
+      form({
+        schoolId: SCHOOL_ID,
+        firstName: "Awa",
+        lastName: "Kone",
+        dateOfBirth: "2012-01-01",
+        gradeLevelId: GRADE_ID,
+        guardianPhone: "+2250700000000",
+        guardianRelation: "Mère",
+        emergencyContactName: "Ibrahim Kone",
+        emergencyContactPhone: "+2250600000000",
+      })
+    )
+    expect(res.error).toBe("Le type d'inscription et l'orientation sont requis.")
     expect(writes).toHaveLength(0)
   })
 
@@ -150,6 +170,8 @@ describe("createPreEnrollment", () => {
         guardianRelation: "Mère",
         emergencyContactName: "Ibrahim Kone",
         emergencyContactPhone: "+2250600000000",
+        enrollmentType: "nouvelle",
+        stateOrientation: "non_oriente",
         previousSchool: "EPP Bingerville 1",
         previousClass: "",
       })
@@ -170,6 +192,8 @@ describe("createPreEnrollment", () => {
         guardianRelation: "",
         emergencyContactName: "Ibrahim Kone",
         emergencyContactPhone: "+2250600000000",
+        enrollmentType: "nouvelle",
+        stateOrientation: "non_oriente",
       })
     )
     expect(res.error).toBe("Le lien avec l'élève est requis.")
@@ -188,6 +212,8 @@ describe("createPreEnrollment", () => {
         guardianRelation: "Mère",
         emergencyContactName: "",
         emergencyContactPhone: "",
+        enrollmentType: "nouvelle",
+        stateOrientation: "non_oriente",
       })
     )
     expect(res.error).toBe("Le contact d'urgence (nom et téléphone) est requis.")
@@ -214,6 +240,9 @@ describe("createPreEnrollment", () => {
         emergencyContactPhone: "+2250600000000",
         previousSchool: "EPP Bingerville 1",
         previousClass: "CM2",
+        enrollmentType: "nouvelle",
+        stateOrientation: "oriente_etat",
+        orientationNumber: "DECO-2026-123",
         birthCertificateNumber: "ACTE-1",
         paymentMethodId: "pm-1",
         acceptedChecklist: '["c1"]',
@@ -231,6 +260,9 @@ describe("createPreEnrollment", () => {
       emergency_contact_phone: "+2250600000000",
       previous_school: "EPP Bingerville 1",
       previous_class: "CM2",
+      enrollment_type: "nouvelle",
+      state_orientation: "oriente_etat",
+      orientation_number: "DECO-2026-123",
       birth_certificate_number: "ACTE-1",
       payment_method: "cash",
       accepted_checklist: ["c1"],
@@ -273,6 +305,79 @@ describe("validatePreEnrollment", () => {
     expect(writes.filter((w) => w.op === "insert")).toHaveLength(0)
   })
 
+  it("reinscrit l'eleve existant via son matricule sans creer de doublon", async () => {
+    stub(
+      "pre_enrollments",
+      {
+        data: {
+          ...pending,
+          enrollment_type: "reinscription",
+          previous_matricule: "61CC-2026-0001",
+        },
+      },
+      { data: { id: PRE_ID } }
+    )
+    stub("grade_levels", { data: { id: GRADE_ID } })
+    stub("academic_years", { data: { id: YEAR_ID, label: "2026-2027" } })
+    // 1re requete sur enrollments : le lookup du matricule ; 2e : l'insert de l'annee.
+    stub(
+      "enrollments",
+      { data: { student_id: "stu-old", matricule: "61CC-2026-0001" } },
+      { data: { id: "enr-1" }, error: null }
+    )
+    stub("guardians", { data: { id: "g1" } })
+    stub("student_qr_codes", { data: { id: "qr" }, error: null })
+    stub("schools", { data: { name: "Ecole Test" } })
+
+    const res = await validatePreEnrollment(
+      form({
+        preEnrollmentId: PRE_ID,
+        collectPayment: "0",
+      })
+    )
+
+    expect(res.error).toBeUndefined()
+    // Aucune nouvelle fiche eleve : l'ancienne est reutilisee.
+    expect(writes.some((w) => w.table === "students" && w.op === "insert")).toBe(false)
+    const enrollmentInsert = writes.find((w) => w.table === "enrollments" && w.op === "insert")
+    expect(enrollmentInsert?.payload).toMatchObject({
+      student_id: "stu-old",
+      matricule: "61CC-2026-0001",
+      enrollment_type: "reinscription",
+    })
+  })
+
+  it("cree une nouvelle fiche si le matricule de reinscription est inconnu", async () => {
+    stub(
+      "pre_enrollments",
+      {
+        data: {
+          ...pending,
+          enrollment_type: "reinscription",
+          previous_matricule: "INCONNU-1",
+        },
+      },
+      { data: { id: PRE_ID } }
+    )
+    stub("grade_levels", { data: { id: GRADE_ID } })
+    stub("academic_years", { data: { id: YEAR_ID, label: "2026-2027" } })
+    stub("enrollments", { data: null }, { data: { id: "enr-1" }, error: null })
+    stub("students", { data: { id: "stu" }, error: null })
+    stub("guardians", { data: { id: "g1" } })
+    stub("student_qr_codes", { data: { id: "qr" }, error: null })
+    stub("schools", { data: { name: "Ecole Test" } })
+
+    const res = await validatePreEnrollment(
+      form({
+        preEnrollmentId: PRE_ID,
+        collectPayment: "0",
+      })
+    )
+
+    expect(res.error).toBeUndefined()
+    expect(writes.some((w) => w.table === "students" && w.op === "insert")).toBe(true)
+  })
+
   it("transporte lien et urgence vers la fiche tuteur", async () => {
     stub(
       "pre_enrollments",
@@ -284,6 +389,9 @@ describe("validatePreEnrollment", () => {
           emergency_contact_phone: "+2250500000000",
           previous_school: "EPP Bingerville 1",
           previous_class: "CM2",
+          enrollment_type: "nouvelle",
+          state_orientation: "oriente_etat",
+          orientation_number: "DECO-2026-123",
         },
       },
       { data: { id: PRE_ID } }
@@ -314,6 +422,12 @@ describe("validatePreEnrollment", () => {
     expect(studentInsert?.payload).toMatchObject({
       previous_school: "EPP Bingerville 1",
       previous_class: "CM2",
+    })
+    const enrollmentInsert = writes.find((w) => w.table === "enrollments" && w.op === "insert")
+    expect(enrollmentInsert?.payload).toMatchObject({
+      enrollment_type: "nouvelle",
+      state_orientation: "oriente_etat",
+      orientation_number: "DECO-2026-123",
     })
   })
 

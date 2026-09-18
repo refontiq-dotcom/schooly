@@ -66,6 +66,10 @@ export async function createPreEnrollment(formData: FormData): Promise<ActionRes
   const emergencyContactPhone = ((formData.get("emergencyContactPhone") as string) || "").trim()
   const previousSchool = ((formData.get("previousSchool") as string) || "").trim()
   const previousClass = ((formData.get("previousClass") as string) || "").trim()
+  const enrollmentType = ((formData.get("enrollmentType") as string) || "").trim()
+  const stateOrientation = ((formData.get("stateOrientation") as string) || "").trim()
+  const orientationNumber = ((formData.get("orientationNumber") as string) || "").trim() || null
+  const previousMatricule = ((formData.get("previousMatricule") as string) || "").trim() || null
   const paymentMethodId = (formData.get("paymentMethodId") as string) || null
   const paymentReference = ((formData.get("paymentReference") as string) || "").trim() || null
   const acceptedChecklist = parseIdList(formData.get("acceptedChecklist") as string | null)
@@ -84,6 +88,9 @@ export async function createPreEnrollment(formData: FormData): Promise<ActionRes
   // d'un autre établissement — dans ce cas, école ET dernière classe ensemble.
   if ((previousSchool && !previousClass) || (!previousSchool && previousClass)) {
     return { error: "L'école précédente et la dernière classe fréquentée vont ensemble." }
+  }
+  if (!enrollmentType || !stateOrientation) {
+    return { error: "Le type d'inscription et l'orientation sont requis." }
   }
 
   const admin = adminClient()
@@ -156,6 +163,10 @@ export async function createPreEnrollment(formData: FormData): Promise<ActionRes
     emergency_contact_phone: emergencyContactPhone,
     previous_school: previousSchool || null,
     previous_class: previousClass || null,
+    enrollment_type: enrollmentType,
+    state_orientation: stateOrientation,
+    orientation_number: orientationNumber,
+    previous_matricule: previousMatricule,
     birth_certificate_number: birthCertificateNumber,
     payment_method: paymentMethod,
     payment_reference: paymentReference,
@@ -449,29 +460,62 @@ export async function validatePreEnrollment(
     paymentMethod = paymentMethodRaw
   }
 
-  const studentId = crypto.randomUUID()
-  const matricule = generateEnrollmentMatricule(preEnrollment.school_id)
+  // Réinscription : retrouver l'élève existant via son matricule (facultatif,
+  // stocké sur la pré-inscription) pour réinscrire SANS créer de doublon de
+  // fiche. Le matricule d'État est stable d'une année à l'autre
+  // (cf. 20260917040000). Matricule inconnu ou mal tapé → fallback : création
+  // d'une nouvelle fiche, comme avant.
+  let studentId: string = crypto.randomUUID()
+  let matricule = generateEnrollmentMatricule(preEnrollment.school_id)
+  let isReEnrolled = false
+  const previousMatriculeOnPre = (preEnrollment.previous_matricule as string | null) ?? null
+  if ((preEnrollment.enrollment_type as string | null) === "reinscription" && previousMatriculeOnPre) {
+    const { data: existing } = await admin
+      .from("enrollments")
+      .select("student_id, matricule")
+      .eq("school_id", preEnrollment.school_id)
+      .eq("matricule", previousMatriculeOnPre)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (existing?.student_id) {
+      studentId = existing.student_id as string
+      matricule = (existing.matricule as string) || matricule
+      isReEnrolled = true
+    }
+  }
+
   const guardianName =
     ((formData.get("guardianName") as string) || "").trim() ||
     (preEnrollment.guardian_name as string | null)?.trim() ||
     `Tuteur de ${preEnrollment.last_name} ${preEnrollment.first_name}`
 
-  const { error: studentError } = await admin.from("students").insert({
-    id: studentId,
-    school_id: preEnrollment.school_id,
-    first_name: preEnrollment.first_name,
-    last_name: preEnrollment.last_name,
-    date_of_birth: preEnrollment.date_of_birth,
-    birth_certificate_number: preEnrollment.birth_certificate_number || null,
-    previous_school: (preEnrollment.previous_school as string | null) || null,
-    previous_class: (preEnrollment.previous_class as string | null) || null,
-    status: "active",
-  })
-  if (studentError) return { error: studentError.message }
+  // Fiche élève : créée pour un nouveau venu ; pour une réinscription
+  // retrouvée, la fiche existante est réutilisée (pas de doublon).
+  if (!isReEnrolled) {
+    const { error: studentError } = await admin.from("students").insert({
+      id: studentId,
+      school_id: preEnrollment.school_id,
+      first_name: preEnrollment.first_name,
+      last_name: preEnrollment.last_name,
+      date_of_birth: preEnrollment.date_of_birth,
+      birth_certificate_number: preEnrollment.birth_certificate_number || null,
+      previous_school: (preEnrollment.previous_school as string | null) || null,
+      previous_class: (preEnrollment.previous_class as string | null) || null,
+      status: "active",
+    })
+    if (studentError) return { error: studentError.message }
+  }
 
   const guardian = await ensureGuardian(admin, preEnrollment.guardian_phone, guardianName)
   if ("error" in guardian) {
-    await admin.from("students").update({ deleted_at: new Date().toISOString() }).eq("id", studentId)
+    if (!isReEnrolled) {
+      await admin
+        .from("students")
+        .update({ deleted_at: new Date().toISOString() })
+        .eq("id", studentId)
+    }
     return { error: guardian.error }
   }
 
@@ -504,12 +548,20 @@ export async function validatePreEnrollment(
       academic_year_id: academicYear.id,
       status: "confirmed",
       matricule,
+      enrollment_type: (preEnrollment.enrollment_type as string | null) ?? null,
+      state_orientation: (preEnrollment.state_orientation as string | null) ?? null,
+      orientation_number: (preEnrollment.orientation_number as string | null) ?? null,
     })
     .select("id")
     .single()
 
   if (enrollmentError || !enrollment) {
-    await admin.from("students").update({ deleted_at: new Date().toISOString() }).eq("id", studentId)
+    if (!isReEnrolled) {
+      await admin
+        .from("students")
+        .update({ deleted_at: new Date().toISOString() })
+        .eq("id", studentId)
+    }
     return { error: enrollmentError?.message ?? "Impossible de creer l'inscription." }
   }
 
