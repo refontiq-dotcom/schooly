@@ -1,164 +1,97 @@
 import { redirect } from "next/navigation"
-import { Building2, User, Info } from "lucide-react"
+import { Building2, User, Info, CheckCircle2 } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { ActionForm } from "@/components/action-form"
-import { getSchoolSettings, updateSchoolSettings, updateDirectorProfile } from "./actions"
-import { SCHOOL_TYPES } from "./school-types"
+import { getSchoolSettings, type SchoolSettings } from "./actions"
+import { EditSchoolSettingsModal, EditDirectorProfileModal } from "./settings-modals"
+import { IntelligentGuidance } from "@/components/intelligent-guidance"
 
 export default async function SettingsPage() {
-  let settings
+  let settings: SchoolSettings
   try {
     settings = await getSchoolSettings()
   } catch {
     redirect("/login")
   }
 
-  const typeLabel =
-    SCHOOL_TYPES.find((t) => t.value === settings.school_type)?.label ?? "Non renseigné"
+  const missing: string[] = []
+  if (!settings.name?.trim()) missing.push("le nom de l’établissement")
+  if (!settings.city?.trim()) missing.push("la ville")
+  if (!settings.school_type) missing.push("le type d’établissement")
+
+  const typeLabel = settings.school_type
+    ? ({ primaire: "Primaire", college: "Collège", lycee: "Lycée", professionnel: "Professionnel / Technique", islamique: "Islamique / Franco-arabe", superieur: "Supérieur" } as Record<string, string>)[settings.school_type] ?? "Type personnalisé"
+    : "Non renseigné"
 
   return (
     <div className="p-6 space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Paramètres</h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          Informations de l&apos;établissement et du compte de direction.
-        </p>
+        <p className="text-muted-foreground text-sm mt-1">Les informations essentielles de votre établissement et de votre profil.</p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Identité de l'établissement */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Building2 className="h-4 w-4" /> Établissement
-            </CardTitle>
-            <CardDescription>
-              Ces informations apparaissent dans le menu et sur vos documents.
-            </CardDescription>
+      {missing.length > 0 && (
+        <IntelligentGuidance
+          title="Une petite mise au point est nécessaire"
+          items={[{
+            id: "settings-incomplete",
+            title: "Quelques informations manquent",
+            description: `Il manque ${missing.join(", ")}. Complétez-les seulement si elles sont nécessaires à vos documents ou à l’identification de l’établissement.`,
+            severity: "action",
+            actionLabel: "Compléter les informations",
+            href: "#etablissement",
+          }]}
+        />
+      )}
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card id="etablissement">
+          <CardHeader className="flex flex-row items-start justify-between gap-4">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-base"><Building2 className="h-4 w-4" />Établissement</CardTitle>
+              <CardDescription>Les informations de base utilisées par Schooly.</CardDescription>
+            </div>
+            <EditSchoolSettingsModal settings={settings} />
           </CardHeader>
-          <CardContent>
-            <ActionForm action={updateSchoolSettings} className="space-y-4">
-              <div className="space-y-1">
-                <Label htmlFor="name">Nom de l&apos;établissement</Label>
-                <Input
-                  id="name"
-                  name="name"
-                  defaultValue={settings.name}
-                  required
-                />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="city">Ville</Label>
-                <Input
-                  id="city"
-                  name="city"
-                  defaultValue={settings.city ?? ""}
-                  placeholder="Ex: Abidjan"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="schoolType">Type d&apos;établissement</Label>
-                <select
-                  id="schoolType"
-                  name="schoolType"
-                  defaultValue={settings.school_type ?? ""}
-                  className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                >
-                  <option value="">Non renseigné</option>
-                  {SCHOOL_TYPES.map((type) => (
-                    <option key={type.value} value={type.value}>
-                      {type.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <Button type="submit" className="w-full">
-                Enregistrer les modifications
-              </Button>
-            </ActionForm>
+          <CardContent className="space-y-3">
+            <div className="rounded-lg border bg-muted/20 p-4">
+              <p className="text-xs text-muted-foreground">Nom</p>
+              <p className="font-medium">{settings.name || "À renseigner"}</p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Ville</p><p className="font-medium">{settings.city || "À renseigner"}</p></div>
+              <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Type</p><p className="font-medium">{typeLabel}</p></div>
+            </div>
           </CardContent>
         </Card>
 
-        <div className="space-y-6">
-          {/* Compte de direction */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <User className="h-4 w-4" /> Compte de direction
-              </CardTitle>
-              <CardDescription>
-                Nom affiché pour l&apos;utilisateur connecté.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ActionForm action={updateDirectorProfile} className="space-y-4">
-                <div className="space-y-1">
-                  <Label htmlFor="fullName">Nom complet</Label>
-                  <Input
-                    id="fullName"
-                    name="fullName"
-                    defaultValue={settings.directorName}
-                    required
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="email">Email professionnel</Label>
-                  <Input
-                    id="email"
-                    name="email"
-                    defaultValue={settings.directorEmail ?? ""}
-                    disabled
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    L&apos;adresse de connexion ne peut pas être modifiée ici.
-                  </p>
-                </div>
-                <Button type="submit" className="w-full">
-                  Mettre à jour mon profil
-                </Button>
-              </ActionForm>
-            </CardContent>
-          </Card>
-
-          {/* Informations */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Info className="h-4 w-4" /> Informations
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm">
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Type actuel</span>
-                <span className="font-medium">{typeLabel}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Créé le</span>
-                <span className="font-medium">
-                  {new Date(settings.created_at).toLocaleDateString("fr-FR", {
-                    day: "2-digit",
-                    month: "long",
-                    year: "numeric",
-                  })}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Annuaire Trouvetou</span>
-                <Badge variant={settings.published_to_trouvetou ? "default" : "secondary"}>
-                  {settings.published_to_trouvetou ? "Publié" : "Non publié"}
-                </Badge>
-              </div>
-              <p className="text-xs text-muted-foreground pt-1">
-                La publication dans l&apos;annuaire se gère depuis le module Trouvetou.
-              </p>
-            </CardContent>
-          </Card>
-        </div>
+        <Card>
+          <CardHeader className="flex flex-row items-start justify-between gap-4">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-base"><User className="h-4 w-4" />Mon profil</CardTitle>
+              <CardDescription>Ce que les autres utilisateurs voient de votre compte.</CardDescription>
+            </div>
+            <EditDirectorProfileModal settings={settings} />
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="rounded-lg border bg-muted/20 p-4"><p className="text-xs text-muted-foreground">Nom</p><p className="font-medium">{settings.directorName || "À renseigner"}</p></div>
+            <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Email de connexion</p><p className="font-medium break-all">{settings.directorEmail || "Non renseigné"}</p></div>
+          </CardContent>
+        </Card>
       </div>
+
+      <Card>
+        <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Info className="h-4 w-4" />Informations du compte</CardTitle><CardDescription>Informations de référence, sans réglage inutile à modifier.</CardDescription></CardHeader>
+        <CardContent className="grid gap-3 sm:grid-cols-3 text-sm">
+          <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Type actuel</p><p className="font-medium">{typeLabel}</p></div>
+          <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Créé le</p><p className="font-medium">{new Date(settings.created_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })}</p></div>
+          <div className="rounded-lg border p-3">
+            <p className="text-xs text-muted-foreground">Annuaire Trouvetou</p>
+            <div className="mt-1 flex items-center gap-2"><Badge variant={settings.published_to_trouvetou ? "default" : "secondary"}>{settings.published_to_trouvetou ? "Publié" : "Non publié"}</Badge>{settings.published_to_trouvetou && <CheckCircle2 className="h-4 w-4" />}</div>
+            <p className="mt-1 text-xs text-muted-foreground">Géré depuis Trouvetou.</p>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }
