@@ -2,6 +2,8 @@
 
 *SaaS de gestion scolaire multi-établissements — Côte d'Ivoire / Afrique de l'Ouest*
 *Document de référence pour l'agent IA de développement*
+*Version 1.5 — 18/09/2026 — consolidation : troisième enseignement de production (§9.1) — une fonction SQL `security definer` peut se créer sans erreur et échouer à 100 % ; contact d'urgence rattaché au module Vie scolaire (§7.4).*
+*Version 1.4 — 18/09/2026 — parcours d'inscription & réinscription : formulaire public intelligent et facultatif, réinscription en 1 clic, vérification des places en temps réel, contact d'urgence, scolarité antérieure, orientation État, accès parent par le téléphone. Ajout des synthèses « état livré » (§7.1, §7.2, §7.8), des règles d'accessibilité (§8.1) et des enseignements de production (§9.1).*
 *Version 1.3 — ajout des spécifications du module d'évaluation intelligente : configuration, calculs, temporalité, saisie temps réel et bulletins*
 
 > ⚠️ **À lire avant toute reprise de développement** : deux documents transverses ont été créés après la version initiale de ce cahier des charges — `refontiq-architecture-ecosysteme.md` et `refontiq-plan-de-travail-prompts.md`. Ils introduisent des composants partagés à l'échelle de tout l'écosystème Refontiq (pas seulement Schooly), qui remplacent ou complètent certaines sections ci-dessous. Les sections concernées sont annotées. En cas de doute, les documents d'écosystème font foi sur les questions transverses (facturation, identité, alertes internes).
@@ -22,6 +24,7 @@
 13. Definition of Done
 14. Facturation SaaS — modèle « 1000 FCFA / élève »
 15. Glossaire
+16. Synthèse pour la présentation aux établissements
 
 ---
 
@@ -99,9 +102,14 @@ Il n'existe **aucune inscription ouverte** au portail parent : un numéro de té
 
 Flux :
 1. Saisie du numéro sur la PWA.
-2. Le backend cherche ce numéro parmi les tuteurs liés à une inscription, toutes écoles confondues.
+2. Le backend **normalise le numéro** puis le cherche parmi les tuteurs liés à une inscription, toutes écoles confondues.
 3. Trouvé → envoi de l'OTP → session ouverte, accès à tous les enfants/écoles liés (identité globale, §4.3).
 4. Non trouvé → aucun accès ; message neutre (« code envoyé si ce numéro est reconnu ») pour ne pas révéler l'existence ou non d'un compte (anti-énumération).
+
+**Mise en œuvre livrée** :
+- La recherche s'appuie sur `guardians.phone_norm` (**numéro canonique indexé**, cf §7.8.4), jamais sur le numéro saisi : `0700000000`, `+225 07 00 00 00 00` et `002250700000000` désignent **le même parent**. Sans cela, un parent ayant été saisi au guichet dans un format différent de celui du formulaire en ligne aurait pu se voir refuser l'accès à son propre dossier.
+- `guardians.user_id` rattache la fiche tuteur au **compte Auth** du parent, avec une **unicité garantie** (un compte parent ↔ une fiche tuteur). Le téléphone devient réellement la clé d'accès : c'est le numéro donné à l'inscription qui ouvre le tableau de bord parent.
+- Comme le numéro est déjà connu par l'école, le parent **n'a rien à créer ni à mémoriser** — il reçoit un code et entre.
 
 > Note coût : l'OTP relève de la catégorie « authentication », déjà facturée par Meta. Prévoir des sessions longues (ex. 90 jours) pour limiter le nombre d'OTP envoyés par foyer et par an.
 
@@ -116,6 +124,22 @@ Organiser les migrations par domaine, dans cet ordre (respecter les dépendances
 **B. Structure académique** — `academic_years`, `grade_levels`, `classes`, `subjects`, `class_subject_assignments`
 
 **C. Élèves & Inscriptions** — `students`, `guardians` *(tuteurs, identité globale multi-écoles, voir §4.5)*, `pre_enrollments`, `enrollments`, `financial_profiles` *(généralisé, voir §12.1)*
+
+**Colonnes ajoutées le 18/09/2026** (migration de rattrapage `20260918180000_catchup_18_09.sql`, idempotente) :
+
+| Table | Colonnes | Objet |
+|---|---|---|
+| `pre_enrollments` | `guardian_relation`, `emergency_contact_name`, `emergency_contact_phone` | Lien du parent avec l'élève + contact d'urgence (§7.1.1) |
+| `pre_enrollments` | `previous_school`, `previous_class` | Scolarité antérieure pour un élève venant d'un autre établissement |
+| `pre_enrollments` | `enrollment_type`, `state_orientation`, `orientation_number`, `previous_matricule` | Nouvelle inscription vs réinscription ; orienté État ou non ; matricule d'origine |
+| `pre_enrollments` | `source` (`form` / `trouvetou` / `counter`) | Traçabilité du canal d'origine (§7.8.3) |
+| `students` | `previous_school`, `previous_class` | Historique conservé au dossier de l'élève |
+| `enrollments` | `enrollment_type`, `state_orientation`, `orientation_number` | Traçabilité de l'origine, année par année |
+| `guardians` | `relation`, `emergency_contact_name`, `emergency_contact_phone` | Ces informations vivent au dossier tuteur, pas seulement sur la demande |
+| `guardians` | `phone_norm` (indexé, calculé par trigger) | Clé de recherche parent, indépendante du format de saisie (§7.8.4) |
+| `guardians` | `user_id` → `auth.users` (unique) | Accès du parent à son tableau de bord par le téléphone (§4.5) |
+
+> **Principe appliqué** : une information se saisit **une fois**, au plus près de la personne qui la connaît, puis circule vers le dossier définitif sans ressaisie (pré-inscription → fiche élève / fiche tuteur → inscription de l'année).
 
 **D. Finance** — `fee_schedules`, `payments`, `receipts`, `cash_sessions`, `moratoriums`, `accounting_exports`
 
@@ -151,15 +175,73 @@ Organiser les migrations par domaine, dans cet ordre (respecter les dépendances
 ## 7. Cahier des charges fonctionnel par module
 
 ### 7.1 Inscriptions & Admissions
-- Pré-inscription en ligne texte-only (nom, date de naissance, n° acte de naissance, classe visée, contact tuteur) → code à 6 caractères, réservation de place 72h.
-- Validation physique au guichet : saisie du code → pré-remplissage → vérification visuelle des pièces papier → encaissement → validation → matricule + badge QR générés.
-- Réinscription en 1 clic (pré-remplissage N-1, décision du conseil de classe déjà en base).
+
+> **Légende** : ✅ **livré** = utilisable dès aujourd'hui · 🔜 **cible** = spécifié, à implémenter.
+> Les blocs ✅ sont rédigés pour être **lus tels quels par un chef d'établissement** : chacun décrit un bénéfice concret pour l'école ou pour la famille.
+
+#### 7.1.1 ✅ Pré-inscription en ligne — intelligente, et jamais obligatoire
+
+Le parent remplit un formulaire public (`/enroll/{schoolId}`), **sans créer de compte**, depuis son téléphone. **La pré-inscription en ligne reste facultative** : toute famille qui ne maîtrise pas le numérique — ou qui préfère le contact humain — est inscrite directement au guichet, avec exactement les mêmes informations collectées. Aucun élève n'est refusé parce qu'il n'a pas rempli le formulaire.
+
+**Ce que le formulaire demande** (14 champs dont 10 obligatoires) et ce qu'il fait à la place du parent :
+
+| Bloc | Champs | Intelligence embarquée |
+|---|---|---|
+| Élève | Prénom, Nom, Date de naissance, N° acte de naissance, Niveau souhaité | Capitalisation automatique des noms (`jean-paul` → `Jean-Paul`, `n'guessan` → `N'Guessan`) ; **âge affiché en direct** sous la date ; date future impossible ; alerte orange si l'âge est incohérent avec le niveau |
+| Scolarité antérieure | ☑ Première scolarisation · École précédente · Dernière classe fréquentée | **Classe précédente pré-remplie automatiquement** avec le niveau juste avant celui demandé (6ème → CM2, modifiable) ; tout le bloc **disparaît** si l'élève n'a jamais été scolarisé |
+| Type & orientation | Type d'inscription · Orientation · Matricule · N° de notification | « Réinscription » masque la scolarité antérieure et révèle le matricule ; « Orienté(e) par l'État » révèle le n° de notification d'affectation |
+| Fournitures scolaires | Cases à cocher (+ montant indicatif) | Listes et tarifs définis par l'établissement |
+| Pièces à fournir | Cases à cocher | Liste filtrée selon le niveau visé |
+| Moyen de paiement | Choix unique | Uniquement les moyens que l'école a activés |
+| Parent ou tuteur | **Lien avec l'élève** · Nom du parent ou tuteur · Téléphone · ☑ Même contact en cas d'urgence | Lien obligatoire (Père / Mère / Tuteur légal / Autre parent / Autre → champ de précision) ; **téléphone formaté automatiquement** (`0700000000` → `+225 07 00 00 00 00`) ; case urgence **cochée par défaut**, la décocher révèle le nom + téléphone du contact d'urgence |
+
+**Confort de la famille** :
+- **Brouillon automatique** : la saisie est conservée sur l'appareil. Coupure réseau, rafraîchissement, fermeture d'onglet, batterie faible — rien n'est perdu. Au retour : bandeau « Brouillon restauré » et bouton « Repartir de zéro ».
+- **Remplissage assisté par le navigateur / gestionnaire de mots de passe** : le parent déjà connu remplit nom, date de naissance et téléphone d'un seul geste.
+- **Aucun jargon technique** : pas de matricule à connaître, pas d'identifiant, pas de pièce à scanner. Le parent est guidé par des libellés en français courant et des exemples (« Ex. : KOUASSI Jean »).
+- Résultat : un **code à 6 caractères valable 72 heures**. La place est réservée ; l'inscription devient définitive au guichet.
+
+#### 7.1.2 ✅ Réinscription en 1 clic — le parent confirme, il ne ressaisit rien
+
+Pour une famille déjà connue de l'établissement, **aucun formulaire technique n'est demandé**. Le parent indique **son numéro de téléphone** (celui utilisé lors de l'inscription initiale) : le système retrouve ses enfants inscrits, affiche **la classe de l'année suivante déjà calculée**, et le parent **confirme d'un bouton**.
+
+- Un seul geste utile : « oui, mon enfant continue ici ».
+- Les informations d'identité, le parent, le contact d'urgence et le matricule sont **repris du dossier existant** — zéro double saisie, zéro risque d'erreur de recopie.
+- **Anti-doublon** : le matricule de l'élève permet de réinscrire **sur sa fiche existante** plutôt que de créer un second dossier.
+- **Idempotent sur 72 h** : si le parent clique deux fois ou recharge la page, une seule réinscription est créée.
+
+#### 7.1.3 ✅ Places disponibles vérifiées avant d'accepter
+
+Le nombre de places est calculé **en temps réel** à partir de la capacité déclarée des classes de l'école. Une inscription ou une réinscription est **refusée d'emblée si l'établissement est complet** pour le niveau visé, avec un message clair pour la famille — jamais une promesse de place qui ne pourrait pas être tenue. Le contrôle est refait au moment de la confirmation, pour couvrir le cas où la dernière place part entre-temps.
+
+#### 7.1.4 ✅ Validation au guichet — le contrôle humain reste souverain
+
+Le secrétariat saisit le **code à 6 caractères** : le dossier se pré-remplit, le secrétariat **vérifie visuellement les pièces papier**, encaisse si nécessaire, puis valide. À cet instant seulement : création de l'élève, **matricule** et **badge QR** générés, inscription rattachée à l'année et à la classe.
+
+- Les informations du parent (lien de parenté, contact d'urgence, scolarité antérieure, type d'inscription, orientation État) sont **transférées automatiquement** vers la fiche élève et la fiche tuteur : elles restent au dossier de façon permanente, sans ressaisie.
+- Un dossier non validé dans les 72 heures expire sans intervention (aucun nettoyage manuel à prévoir).
+- **Ce que le secrétariat voit à l'écran** : pour chaque demande, une ligne de contexte (`Mère : Mariam Kone · Urgence : Ibrahim Kone (+225 …) · Venant de : EPP Bingerville 1 (CM2) · Ancien matricule : …`) et des badges `Réinscription` / `Orienté(e) État` — le dossier est qualifié avant même d'être ouvert.
+
+#### 7.1.5 ✅ Référence de paiement adaptée au mode choisi
+
+Le champ « référence » n'apparaît que lorsqu'il a un sens : **obligatoire pour un chèque**, proposé (facultatif) pour un virement ou un mobile money, **absent pour les espèces**. Le secrétariat n'est plus arrêté par un champ inutile au guichet, et ne peut plus valider un chèque sans son numéro.
+
+#### 7.1.6 🔜 Reste à implémenter sur ce module
+
 - Import CSV/Excel de la liste officielle du Ministère pour les élèves affectés.
-- Moteur d'affectation automatique de classe (algorithme « serpentin », contraintes dures : capacité, options obligatoires ; contraintes souples : équilibre filles/garçons, niveau académique) avec écran de prévisualisation et ajustement manuel (drag & drop).
+- Moteur d'affectation automatique de classe (algorithme « serpentin » ; contraintes dures : capacité, options obligatoires ; contraintes souples : équilibre filles/garçons, niveau académique) avec écran de prévisualisation et ajustement manuel (drag & drop).
 
 ### 7.2 Structure & gestion académique
-- Configuration multi-cycles (primaire → supérieur), classes, matières, coefficients variables par niveau/série.
-- Matrice classe × matière × professeur (multi-professeurs par classe), professeur principal avec droits étendus.
+
+**État livré (✅)** — écran `/dashboard/academic-structure` :
+- Création et gestion des **années académiques**, **niveaux** (avec rang d'ordre et cycle), **classes** (capacité, professeur principal), **matières** (code, coefficient) et **affectations classe × matière × professeur**.
+- **Sélecteur d'année académique** transversal, avec alerte explicite quand on consulte un écran hors de l'année courante.
+- **Bascule d'année** assistée (§7.9) : la capacité déclarée par classe est ce qui alimente le calcul des places disponibles côté parents et Trouvetou (§7.8.2) — saisir la capacité n'est donc pas une formalité administrative, c'est ce qui protège l'école d'un sur-effectif.
+- L'écran respecte les exigences d'accessibilité (§8.1) et les messages d'erreur y sont **explicites** : « Action réservée à un rôle supérieur », « Aucune école rattachée », « Erreur serveur » sont distingués (cf. §9.1) — le secrétariat sait immédiatement s'il doit changer de compte, faire rattacher l'utilisateur, ou signaler un incident.
+
+**Cible (🔜)** :
+- Configuration multi-cycles (primaire → supérieur) complète, coefficients variables par niveau/série.
+- Matrice classe × matière × professeur avancée (multi-professeurs par classe), professeur principal avec droits étendus.
 - Sous-groupes (TP/TD), matières optionnelles inter-classes.
 - Emplois du temps, gestion des salles, remplacements.
 
@@ -298,6 +380,7 @@ Parent / Élève : notification → bulletin officiel ; décision validée → b
 - Discipline : rapports d'incident, retenues, conseils de discipline.
 - Contrôle d'accès par scan QR (portail, examens) *(optionnel, écoles équipées uniquement)*, logique anti-passback.
 - 🆕 Pour les écoles équipées d'un scan de portail : croisement automatique avec l'appel par cours pour détecter « élève entré dans l'établissement mais absent en cours » → alerte de décrochage envoyée à la surveillance.
+- 🆕 **Contact d'urgence disponible au dossier** : le nom et le téléphone de la personne à prévenir sont portés par la fiche tuteur, saisis **dès l'inscription** (par défaut le parent lui-même, cf. §7.1.1). La surveillance ou l'infirmerie dispose donc immédiatement du bon numéro, sans dépendre d'un appel au secrétariat ni de la mémoire d'un agent. Le **lien de parenté** et la **scolarité antérieure** (école et classe précédentes) sont au même endroit — utiles pour reconstituer un parcours en cas d'incident ou d'orientation.
 
 ### 7.5 Finance & recouvrement
 - Grille tarifaire par classe (généralisée en profils financiers configurables, cf §5).
@@ -316,9 +399,43 @@ Parent / Élève : notification → bulletin officiel ; décision validée → b
 Transport scolaire · Cantine · Internat (bâtiments → dortoirs → chambres → lits, inventaire de chambre, permissions de sortie) · Bibliothèque · Infirmerie · Inventaire fournitures (collecte au guichet, bons de sortie, alertes de seuil) · Anti-vol tenues (macaron QR sublimé, étiquette thermocollante, ou puce RFID textile lavable en option premium).
 
 ### 7.8 Intégration Trouvetou
-- API publique `/api/v1/public/schools/{id}/availability` exposant les places disponibles en temps réel (par niveau et par profil).
-- Pré-inscription initiée sur Trouvetou → tunnel Schooly.
-- Décrémentation automatique des quotas à chaque validation.
+
+Trouvetou est le **canal d'acquisition** : c'est lui qui présente les établissements aux familles et initie les inscriptions. Schooly reste la source de vérité (structure, places, dossiers) et expose une API publique protégée par clé (`Authorization: Bearer`, `TROUVETOU_API_KEY`), versionnée sous `/api/v1/public/`.
+
+> **Règle produit non négociable** : un établissement n'est visible et réservable via Trouvetou que s'il est explicitement **publié** (`schools.published_to_trouvetou`). Le contenu de son offre (niveaux, places) n'est jamais exposé par défaut.
+
+#### 7.8.1 ✅ Routes livrées
+
+| Route | Rôle |
+|---|---|
+| `GET /api/v1/public/ecoles` | Catalogue des établissements publiés |
+| `GET /api/v1/public/ecoles/{id}` | Fiche établissement (structure, niveaux, moyens de paiement) |
+| `GET /api/v1/public/schools/{id}/availability` | **Places disponibles en temps réel**, par niveau |
+| `POST /api/v1/public/ecoles/{id}/request` | Création d'une demande de place (`pending_payment`) |
+| `POST /api/v1/public/ecoles/{id}/reserve` | Encaissement en ligne → dossier `reserved`, QR token, validité 72 h |
+| `POST /api/v1/public/ecoles/{id}/reinscription/check` | **Réinscription 1 clic — étape 1** : retrouve les enfants à partir du téléphone du parent, calcule la classe suivante et vérifie les places |
+| `POST /api/v1/public/ecoles/{id}/reinscription/confirm` | **Réinscription 1 clic — étape 2** : le parent confirme, la pré-inscription est créée (`source = 'trouvetou'`) |
+| `POST /api/v1/admin/trouvetou/reservations/finalize` | Finalisation d'une réservation par le secrétariat (création élève + inscription) |
+
+#### 7.8.2 ✅ Places disponibles — une seule règle, jamais deux
+
+La capacité d'un niveau est la **somme des capacités de ses classes**, et les élèves comptés sont ceux des inscriptions **vivantes** (hors brouillon, refus, transfert). La règle est calculée par une fonction partagée (`loadLevelsWithSeats`) utilisée par **toutes** les routes qui exposent ou vérifient les places : impossible que l'affichage Trouvetou et le contrôle d'acceptation divergent. La décrémentation des quotas est donc **automatique et cohérente** avec la réalité de l'école.
+
+#### 7.8.3 ✅ Traçabilité de l'origine des dossiers
+
+Chaque pré-inscription porte sa **source** : `form` (lien public de l'école), `trouvetou` (parcours Trouvetou), `counter` (saisie directe au guichet). L'école peut ainsi mesurer, année après année, ce que chaque canal lui apporte — et l'équipe peut diagnostiquer un dossier sans deviner son origine.
+
+#### 7.8.4 ✅ Anti-doublon inter-canal (téléphone normalisé)
+
+Un même parent peut saisir son numéro de plusieurs façons : `0700000000` au guichet, `+225 07 00 00 00 00` sur le formulaire en ligne, `002250700000000` via un partenaire. Sans traitement, ces trois écritures créent **trois tuteurs distincts** pour la même personne, et la réinscription en 1 clic ne retrouve plus l'enfant.
+
+Correctif livré : un **format canonique unique** (`+225` + chiffres) calculé par la base elle-même (trigger sur `guardians.phone`), stocké dans `guardians.phone_norm` et indexé. **Toutes les recherches de parent passent par `phone_norm`, jamais par le numéro brut** — le miroir JavaScript et la fonction SQL appliquent exactement la même règle. Le numéro affiché à l'utilisateur reste, lui, dans son format d'origine.
+
+#### 7.8.5 🔜 Reste à implémenter sur cette intégration
+
+- Journal de synchronisation (`trouvetou_sync_log`) : traçabilité fine des échanges, utile en cas de litige sur une réservation.
+- Publication automatique des nouveaux quotas à l'ouverture de l'année suivante (cf. §7.9).
+
 
 ### 7.9 Bascule d'année académique
 - Clonage en 1 clic de la structure (classes, matières, tarifs) avec gestion des « deltas ».
@@ -349,6 +466,21 @@ Style de référence : sobre, inspiré des interfaces type « Gemini » — side
 - Aucune action destructrice sans confirmation.
 - Progressive disclosure : jamais d'options avancées par défaut (onboarding en 4 étapes max).
 
+#### 8.1 ✅ Accessibilité — exigence de qualité, pas option
+
+L'interface est utilisée par un secrétariat en plein jour, parfois sur écran médiocre, et par des parents sur téléphone d'entrée de gamme. Elle doit donc être **conforme WCAG AA**, ce qui est vérifié automatiquement à chaque déploiement (audit Vercel / axe).
+
+Règles obligatoires pour tout nouvel écran :
+
+| Règle | Attendu |
+|---|---|
+| **Étiquetage des champs** | Chaque champ de formulaire a un `<label>` réellement relié (`htmlFor` ↔ `id`). Un champ sans étiquette accessible est un bug bloquant pour la mise en production. |
+| **Nom accessible des fenêtres modales** | Toute boîte de dialogue porte un titre annoncé (`aria-labelledby`) ou un libellé de secours ; le bouton de fermeture a un nom explicite (« Fermer »), jamais un simple « ✕ ». |
+| **Contraste des textes** | Ratio minimal 4,5:1 (texte normal) et 3:1 (grand texte / éléments d'interface). Corrigé le 18/09 : verts et rouges trop clairs sur fond coloré, gris de la barre latérale, boutons en survol. |
+| **Couleur jamais seule** | Une information d'état (validé, en attente, refusé) est portée par un texte ou une icône **en plus** de la couleur. |
+| **Navigation au clavier** | Tout est atteignable sans souris, l'élément sélectionné est visible (focus), `Échap` ferme les dialogues. |
+| **Annonce des erreurs** | Les messages d'erreur sont annoncés aux lecteurs d'écran (`role="alert"`), pas seulement affichés. |
+
 ---
 
 ## 9. Exigences non-fonctionnelles
@@ -360,11 +492,32 @@ Style de référence : sobre, inspiré des interfaces type « Gemini » — side
 - **Confidentialité mineurs** : données d'élèves particulièrement sensibles — principe de moindre privilège strict (RLS + UI).
 - **Scalabilité multi-écoles** : aucune requête ne doit scanner l'ensemble de la base sans filtre `school_id`.
 
+#### 9.1 ✅ Trois règles apprises en production (18/09/2026)
+
+**1. Un `GRANT` est aussi obligatoire que la policy RLS.**
+Sur PostgreSQL, une policy RLS n'est évaluée **qu'après** le privilège SQL de base sur la table. Une table avec une policy parfaite mais sans `GRANT` au rôle `authenticated` renvoie `42501 permission denied` — et non « accès refusé par la politique ». C'est exactement ce qui a produit, en production, un message « Aucune école rattachée » pour des comptes pourtant correctement rattachés : la lecture échouait avant même d'atteindre la policy.
+
+Règle : **toute nouvelle table** destinée au client de session doit avoir ses `GRANT` explicites (`select`, plus `update`/`insert` si le rôle doit écrire) dans la **même migration** que sa création. Le moindre privilège reste la règle ; les migrations de rattrapage sont un pansement, pas une méthode.
+
+Corollaire côté code : **une garde d'accès ne doit jamais confondre « pas de données » et « erreur serveur »**. Une erreur SQL remontée comme « aucune école rattachée » envoie l'équipe sur une fausse piste pendant des heures. Les causes sont désormais distinguées : `Non autorisé` (session), `Action réservée à un rôle supérieur` (rôle), `Aucune école rattachée` (données), `Erreur serveur` (technique).
+
+**2. Les migrations doivent être idempotentes et vérifiables.**
+Toutes les migrations sont ré-exécutables sans erreur (`if not exists`, `create or replace`, `drop ... if exists`). Pour un rattrapage d'exploitation, un **script unique consolidé** est fourni (`20260918180000_catchup_18_09.sql`) : appliquer six fichiers à la main est une source d'oubli, et une migration manquée se traduit par un formulaire qui échoue silencieusement. Le script porte en fin de fichier les requêtes de contrôle permettant de vérifier que tout est bien appliqué.
+
+**3. Une fonction SQL peut être « valide » et ne jamais fonctionner.**
+`finalize_reservation()` (finalisation d'une réservation Trouvetou) écrivait dans `students (birth_date)` — une colonne **inexistante** (la vraie est `date_of_birth`, et elle est obligatoire). La fonction se créait sans la moindre erreur, mais **100 % des finalisations échouaient ensuite**, en erreur 500 sans message exploitable : rien dans les journaux ne désignait la ligne fautive. Le bug était invisible depuis l'interface et ne se voyait que sur un appel réel.
+
+Règle : une fonction `security definer` qui écrit en base se **valide par un appel réel sur une base de recette**, jamais en se contentant de vérifier qu'elle se compile. Et une fonction appelée depuis un webhook ou une route publique doit **refuser explicitement un état incomplet** (année académique active absente, date de naissance manquante) plutôt que de laisser remonter une erreur SQL opaque — le dossier reste alors en attente, complétable par le secrétariat, au lieu d'être perdu.
+
+Corollaire métier appliqué : la finalisation **réutilise** le tuteur (retrouvé par téléphone normalisé, cf. §7.8.4) et l'élève (même nom + même date de naissance dans la même école) au lieu de créer systématiquement de nouvelles fiches — sinon chaque réservation en ligne fabriquait un doublon, et la réinscription en 1 clic devenait inopérante faute de retrouver l'enfant.
+
 ---
 
 ## 10. Roadmap de développement (phases pour l'agent IA)
 
 > Chaque phase indique Objectif, Livrables et Critère d'acceptation. Respecter l'ordre : chaque phase dépend structurellement de la précédente, sauf mention « piste parallèle ».
+
+> **État au 18/09/2026** : les phases **0 à 4** sont opérationnelles (fondations, multi-tenant/auth, structure académique, élèves & inscriptions, finance), ainsi que l'essentiel de la phase **10** (Trouvetou : catalogue, disponibilité temps réel, réservation, réinscription en 1 clic). La phase **6** (pédagogie) est intégralement spécifiée (§7.3) et en cours d'implémentation. Pour la lecture côté établissement, voir le statut de mise en service §16.4.
 
 **Phase 0 — Fondations techniques**
 Repo structuré, Next.js + TS strict, Supabase (dev/staging/prod), CI (lint+test+build), design tokens + composants UI de base, Sentry, conventions de nommage.
@@ -451,11 +604,15 @@ Avant d'écrire la moindre fonctionnalité métier, l'agent doit :
 
 ## 13. Definition of Done (à appliquer à chaque module)
 - [ ] RLS testée (isolation multi-école prouvée)
+- [ ] **GRANT explicites** posés dans la même migration que la création de table (cf. §9.1)
+- [ ] **Accessibilité WCAG AA** : labels reliés, contraste ≥ 4,5:1, dialogues nommés, erreurs annoncées (cf. §8.1)
 - [ ] Aucune valeur métier codée en dur (tarif, statut, coefficient)
 - [ ] Fonctionne en mode dégradé réseau (offline ou message clair)
 - [ ] États vide / chargement / erreur tous conçus
+- [ ] **Message d'erreur compréhensible par le rôle concerné** (jamais un code technique, jamais un message générique qui masque la cause)
 - [ ] Tests automatisés sur la logique métier (pas seulement le rendu)
 - [ ] Vocabulaire adapté au rôle concerné (pas de jargon technique visible)
+- [ ] **Documentation à jour** : toute fonctionnalité livrée est décrite dans ce cahier des charges (§7.x du module concerné). Si elle est visible par l'école ou par la famille, elle est **aussi** ajoutée à la synthèse « présentation aux établissements » (§16) et au statut de mise en service (§16.4) — c'est ce document qui sert à expliquer Schooly aux écoles intéressées, il ne doit jamais être en retard sur le code.
 
 ---
 
@@ -495,7 +652,79 @@ Prévoir un compte dédié dans le mapping SYSCOHADA de chaque école (ex. « Fr
 ---
 
 ## 15. Glossaire rapide
-- **RLS** : Row Level Security — sécurité au niveau ligne, Postgres.
-- **DRENA** : Direction Régionale de l'Éducation Nationale (Côte d'Ivoire).
-- **SYSCOHADA** : référentiel comptable en vigueur en zone OHADA.
+
+**Technique**
+- **RLS** : Row Level Security — sécurité au niveau ligne, Postgres. Ne s'applique qu'**après** un `GRANT` explicite (cf. §9.1).
+- **GRANT** : privilège SQL de base accordé à un rôle (`authenticated`, `service_role`). Indispensable en plus de la policy RLS.
 - **Rollover** : bascule d'une année académique à la suivante.
+- **Soft-delete** : suppression logique (`deleted_at`) — la donnée n'est jamais effacée physiquement.
+- **Idempotent** : opération ré-exécutable sans effet supplémentaire (une migration, un webhook, une réinscription confirmée deux fois).
+
+**Métier — inscriptions**
+- **Pré-inscription** : demande remplie par la famille (en ligne ou au guichet), **non définitive**, valable 72 h, matérialisée par un code à 6 caractères. Elle ne crée ni élève ni matricule.
+- **Inscription** : acte définitif prononcé **au guichet** après vérification des pièces — crée la fiche élève, le matricule et le badge QR.
+- **Réinscription** : élève **déjà connu** de l'établissement qui poursuit sa scolarité. Se fait en un clic, sans ressaisie.
+- **Matricule** : identifiant permanent de l'élève, stable d'une année à l'autre — c'est lui qui permet de réinscrire sur la fiche existante sans créer de doublon.
+- **Orienté État / non orienté** : élève affecté dans l'établissement par l'État (notification DECO/DRENA) ou inscrit à l'initiative de sa famille. Le numéro de notification est conservé au dossier.
+- **Contact d'urgence** : personne à appeler en cas d'incident — par défaut le parent lui-même, sinon une autre personne désignée dès l'inscription.
+- **`phone_norm`** : forme canonique d'un numéro (`+225` + chiffres), calculée par la base. Deux écritures du même numéro désignent ainsi **un seul** parent (cf. §7.8.4).
+
+**Écosystème & référentiels**
+- **Trouvetou** : plateforme de découverte d'établissements (écosystème Refontiq) — canal d'acquisition qui alimente Schooly en dossiers.
+- **DRENA** : Direction Régionale de l'Éducation Nationale (Côte d'Ivoire).
+- **DECO** : Direction de l'Éducation et de l'Orientation — émet les affectations d'élèves.
+- **SYSCOHADA** : référentiel comptable en vigueur en zone OHADA.
+---
+
+## 16. Synthèse pour la présentation aux établissements
+
+> Cette section est destinée à être **parlée telle quelle** à un directeur ou un fondateur d'école. Elle ne contient aucun terme technique.
+
+### 16.1 Ce que l'école gagne, concrètement
+
+| Le problème de l'école aujourd'hui | Ce que Schooly fait à la place |
+|---|---|
+| Les inscriptions se font au guichet, sur papier, avec des files d'attente | La famille peut pré-inscrire son enfant **depuis son téléphone en 3 minutes**, ou passer au guichet — l'école choisit, la famille aussi |
+| Les parents remplissent des formulaires longs et se trompent (noms, dates, numéros) | Le formulaire **corrige automatiquement** les noms, formate les numéros, calcule l'âge, pré-remplit ce qu'il peut deviner — et **sauvegarde la saisie** si le réseau coupe |
+| Les élèves réinscrits repassent par tout le circuit administratif | La réinscription se fait **en un clic** : le parent confirme, le dossier est déjà complet |
+| L'école promet des places puis découvre qu'elle est complète | Les **places disponibles sont vérifiées en temps réel** avant d'accepter une inscription — plus de promesse impossible à tenir |
+| Le secrétariat retape les mêmes informations pour chaque année, chaque frère et sœur | Une information saisie **une fois** suit l'élève et sa famille : scolarité antérieure, lien de parenté, contact d'urgence, tuteur |
+| En cas d'urgence, personne ne sait qui appeler | Le **contact d'urgence est au dossier**, saisi dès l'inscription (et par défaut : le parent lui-même) |
+| Le suivi des élèves orientés par l'État se perd dans les cahiers | Chaque dossier indique s'il est **orienté par l'État** ou non, avec le numéro de notification — filtrable et exportable |
+| Le parent n'a aucun moyen de suivre son enfant sans appeler l'école | Le **même numéro de téléphone** donné à l'inscription ouvre le tableau de bord parent (notes, paiements, absence) |
+| Les dossiers créés via un partenaire finissent en doublons | Le téléphone est normalisé : un parent = **un seul dossier**, quel que soit le canal qui l'a saisi |
+| Le secrétariat se bloque sur des erreurs techniques incompréhensibles | Les messages sont **en français et parlants** : « action réservée à un rôle supérieur », « aucune école rattachée », jamais « erreur 42501 » |
+
+### 16.2 Trois arguments de vente à retenir
+
+1. **« Vos familles n'ont rien à apprendre. »** Pas de compte à créer, pas d'application à installer, pas de matricule à retrouver : le téléphone du parent est son identifiant. La réinscription se fait en un seul bouton.
+2. **« Votre secrétariat ne ressaisit jamais deux fois la même information. »** Ce que le parent déclare circule automatiquement jusqu'au dossier définitif de l'élève et du tuteur.
+3. **« Vous ne promettez jamais plus de places que vous n'en avez. »** L'école déclare la capacité de ses classes une fois ; le système refuse automatiquement toute inscription au-delà, partout — guichet, lien public, Trouvetou.
+
+### 16.3 Ce que l'école doit fournir pour démarrer
+
+1. Sa **structure** : niveaux, classes et **capacité de chaque classe** (déterminant pour les places disponibles).
+2. Ses **frais et échéanciers** par niveau, et les moyens de paiement acceptés.
+3. Sa **liste des fournitures et des pièces à fournir** (par niveau si elle diffère).
+4. Les **comptes utilisateurs** de son personnel, avec le rôle de chacun (direction, secrétariat, comptabilité, professeur, surveillance).
+
+Le reste — formulaire public, calcul des places, réinscription en 1 clic, accès parent — est **opérationnel dès la mise en service**.
+
+### 16.4 Statut de mise en service au 18/09/2026
+
+Tableau honnête à montrer tel quel à un établissement : ce qui est **utilisable aujourd'hui**, et ce qui reste **à venir**. Ne jamais présenter un élément 🔜 comme disponible.
+
+| Domaine | État | Détail |
+|---|---|---|
+| Inscriptions & admissions | ✅ en service | Formulaire public intelligent et facultatif, pré-inscription par code 72 h, validation au guichet, matricule + badge QR |
+| Réinscription en 1 clic | ✅ en service | Le parent confirme par téléphone, la classe suivante est pré-calculée |
+| Places disponibles | ✅ en service | Calcul en temps réel depuis la capacité déclarée des classes ; refus automatique au-delà, guichet comme en ligne |
+| Dossier famille | ✅ en service | Lien de parenté, contact d'urgence, scolarité antérieure, orientation État, tuteur unique anti-doublon |
+| Accès parent (téléphone) | ✅ mécanisme livré | Rattachement tuteur ↔ compte parent et normalisation du numéro en base ; l'écran d'accès PWA suit la Phase 8 de la roadmap |
+| Structure académique | ✅ en service | Années, niveaux, classes, matières, affectations, bascule d'année |
+| Finance | ✅ socle en service | Tarification, encaissement, reçus, caisse, référence de paiement adaptée au mode |
+| Pédagogie & bulletins | 🔜 spécifié | Module d'évaluation intelligente entièrement spécifié (§7.3), implémentation en cours |
+| Vie scolaire, portails, modules à la carte | 🔜 spécifié | Specs prêtes (§7.4, §7.6, §7.7), développement selon la roadmap (§10) |
+| Import de la liste du Ministère, affectation automatique de classe | 🔜 à venir | Décrit en §7.1.6, utile surtout pour les gros effectifs |
+
+> **Règle de communication** : un établissement peut démarrer **dès maintenant** sur les inscriptions, la structure et la caisse — c'est le cœur de sa rentrée. Le reste s'ajoute sans réinstallation ni reprise de données.
