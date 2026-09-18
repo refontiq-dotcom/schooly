@@ -53,6 +53,8 @@ const PAYMENT_LABELS: Record<PaymentMethod["type"], string> = {
   cheque: "Chèque",
 }
 
+const GUARDIAN_RELATIONS = ["Père", "Mère", "Tuteur légal", "Autre parent", "Autre"] as const
+
 export default function PreEnrollmentForm({
   schoolId,
   gradeLevels,
@@ -84,6 +86,13 @@ export default function PreEnrollmentForm({
   const [draftHydrated, setDraftHydrated] = useState(false)
   const [draftRestored, setDraftRestored] = useState(false)
 
+  // Lien avec l'élève + contact d'urgence
+  const [guardianRelation, setGuardianRelation] = useState("")
+  const [guardianRelationDetail, setGuardianRelationDetail] = useState("")
+  const [sameEmergencyContact, setSameEmergencyContact] = useState(true)
+  const [emergencyName, setEmergencyName] = useState("")
+  const [emergencyPhone, setEmergencyPhone] = useState("")
+
   const DRAFT_KEY = `schooly-preenroll-draft-${schoolId}`
 
   const selectedGrade = gradeLevels.find((level) => level.id === selectedGradeLevel)
@@ -109,14 +118,20 @@ export default function PreEnrollmentForm({
     try {
       const raw = window.localStorage.getItem(DRAFT_KEY)
       if (raw) {
-        const d = JSON.parse(raw) as Record<string, string>
-        setFirstName(d.firstName ?? "")
-        setLastName(d.lastName ?? "")
-        setDateOfBirth(d.dateOfBirth ?? "")
-        setBirthCertificateNumber(d.birthCertificateNumber ?? "")
-        setGuardianName(d.guardianName ?? "")
-        setGuardianPhone(d.guardianPhone ?? "")
-        setSelectedGradeLevel(d.gradeLevelId ?? "")
+        const d = JSON.parse(raw) as Record<string, unknown>
+        const str = (v: unknown) => (typeof v === "string" ? v : "")
+        setFirstName(str(d.firstName))
+        setLastName(str(d.lastName))
+        setDateOfBirth(str(d.dateOfBirth))
+        setBirthCertificateNumber(str(d.birthCertificateNumber))
+        setGuardianName(str(d.guardianName))
+        setGuardianPhone(str(d.guardianPhone))
+        setGuardianRelation(str(d.guardianRelation))
+        setGuardianRelationDetail(str(d.guardianRelationDetail))
+        setSameEmergencyContact(d.sameEmergencyContact !== false)
+        setEmergencyName(str(d.emergencyName))
+        setEmergencyPhone(str(d.emergencyPhone))
+        setSelectedGradeLevel(str(d.gradeLevelId))
         setDraftRestored(true)
       }
     } catch {
@@ -131,7 +146,16 @@ export default function PreEnrollmentForm({
     if (!draftHydrated) return
     try {
       const hasAnything =
-        firstName || lastName || dateOfBirth || birthCertificateNumber || guardianName || guardianPhone || selectedGradeLevel
+        firstName ||
+        lastName ||
+        dateOfBirth ||
+        birthCertificateNumber ||
+        guardianName ||
+        guardianPhone ||
+        guardianRelation ||
+        guardianRelationDetail ||
+        (sameEmergencyContact ? false : emergencyName || emergencyPhone) ||
+        selectedGradeLevel
       if (!hasAnything) {
         window.localStorage.removeItem(DRAFT_KEY)
         return
@@ -145,6 +169,11 @@ export default function PreEnrollmentForm({
           birthCertificateNumber,
           guardianName,
           guardianPhone,
+          guardianRelation,
+          guardianRelationDetail,
+          sameEmergencyContact,
+          emergencyName,
+          emergencyPhone,
           gradeLevelId: selectedGradeLevel,
         })
       )
@@ -160,6 +189,11 @@ export default function PreEnrollmentForm({
     birthCertificateNumber,
     guardianName,
     guardianPhone,
+    guardianRelation,
+    guardianRelationDetail,
+    sameEmergencyContact,
+    emergencyName,
+    emergencyPhone,
     selectedGradeLevel,
   ])
 
@@ -174,6 +208,11 @@ export default function PreEnrollmentForm({
     setBirthCertificateNumber("")
     setGuardianName("")
     setGuardianPhone("")
+    setGuardianRelation("")
+    setGuardianRelationDetail("")
+    setSameEmergencyContact(true)
+    setEmergencyName("")
+    setEmergencyPhone("")
     setSelectedGradeLevel("")
     setDraftRestored(false)
     try {
@@ -195,6 +234,23 @@ export default function PreEnrollmentForm({
     formData.set(
       "providedDocuments",
       JSON.stringify(Object.keys(providedDocuments).filter((id) => providedDocuments[id]))
+    )
+    // Lien avec l'élève : « Autre » est résolu vers le texte libre saisi.
+    const resolvedRelation =
+      guardianRelation === "Autre" ? guardianRelationDetail.trim() : guardianRelation
+    if (!resolvedRelation) {
+      toast.error("Précisez le lien avec l'élève.")
+      return
+    }
+    formData.set("guardianRelation", resolvedRelation)
+    // Contact d'urgence : si c'est le parent lui-même, on reprend ses coordonnées.
+    formData.set(
+      "emergencyContactName",
+      sameEmergencyContact ? guardianName.trim() : emergencyName.trim()
+    )
+    formData.set(
+      "emergencyContactPhone",
+      sameEmergencyContact ? guardianPhone.trim() : emergencyPhone.trim()
     )
     setLoading(true)
     const result = await createPreEnrollment(formData)
@@ -473,6 +529,38 @@ export default function PreEnrollmentForm({
               <Users className="h-4 w-4 text-primary" />
               Parent ou tuteur
             </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="guardianRelation">Lien avec l'élève *</Label>
+              <Select
+                value={guardianRelation}
+                onValueChange={setGuardianRelation}
+                displayLabel={guardianRelation || undefined}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Sélectionner le lien" />
+                </SelectTrigger>
+                <SelectContent>
+                  {GUARDIAN_RELATIONS.map((relation) => (
+                    <SelectItem key={relation} value={relation}>
+                      {relation}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {guardianRelation === "Autre" && (
+                <Input
+                  id="guardianRelationDetail"
+                  placeholder="Précisez le lien (ex. : oncle, voisine...)"
+                  required
+                  disabled={loading}
+                  value={guardianRelationDetail}
+                  onChange={(e) => setGuardianRelationDetail(capitalizeWords(e.target.value))}
+                  className="min-h-11"
+                />
+              )}
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="guardianName">Nom du parent ou tuteur *</Label>
@@ -508,12 +596,69 @@ export default function PreEnrollmentForm({
                 </p>
               </div>
             </div>
+
+            <label className="flex items-start gap-3 rounded-lg border p-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={sameEmergencyContact}
+                onChange={(e) => setSameEmergencyContact(e.target.checked)}
+                disabled={loading}
+                className="h-4 w-4 mt-0.5"
+              />
+              <span className="text-sm">
+                Le parent ci-dessus est le contact en cas d'urgence
+                <span className="block text-xs text-muted-foreground">
+                  Décochez pour désigner une autre personne à appeler.
+                </span>
+              </span>
+            </label>
+
+            {!sameEmergencyContact && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="emergencyName">Nom du contact d'urgence *</Label>
+                  <Input
+                    id="emergencyName"
+                    required
+                    disabled={loading}
+                    autoComplete="name"
+                    placeholder="Ex. : TRAORE Fatou"
+                    value={emergencyName}
+                    onChange={(e) => setEmergencyName(capitalizeWords(e.target.value))}
+                    className="min-h-11"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="emergencyPhone">Téléphone d'urgence *</Label>
+                  <Input
+                    id="emergencyPhone"
+                    type="tel"
+                    inputMode="tel"
+                    required
+                    disabled={loading}
+                    autoComplete="tel"
+                    placeholder="+225 05 00 00 00 00"
+                    value={emergencyPhone}
+                    onChange={(e) => setEmergencyPhone(formatGuardianPhone(e.target.value))}
+                    className="min-h-11"
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           <Button
             type="submit"
             className="w-full min-h-11"
-            disabled={loading || !selectedGradeLevel || requiredChecklistMissing || requiredDocumentsMissing}
+            disabled={
+              loading ||
+              !selectedGradeLevel ||
+              !guardianRelation ||
+              (guardianRelation === "Autre" && !guardianRelationDetail.trim()) ||
+              (!sameEmergencyContact && (!emergencyName.trim() || !emergencyPhone.trim())) ||
+              requiredChecklistMissing ||
+              requiredDocumentsMissing
+            }
           >
             {loading ? "Enregistrement..." : "Réserver ma place"}
           </Button>

@@ -129,9 +129,48 @@ describe("createPreEnrollment", () => {
         dateOfBirth: "2012-01-01",
         gradeLevelId: GRADE_ID,
         guardianPhone: "+2250700000000",
+        guardianRelation: "Mère",
+        emergencyContactName: "Ibrahim Kone",
+        emergencyContactPhone: "+2250600000000",
       })
     )
     expect(res).toEqual({ error: "Établissement introuvable." })
+    expect(writes).toHaveLength(0)
+  })
+
+  it("exige le lien avec l'eleve", async () => {
+    const res = await createPreEnrollment(
+      form({
+        schoolId: SCHOOL_ID,
+        firstName: "Awa",
+        lastName: "Kone",
+        dateOfBirth: "2012-01-01",
+        gradeLevelId: GRADE_ID,
+        guardianPhone: "+2250700000000",
+        guardianRelation: "",
+        emergencyContactName: "Ibrahim Kone",
+        emergencyContactPhone: "+2250600000000",
+      })
+    )
+    expect(res.error).toBe("Le lien avec l'élève est requis.")
+    expect(writes).toHaveLength(0)
+  })
+
+  it("exige un contact d'urgence complet", async () => {
+    const res = await createPreEnrollment(
+      form({
+        schoolId: SCHOOL_ID,
+        firstName: "Awa",
+        lastName: "Kone",
+        dateOfBirth: "2012-01-01",
+        gradeLevelId: GRADE_ID,
+        guardianPhone: "+2250700000000",
+        guardianRelation: "Mère",
+        emergencyContactName: "",
+        emergencyContactPhone: "",
+      })
+    )
+    expect(res.error).toBe("Le contact d'urgence (nom et téléphone) est requis.")
     expect(writes).toHaveLength(0)
   })
 
@@ -150,6 +189,9 @@ describe("createPreEnrollment", () => {
         gradeLevelId: GRADE_ID,
         guardianPhone: "+2250700000000",
         guardianName: "Mariam Kone",
+        guardianRelation: "Mère",
+        emergencyContactName: "Ibrahim Kone",
+        emergencyContactPhone: "+2250600000000",
         birthCertificateNumber: "ACTE-1",
         paymentMethodId: "pm-1",
         acceptedChecklist: '["c1"]',
@@ -162,6 +204,9 @@ describe("createPreEnrollment", () => {
     const insert = writes.find((w) => w.table === "pre_enrollments" && w.op === "insert")
     expect(insert?.payload).toMatchObject({
       guardian_name: "Mariam Kone",
+      guardian_relation: "Mère",
+      emergency_contact_name: "Ibrahim Kone",
+      emergency_contact_phone: "+2250600000000",
       birth_certificate_number: "ACTE-1",
       payment_method: "cash",
       accepted_checklist: ["c1"],
@@ -202,6 +247,43 @@ describe("validatePreEnrollment", () => {
     )
     expect(res.error).toMatch(/montant/)
     expect(writes.filter((w) => w.op === "insert")).toHaveLength(0)
+  })
+
+  it("transporte lien et urgence vers la fiche tuteur", async () => {
+    stub(
+      "pre_enrollments",
+      {
+        data: {
+          ...pending,
+          guardian_relation: "Père",
+          emergency_contact_name: "Moussa Kone",
+          emergency_contact_phone: "+2250500000000",
+        },
+      },
+      { data: { id: PRE_ID } }
+    )
+    stub("grade_levels", { data: { id: GRADE_ID } })
+    stub("academic_years", { data: { id: YEAR_ID, label: "2026-2027" } })
+    stub("students", { data: { id: "stu" }, error: null })
+    stub("guardians", { data: { id: "g1" } }, { data: null, error: null })
+    stub("enrollments", { data: { id: "enr-1" }, error: null })
+    stub("student_qr_codes", { data: { id: "qr" }, error: null })
+    stub("schools", { data: { name: "Ecole Test" } })
+
+    const res = await validatePreEnrollment(
+      form({
+        preEnrollmentId: PRE_ID,
+        collectPayment: "0",
+      })
+    )
+
+    expect(res.error).toBeUndefined()
+    const guardianUpdate = writes.find((w) => w.table === "guardians" && w.op === "update")
+    expect(guardianUpdate?.payload).toMatchObject({
+      relation: "Père",
+      emergency_contact_name: "Moussa Kone",
+      emergency_contact_phone: "+2250500000000",
+    })
   })
 
   it("cree eleve, inscription, paiement et recu", async () => {

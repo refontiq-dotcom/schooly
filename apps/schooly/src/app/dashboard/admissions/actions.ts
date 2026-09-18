@@ -61,6 +61,9 @@ export async function createPreEnrollment(formData: FormData): Promise<ActionRes
   const guardianPhone = (formData.get("guardianPhone") as string)?.trim()
   const guardianName = ((formData.get("guardianName") as string) || "").trim() || null
   const birthCertificateNumber = ((formData.get("birthCertificateNumber") as string) || "").trim() || null
+  const guardianRelation = ((formData.get("guardianRelation") as string) || "").trim()
+  const emergencyContactName = ((formData.get("emergencyContactName") as string) || "").trim()
+  const emergencyContactPhone = ((formData.get("emergencyContactPhone") as string) || "").trim()
   const paymentMethodId = (formData.get("paymentMethodId") as string) || null
   const paymentReference = ((formData.get("paymentReference") as string) || "").trim() || null
   const acceptedChecklist = parseIdList(formData.get("acceptedChecklist") as string | null)
@@ -68,6 +71,12 @@ export async function createPreEnrollment(formData: FormData): Promise<ActionRes
 
   if (!schoolId || !firstName || !lastName || !dateOfBirth || !guardianPhone || !gradeLevelId) {
     return { error: "Tous les champs sont requis." }
+  }
+  if (!guardianRelation) {
+    return { error: "Le lien avec l'élève est requis." }
+  }
+  if (!emergencyContactName || !emergencyContactPhone) {
+    return { error: "Le contact d'urgence (nom et téléphone) est requis." }
   }
 
   const admin = adminClient()
@@ -135,6 +144,9 @@ export async function createPreEnrollment(formData: FormData): Promise<ActionRes
     grade_level_id: gradeLevelId,
     guardian_phone: guardianPhone,
     guardian_name: guardianName,
+    guardian_relation: guardianRelation,
+    emergency_contact_name: emergencyContactName,
+    emergency_contact_phone: emergencyContactPhone,
     birth_certificate_number: birthCertificateNumber,
     payment_method: paymentMethod,
     payment_reference: paymentReference,
@@ -450,6 +462,24 @@ export async function validatePreEnrollment(
   if ("error" in guardian) {
     await admin.from("students").update({ deleted_at: new Date().toISOString() }).eq("id", studentId)
     return { error: guardian.error }
+  }
+
+  // Transport des informations saisies lors de la pré-inscription (lien avec
+  // l'élève, contact d'urgence) vers la fiche tuteur — les dernières
+  // informations gagnent. Rien n'est écrasé pour les anciennes pré-inscriptions
+  // qui ne portaient pas ces informations.
+  const relation = (preEnrollment.guardian_relation as string | null) ?? null
+  const emergencyName = (preEnrollment.emergency_contact_name as string | null) ?? null
+  const emergencyPhone = (preEnrollment.emergency_contact_phone as string | null) ?? null
+  if (relation || emergencyName || emergencyPhone) {
+    await admin
+      .from("guardians")
+      .update({
+        relation,
+        emergency_contact_name: emergencyName,
+        emergency_contact_phone: emergencyPhone,
+      })
+      .eq("id", guardian.id)
   }
 
   const { data: enrollment, error: enrollmentError } = await admin
