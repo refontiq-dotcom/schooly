@@ -14,6 +14,7 @@ import { AddFeeScheduleModal } from "./add-fee-schedule-modal"
 import { DuplicateFeeScheduleModal } from "./duplicate-fee-schedule-modal"
 import { SiblingDiscountModal } from "./sibling-discount-modal"
 import { AlertTriangle, CalendarClock, Landmark, PieChart, Wallet } from "lucide-react"
+import { IntelligentGuidance } from "@/components/intelligent-guidance"
 
 export default async function FinancePage() {
   const supabase = await createClient()
@@ -52,6 +53,13 @@ export default async function FinancePage() {
           Solde de chaque élève en temps réel, encaissements et recouvrement
         </p>
       </div>
+
+      <IntelligentGuidance items={[
+        ...((overview?.unpaidCount ?? 0) > 0 ? [{ id: "unpaid", title: `${overview?.unpaidCount ?? 0} élève(s) ont encore un solde`, description: "Schooly détecte des impayés et peut vous guider vers les relances avant une éventuelle demande de moratoire.", severity: "action" as const, actionLabel: "Gérer les relances", href: "/dashboard/direction/finance/reminders" }] : []),
+        ...((overview?.upcomingDue?.length ?? 0) > 0 ? [{ id: "due", title: "Des échéances arrivent dans les 7 prochains jours", description: "Préparez les relances préventives avant la date d’échéance.", severity: "warning" as const, actionLabel: "Voir les relances", href: "/dashboard/direction/finance/reminders" }] : []),
+        ...(config && config.schedules.length === 0 ? [{ id: "tariff", title: "La grille tarifaire n’est pas encore configurée", description: "Sans tarif, Schooly ne peut pas calculer correctement le dû et le solde des inscriptions.", severity: "critical" as const, actionLabel: "Configurer les tarifs", href: "/dashboard/direction/finance" }] : []),
+        ...(!overview?.openCashSession ? [{ id: "cash", title: "La caisse est fermée", description: "Si des encaissements doivent être réalisés aujourd’hui, ouvrez une session avant de commencer.", severity: "info" as const, actionLabel: "Ouvrir la caisse", href: "/dashboard/caisse" }] : []),
+      ]} />
 
       {/* KPI réels — plus de cartes factices */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
