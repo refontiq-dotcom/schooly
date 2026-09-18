@@ -6,7 +6,7 @@ import { createClient as createAdminClient } from "@supabase/supabase-js"
 import { revalidatePath } from "next/cache"
 import crypto from "crypto"
 import { generateFeeItemsForEnrollment } from "@/lib/finance-fees"
-import { SIBLING_DEFAULT_RATE, planSiblingDiscounts } from "@/lib/discounts"
+import { planSiblingDiscounts } from "@/lib/discounts"
 
 type ActionResult<T = void> = {
   error?: string
@@ -1115,10 +1115,27 @@ export async function applySiblingDiscounts(
   const { schoolId, userId } = guard.context
 
   const academicYearId = formData.get("academicYearId") as string
-  const rateInput = parseInt(formData.get("rate") as string || "0")
-  const rate = rateInput > 0 && rateInput <= 50 ? rateInput : SIBLING_DEFAULT_RATE
 
   if (!academicYearId) return { error: "Année académique requise." }
+
+  // Le taux de remise fratrie n'est PAS imposé : toutes les écoles ne
+  // pratiquent pas de remise fratrie, et celles qui en pratiquent choisissent
+  // leur taux. Aucune valeur par défaut n'est donc appliquée en silence —
+  // l'absence de taux explicite est une erreur, pas un « 10 % » implicite.
+  const rateRaw = ((formData.get("rate") as string) || "").trim()
+  if (!rateRaw) {
+    return {
+      error:
+        "Indiquez le taux de remise fratrie appliqué par l'établissement (1 à 50 %). Aucun taux n'est appliqué par défaut.",
+    }
+  }
+
+  const rateInput = Number.parseInt(rateRaw, 10)
+  if (!Number.isFinite(rateInput) || rateInput < 1 || rateInput > 50) {
+    return { error: "Le taux de remise fratrie doit être compris entre 1 % et 50 %." }
+  }
+
+  const rate = rateInput
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

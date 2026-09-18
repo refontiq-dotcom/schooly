@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ActionForm } from "@/components/action-form"
 import { getFinanceOverview, getFinanceConfig, generateMissingFeeItems, applySiblingDiscounts, generateDueReminders } from "@/app/dashboard/finance/actions"
+import { SIBLING_DEFAULT_RATE } from "@/lib/discounts"
 import { FeeScheduleManager, type ScheduleRow } from "./fee-schedule-manager"
 import { AlertTriangle, CalendarClock, Landmark, PieChart, Wallet } from "lucide-react"
 
@@ -210,14 +211,28 @@ export default async function FinancePage() {
               <CardTitle className="text-base">Remises fratrie (en masse)</CardTitle>
               <CardDescription>
                 Détecte les parents de 2+ enfants et applique la remise au 2e et suivants (par matricule). Idempotent.
+                Aucun taux n&apos;est imposé : toutes les écoles ne pratiquent pas la remise fratrie.
               </CardDescription>
             </CardHeader>
             <CardContent>
               <ActionForm action={applySiblingDiscounts} className="flex flex-wrap items-end gap-3">
                 <input type="hidden" name="academicYearId" value={config.years[0]?.id ?? ""} />
                 <div className="space-y-1">
-                  <Label htmlFor="siblingRate">Taux (%)</Label>
-                  <Input id="siblingRate" name="rate" type="number" min="1" max="50" defaultValue={10} className="w-24" />
+                  <Label htmlFor="siblingRate">Taux appliqué par l&apos;établissement (%)</Label>
+                  <Input
+                    id="siblingRate"
+                    name="rate"
+                    type="number"
+                    min="1"
+                    max="50"
+                    required
+                    placeholder={String(SIBLING_DEFAULT_RATE)}
+                    className="w-28"
+                    aria-describedby="siblingRateHint"
+                  />
+                  <p id="siblingRateHint" className="text-xs text-muted-foreground">
+                    À saisir à chaque application (1 à 50 %). Laisser vide = aucune remise.
+                  </p>
                 </div>
                 <Button type="submit" variant="secondary">Appliquer les remises fratrie</Button>
               </ActionForm>

@@ -3,14 +3,21 @@
 //
 // FRATRIE : plusieurs enfants du même parent (même guardian) inscrits dans la
 // même école la même année. Convention métier : le plus ancien matricule paie
-// plein, les suivants -10 % (taux configurable). L'école peut toujours ajuster
-// ou retirer la remise manuellement (table fee_discounts).
+// plein, les suivants reçoivent une remise dont le TAUX EST CHOISI PAR L'ÉCOLE.
+// Toutes les écoles ne pratiquent pas de remise fratrie : aucune ne doit se voir
+// imposer un taux implicite. L'école peut toujours ajuster ou retirer la remise
+// manuellement (table fee_discounts).
 //
 // BOURSE : statut déclaré à l'admission (mouvement ORT) ou profil financier
 // (demi-bourse…) — la réduction est créée sur décision, avec le taux voulu.
 // ============================================================================
 
-export const SIBLING_DEFAULT_RATE = 10 // % de remise à partir du 2e enfant
+/**
+ * Taux *suggéré* dans l'interface (pré-remplissage indicatif) — jamais appliqué
+ * en silence : `applySiblingDiscounts` exige un taux explicite transmis par
+ * l'école, et refuse l'opération si aucun n'est fourni.
+ */
+export const SIBLING_DEFAULT_RATE = 10
 
 export type SiblingGroup = {
   guardianId: string
