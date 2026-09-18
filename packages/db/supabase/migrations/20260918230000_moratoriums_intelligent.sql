@@ -42,10 +42,6 @@ create policy moratorium_installments_finance_write on public.moratorium_install
   );
 grant select on public.moratorium_installments to authenticated;
 
-create unique index if not exists uq_moratorium_active_enrollment
-  on public.moratoriums(enrollment_id)
-  where deleted_at is null and status in ('pending','approved');
-
 create or replace function public.sync_enrollment_fee_status_from_moratorium()
 returns trigger language plpgsql as $$
 declare v_enrollment uuid;
@@ -65,7 +61,7 @@ begin
        end
      where e.id = v_enrollment;
   end if;
-  return coalesce(new, old);
+  return null;
 end $$;
 
 drop trigger if exists trg_sync_fee_status_moratoriums on public.moratoriums;
@@ -99,7 +95,7 @@ begin
            when v_expected-v_discount-v_paid<0 then 'avance'
            else 'soldé' end
    where e.id=v_enrollment;
-  return coalesce(new,old);
+  return null;
 end $$;
 
 comment on table public.moratorium_installments is 'Échéancier réel d’un moratoire approuvé. Chaque ligne représente une échéance traçable.';
