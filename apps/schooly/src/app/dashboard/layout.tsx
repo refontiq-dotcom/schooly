@@ -77,13 +77,13 @@ export default async function DashboardLayout({
       />
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Bannière supérieure avec sélecteur d'année académique */}
-        <header className="flex h-[72px] shrink-0 items-center justify-between border-b border-border/70 bg-background/72 px-5 backdrop-blur-xl sm:px-8">
+        <header className="flex h-[72px] shrink-0 items-center justify-between border-b border-border/70 bg-background/72 px-8 pl-10 backdrop-blur-xl lg:px-10 lg:pl-12">
           <AcademicYearSelector schoolId={schoolId} />
           <div className="hidden rounded-full border border-border bg-card/70 px-3 py-1.5 text-xs font-medium text-muted-foreground sm:block">
             {schoolName}
           </div>
         </header>
-                <main className="flex-1 overflow-y-auto scroll-smooth">
+                <main className="flex-1 overflow-y-auto scroll-smooth px-8 py-8 pl-10 lg:px-10 lg:pl-12">
           {children}
         </main>
 

@@ -40,7 +40,7 @@ export function Sidebar({ role, schoolName, userName }: SidebarProps) {
   return (
     <aside
       className={cn(
-        "schooly-sidebar flex flex-col h-screen border-r transition-[width] duration-300 ease-[cubic-bezier(.2,.8,.2,1)]",
+        "schooly-sidebar flex flex-col h-screen shrink-0 border-r transition-[width] duration-300 ease-[cubic-bezier(.2,.8,.2,1)]",
         collapsed ? "w-16" : "w-64"
       )}
     >

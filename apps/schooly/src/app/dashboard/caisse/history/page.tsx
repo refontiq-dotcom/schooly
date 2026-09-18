@@ -32,7 +32,7 @@ export default async function CaisseHistoryPage() {
   const total = (payments || []).reduce((sum: number, p: any) => sum + p.amount, 0)
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Historique des encaissements</h1>

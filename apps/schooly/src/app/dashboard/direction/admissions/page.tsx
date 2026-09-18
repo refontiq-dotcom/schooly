@@ -181,7 +181,7 @@ export default function AdmissionsPage() {
   )
 
   if (loading) {
-    return <div className="p-6 text-center text-muted-foreground">Chargement...</div>
+    return <div className="text-center text-muted-foreground">Chargement...</div>
   }
 
   return (
