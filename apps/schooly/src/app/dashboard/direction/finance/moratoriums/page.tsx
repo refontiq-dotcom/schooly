@@ -8,7 +8,6 @@ import { Badge } from "@/components/ui/badge"
 import { useSupabaseUser } from "@/hooks/use-supabase-user"
 import {
   getMoratoriums,
-  reviewMoratorium,
 } from "@/app/dashboard/finance/moratoriums/actions"
 import { getEnrollments } from "@/app/dashboard/admissions/actions"
 import { AddMoratoriumModal } from "./add-moratorium-modal"\nimport { ReviewMoratoriumModal } from "./review-moratorium-modal"
