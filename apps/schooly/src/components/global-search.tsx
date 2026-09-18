@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react"
 import { useRouter } from "next/navigation"
 import { Clock, FileText, GraduationCap, Loader2, Search, Users, X } from "lucide-react"
 import { Input } from "@/components/ui/input"
@@ -50,7 +50,7 @@ export function GlobalSearch() {
   }, [])
 
   useEffect(() => {
-    function onKey(e: KeyboardEvent) {
+    function onKey(e: globalThis.KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault()
         inputRef.current?.focus()
@@ -64,7 +64,7 @@ export function GlobalSearch() {
   }, [load])
 
   useEffect(() => {
-    function onPointer(e: MouseEvent) {
+    function onPointer(e: globalThis.MouseEvent) {
       if (!boxRef.current?.contains(e.target as Node)) setOpen(false)
     }
     document.addEventListener("mousedown", onPointer)
@@ -83,7 +83,7 @@ export function GlobalSearch() {
     router.push(url)
   }
 
-  function onKeyDown(e: KeyboardEvent<HTMLInputElement>) {
+  function onKeyDown(e: ReactKeyboardEvent<HTMLInputElement>) {
     if (!open) return
     if (e.key === "ArrowDown") {
       e.preventDefault()
