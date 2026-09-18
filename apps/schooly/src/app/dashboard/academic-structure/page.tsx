@@ -43,6 +43,7 @@ import {
 import { ActionForm } from "@/components/action-form"
 import { useSupabaseUser } from "@/hooks/use-supabase-user"
 import { computeAcademicWindow } from "@/components/academic-year-selector"
+import { AcademicGuidancePanel } from "./academic-guidance"
 
 type AcademicYear = { id: string; label: string; status: string }
 type GradeLevel = { id: string; name: string; level: number; cycle: string }
@@ -328,6 +329,15 @@ export default function AcademicStructurePage() {
     setCreateYearOpen(true)
   }
 
+  const handleGuidanceNavigation = (targetTab: string, stepId: string) => {
+    setActionError(null)
+    setTab(targetTab)
+    if (stepId === "year") {
+      if (plannedYear) requestActivateYear(plannedYear.id, plannedYear.label)
+      else if (!currentYear) setCreateYearOpen(true)
+    }
+  }
+
   return (
     <div className="space-y-6">
       {!currentYear && (
@@ -359,6 +369,18 @@ export default function AcademicStructurePage() {
           </CardContent>
         </Card>
       )}
+
+      <AcademicGuidancePanel
+        state={{
+          hasCurrentYear: Boolean(currentYear),
+          hasPlannedYear: Boolean(plannedYear),
+          levelsCount: gradeLevels.length,
+          classesCount: classes.length,
+          subjectsCount: subjects.length,
+          assignmentsCount: assignments.length,
+        }}
+        onNavigate={handleGuidanceNavigation}
+      />
 
       {currentYear && (
         <Card className="border-green-800/30 bg-green-50 dark:border-green-900 dark:bg-green-950/20">
