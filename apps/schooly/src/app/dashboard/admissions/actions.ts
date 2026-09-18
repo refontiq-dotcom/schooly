@@ -10,6 +10,7 @@ import {
   requireSchoolRole,
 } from "@/utils/supabase/require-role"
 import { alertEnrollmentConfirmed } from "@/lib/telegram"
+import { generateFeeItemsForEnrollment } from "@/lib/finance-fees"
 import {
   generateEnrollmentMatricule,
   isPaymentMethod,
@@ -567,6 +568,16 @@ export async function validatePreEnrollment(
 
   const qrCode = await issueQrCode(admin, preEnrollment.school_id, enrollment.id)
 
+  // Échéancier : best effort — si la grille n'a pas de tarif pour ce niveau,
+  // la direction rattrape via « Générer les échéanciers manquants » (finance).
+  await generateFeeItemsForEnrollment(admin, {
+    schoolId: preEnrollment.school_id,
+    enrollmentId: enrollment.id,
+    academicYearId: academicYear.id,
+    gradeLevelId: preEnrollment.grade_level_id,
+    financialProfileId: null,
+  })
+
   let receipt: { receiptNumber: string; verificationCode: string } | undefined
   if (collectNow && paymentMethod) {
     const paid = await collectPayment({
@@ -698,6 +709,15 @@ export async function completeCounterEnrollment(
   }
 
   const qrCode = await issueQrCode(admin, guard.context.schoolId, enrollment.id)
+
+  // Échéancier : best effort — grille vide tolérée (rattrapage côté finance).
+  await generateFeeItemsForEnrollment(admin, {
+    schoolId: guard.context.schoolId,
+    enrollmentId: enrollment.id,
+    academicYearId: academicYear.id,
+    gradeLevelId,
+    financialProfileId: null,
+  })
 
   let receipt: { receiptNumber: string; verificationCode: string } | undefined
   if (collectNow && isPaymentMethod(paymentMethodRaw)) {

@@ -20,6 +20,7 @@ import {
   createPayment,
   getPayments,
   getOpenCashSession,
+  getStudentBalances,
 } from "@/app/dashboard/finance/actions"
 import { getEnrollments } from "@/app/dashboard/admissions/actions"
 import { toast } from "sonner"
@@ -63,6 +64,8 @@ export default function CaissePage() {
   const [loading, setLoading] = useState(false)
   const [selectedEnrollment, setSelectedEnrollment] = useState("")
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState("")
+  const [balances, setBalances] = useState<Record<string, number>>({})
+  const [amount, setAmount] = useState("")
 
   useEffect(() => {
     if (!user) return
@@ -85,10 +88,11 @@ export default function CaissePage() {
       if (!roleData?.school_id) return
       setSchoolId(roleData.school_id)
 
-      const [enrollRes, payRes, sessionRes] = await Promise.all([
+      const [enrollRes, payRes, sessionRes, balancesRes] = await Promise.all([
         getEnrollments(roleData.school_id),
         getPayments(roleData.school_id),
         getOpenCashSession(roleData.school_id),
+        getStudentBalances(roleData.school_id),
       ])
 
       if (enrollRes.data) {
@@ -103,6 +107,11 @@ export default function CaissePage() {
       }
       if (payRes.data) setPayments(payRes.data as Payment[])
       if (sessionRes.data) setSession(sessionRes.data as CashSession)
+      if (balancesRes.data) {
+        const map: Record<string, number> = {}
+        for (const b of balancesRes.data) map[b.enrollment_id] = b.balance
+        setBalances(map)
+      }
 
       setLoading(false)
     }
@@ -180,9 +189,32 @@ export default function CaissePage() {
                     </SelectContent>
                   </Select>
                 </div>
+                {selectedEnrollment && (
+                  <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/40 text-sm">
+                    <span className="text-muted-foreground">Solde de l’élève</span>
+                    <span className="font-mono font-semibold">
+                      {(balances[selectedEnrollment] ?? null) === null
+                        ? "…"
+                        : `${(balances[selectedEnrollment] ?? 0).toLocaleString("fr-FR")} FCFA`}
+                    </span>
+                  </div>
+                )}
                 <div className="space-y-1">
                   <Label htmlFor="amount">Montant (FCFA)</Label>
-                  <Input name="amount" type="number" required min={1} placeholder="Ex: 15000" />
+                  <Input
+                    name="amount"
+                    type="number"
+                    required
+                    min={1}
+                    placeholder="Ex: 15000"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                  />
+                  {selectedEnrollment && Number(amount) > 0 && (balances[selectedEnrollment] ?? Infinity) < Number(amount) && (
+                    <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <input type="checkbox" name="allowOverpay" /> Enregistrer comme avance volontaire (au-delà du solde)
+                    </label>
+                  )}
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor="paymentMethod">Mode de paiement</Label>

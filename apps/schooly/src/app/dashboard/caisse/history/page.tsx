@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { getPayments } from "@/app/dashboard/finance/actions"
+import { CancelPaymentButton } from "@/app/dashboard/direction/finance/cancel-payment-button"
 import { CreditCard, Download } from "lucide-react"
 
 export default async function CaisseHistoryPage() {
@@ -19,7 +20,7 @@ export default async function CaisseHistoryPage() {
 
   const { data: roleData } = await admin
     .from("user_school_roles")
-    .select("school_id")
+    .select("school_id, role_code")
     .eq("user_id", user.id)
     .eq("is_active", true)
     .limit(1)
@@ -30,6 +31,7 @@ export default async function CaisseHistoryPage() {
   const { data: payments } = await getPayments(roleData.school_id)
 
   const total = (payments || []).reduce((sum: number, p: any) => sum + p.amount, 0)
+  const canCancel = ["direction", "compta", "super_admin"].includes(roleData.role_code)
 
   return (
     <div className="p-6 space-y-6">
@@ -55,6 +57,7 @@ export default async function CaisseHistoryPage() {
                   <th className="text-left p-3 font-medium">Mode</th>
                   <th className="text-right p-3 font-medium">Montant</th>
                   <th className="text-right p-3 font-medium">Réf.</th>
+                  <th className="text-right p-3 font-medium">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -77,11 +80,18 @@ export default async function CaisseHistoryPage() {
                       {p.amount.toLocaleString("fr-FR")} FCFA
                     </td>
                     <td className="p-3 text-right text-muted-foreground">{p.reference || "—"}</td>
+                    <td className="p-3 text-right">
+                      {canCancel ? (
+                        <CancelPaymentButton paymentId={p.id} />
+                      ) : (
+                        <span className="text-muted-foreground text-xs">—</span>
+                      )}
+                    </td>
                   </tr>
                 ))}
                 {(payments || []).length === 0 && (
                   <tr>
-                    <td colSpan={7} className="p-6 text-center text-muted-foreground">
+                    <td colSpan={8} className="p-6 text-center text-muted-foreground">
                       Aucun encaissement enregistré.
                     </td>
                   </tr>

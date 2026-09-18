@@ -5,6 +5,7 @@ import { CASHIER_ROLES, PRICING_ROLES } from "@/utils/supabase/roles"
 import { createClient as createAdminClient } from "@supabase/supabase-js"
 import { revalidatePath } from "next/cache"
 import crypto from "crypto"
+import { generateFeeItemsForEnrollment } from "@/lib/finance-fees"
 
 type ActionResult<T = void> = {
   error?: string
@@ -110,13 +111,14 @@ export async function getPayments(schoolId: string) {
       users ( full_name )
     `)
     .eq("school_id", guard.context.schoolId)
+    .is("deleted_at", null)
     .order("received_at", { ascending: false })
 
   if (error) return { error: error.message, data: [] }
   return { data: data || [] }
 }
 
-export async function createPayment(formData: FormData): Promise<ActionResult<{ receiptNumber: string; verificationCode: string }>> {
+export async function createPayment(formData: FormData): Promise<ActionResult<{ receiptNumber: string; verificationCode: string; balanceAfter: number | null }>> {
   const supabase = await createClient()
 
   // Encaissement : direction / compta / caisse uniquement.
@@ -128,10 +130,14 @@ export async function createPayment(formData: FormData): Promise<ActionResult<{ 
   const amount = parseInt(formData.get("amount") as string || "0")
   const paymentMethod = formData.get("paymentMethod") as string
   const reference = formData.get("reference") as string | null
-  const cashSessionId = formData.get("cashSessionId") as string | null
+  const allowOverpay = formData.get("allowOverpay") === "on"
 
   if (!enrollmentId || amount <= 0 || !paymentMethod) {
     return { error: "Inscription, montant et méthode de paiement sont requis." }
+  }
+  const VALID_METHODS = ["cash", "mobile_money", "check", "transfer"] as const
+  if (!VALID_METHODS.includes(paymentMethod as (typeof VALID_METHODS)[number])) {
+    return { error: "Mode de paiement inconnu." }
   }
 
   const admin = createAdminClient(
@@ -149,13 +155,55 @@ export async function createPayment(formData: FormData): Promise<ActionResult<{ 
     return { error: "Inscription introuvable ou accès non autorisé." }
   }
 
+  // Session de caisse OBLIGATOIRE pour l'espèces : l'argent physique doit être
+  // retrouvé à la clôture. L'id de session vient du SERVEUR — jamais du client.
+  let sessionId: string | null = null
+  if (paymentMethod === "cash") {
+    const { data: openSession } = await admin
+      .from("cash_sessions")
+      .select("id")
+      .eq("school_id", schoolId)
+      .eq("status", "open")
+      .is("deleted_at", null)
+      .maybeSingle()
+    if (!openSession) {
+      return { error: "Ouvrez une session de caisse avant d'encaisser en espèces." }
+    }
+    sessionId = openSession.id
+  }
+
+  // Solde : impossible d'encaisser au-delà du reste à payer sans le déclarer
+  // explicitement comme une avance volontaire.
+  const { data: feeRows } = await admin
+    .from("student_fee_items")
+    .select("amount")
+    .eq("enrollment_id", enrollmentId)
+    .is("deleted_at", null)
+  const { data: paidRows } = await admin
+    .from("payments")
+    .select("amount")
+    .eq("enrollment_id", enrollmentId)
+    .is("deleted_at", null)
+  const hasFeeItems = (feeRows ?? []).length > 0
+  const expected = (feeRows ?? []).reduce((s: number, r: { amount: number }) => s + r.amount, 0)
+  const paid = (paidRows ?? []).reduce((s: number, r: { amount: number }) => s + r.amount, 0)
+  const balance = expected - paid
+  if (hasFeeItems && amount > balance && !allowOverpay) {
+    return {
+      error:
+        balance > 0
+          ? `Montant supérieur au solde restant (${balance.toLocaleString("fr-FR")} FCFA). Cochez « Enregistrer comme avance » si c'est volontaire.`
+          : "Cet élève est déjà soldé. Cochez « Enregistrer comme avance » pour un versement volontaire.",
+    }
+  }
+
   const { data: payment, error: paymentError } = await admin.from("payments").insert({
     school_id: schoolId,
     enrollment_id: enrollmentId,
     amount,
     payment_method: paymentMethod,
     reference: reference || null,
-    cash_session_id: cashSessionId || null,
+    cash_session_id: sessionId,
     received_by: userId,
   }).select("id").single()
 
@@ -179,7 +227,7 @@ export async function createPayment(formData: FormData): Promise<ActionResult<{ 
   revalidatePath("/dashboard/caisse")
   revalidatePath("/dashboard/caisse/history")
   revalidatePath("/dashboard/direction/finance")
-  return { data: { receiptNumber, verificationCode } }
+  return { data: { receiptNumber, verificationCode, balanceAfter: hasFeeItems ? balance - amount : null } }
 }
 
 // ============================================ SESSIONS DE CAISSE ================
@@ -503,4 +551,417 @@ export async function generateAccountingExport(formData: FormData): Promise<Acti
 
   revalidatePath("/dashboard/direction/finance")
   return { data: { csvContent, totalDebit, totalCredit, lineCount: lines.length } }
+}
+
+// ============================================ CONFIG GRILLE (UI) ================
+
+/**
+ * Données du formulaire de grille tarifaire : grilles existantes + listes
+ * (profils financiers, niveaux, années). Remplace les cartes statiques de
+ * l'ancien dashboard (« Disponible sur demande »…).
+ */
+export async function getFinanceConfig(schoolId: string) {
+  const supabase = await createClient()
+
+  // Lecture + configuration tarifaire : direction / compta uniquement.
+  const guard = await requireSchoolRole(supabase, {
+    allowedRoles: [...PRICING_ROLES],
+    requestedSchoolId: schoolId,
+  })
+  if (!guard.ok) return { error: denial(guard.reason, []).error, data: null }
+
+  const admin = createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+
+  const [schedulesRes, profilesRes, levelsRes, yearsRes] = await Promise.all([
+    admin
+      .from("fee_schedules")
+      .select("id, amount, label, grade_level_id, financial_profile_id, academic_year_id, financial_profiles ( name ), grade_levels ( name ), academic_years ( label )")
+      .eq("school_id", guard.context.schoolId)
+      .is("deleted_at", null)
+      .order("academic_year_id", { ascending: false }),
+    admin
+      .from("financial_profiles")
+      .select("id, name")
+      .eq("school_id", guard.context.schoolId)
+      .eq("is_active", true)
+      .is("deleted_at", null)
+      .order("name"),
+    admin
+      .from("grade_levels")
+      .select("id, name, level")
+      .eq("school_id", guard.context.schoolId)
+      .is("deleted_at", null)
+      .order("level", { ascending: true }),
+    admin
+      .from("academic_years")
+      .select("id, label, status")
+      .eq("school_id", guard.context.schoolId)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false }),
+  ])
+
+  if (schedulesRes.error) return { error: schedulesRes.error.message, data: null }
+
+  return {
+    data: {
+      schedules: schedulesRes.data ?? [],
+      profiles: profilesRes.data ?? [],
+      gradeLevels: levelsRes.data ?? [],
+      years: yearsRes.data ?? [],
+    },
+  }
+}
+
+/**
+ * Duplique la grille d'une année vers une autre (la rentrée N+1 en 1 clic).
+ * Les lignes déjà présentes sur l'année cible (même niveau × profil) sont
+ * ignorées — re-duplication sans doublon.
+ */
+export async function duplicateFeeSchedule(
+  formData: FormData
+): Promise<ActionResult<{ copied: number; skipped: number }>> {
+  const supabase = await createClient()
+
+  const guard = await requireSchoolRole(supabase, { allowedRoles: [...PRICING_ROLES] })
+  if (!guard.ok) return { error: denial(guard.reason, []).error }
+  const { schoolId } = guard.context
+
+  const sourceYearId = formData.get("sourceYearId") as string
+  const targetYearId = formData.get("targetYearId") as string
+
+  if (!sourceYearId || !targetYearId) {
+    return { error: "Année source et année cible sont requises." }
+  }
+  if (sourceYearId === targetYearId) {
+    return { error: "L'année cible doit être différente de l'année source." }
+  }
+
+  const admin = createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+
+  const { data: sourceRows, error: sourceError } = await admin
+    .from("fee_schedules")
+    .select("grade_level_id, financial_profile_id, amount, label")
+    .eq("school_id", schoolId)
+    .eq("academic_year_id", sourceYearId)
+    .is("deleted_at", null)
+
+  if (sourceError) return { error: sourceError.message }
+  if (!sourceRows?.length) {
+    return { error: "Aucune ligne à dupliquer sur l'année source." }
+  }
+
+  const { data: existing } = await admin
+    .from("fee_schedules")
+    .select("grade_level_id, financial_profile_id")
+    .eq("school_id", schoolId)
+    .eq("academic_year_id", targetYearId)
+    .is("deleted_at", null)
+
+  type FeeRow = { grade_level_id: string | null; financial_profile_id: string | null; amount: number; label: string | null }
+  const existingKeys = new Set(
+    (existing ?? []).map((e: { grade_level_id: string | null; financial_profile_id: string | null }) =>
+      `${e.grade_level_id ?? "none"}:${e.financial_profile_id ?? "none"}`
+    )
+  )
+
+  const toInsert = ((sourceRows ?? []) as FeeRow[])
+    .filter((row) => !existingKeys.has(`${row.grade_level_id ?? "none"}:${row.financial_profile_id ?? "none"}`))
+    .map((row) => ({
+      school_id: schoolId,
+      grade_level_id: row.grade_level_id,
+      financial_profile_id: row.financial_profile_id,
+      amount: row.amount,
+      label: row.label,
+      academic_year_id: targetYearId,
+    }))
+
+  const skipped = (sourceRows as FeeRow[]).length - toInsert.length
+  if (toInsert.length > 0) {
+    const { error } = await admin.from("fee_schedules").insert(toInsert)
+    if (error) {
+      if (error.code === "23505") return { error: "Certaines lignes existent déjà sur l'année cible." }
+      return { error: error.message }
+    }
+  }
+
+  revalidatePath("/dashboard/direction/finance")
+  return { data: { copied: toInsert.length, skipped } }
+}
+
+/** Retire une ligne de la grille (soft delete, anti-IDOR vérifié). */
+export async function deleteFeeSchedule(formData: FormData): Promise<ActionResult> {
+  const supabase = await createClient()
+
+  const guard = await requireSchoolRole(supabase, { allowedRoles: [...PRICING_ROLES] })
+  if (!guard.ok) return { error: denial(guard.reason, []).error }
+  const { schoolId } = guard.context
+
+  const id = formData.get("id") as string
+  if (!id) return { error: "Ligne introuvable." }
+
+  const admin = createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+
+  const { data: row } = await admin
+    .from("fee_schedules")
+    .select("id")
+    .eq("id", id)
+    .eq("school_id", schoolId)
+    .is("deleted_at", null)
+    .maybeSingle()
+
+  if (!row) return { error: "Ligne introuvable dans la grille de cet établissement." }
+
+  const { error } = await admin
+    .from("fee_schedules")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", id)
+
+  if (error) return { error: error.message }
+
+  revalidatePath("/dashboard/direction/finance")
+  return {}
+}
+
+// ============================================ SOLDES & IMPAYÉS ==================
+
+/** Une ligne de la vue v_student_balances (solde d'une inscription). */
+export type StudentBalance = {
+  enrollment_id: string
+  school_id: string
+  matricule: string | null
+  first_name: string
+  last_name: string
+  guardian_name: string | null
+  guardian_phone: string | null
+  grade_level_name: string | null
+  class_name: string | null
+  academic_year_label: string | null
+  has_fee_items: boolean
+  expected_total: number
+  paid_total: number
+  balance: number
+  next_due_date: string | null
+  next_due_amount: number | null
+  last_payment_at: string | null
+}
+
+/**
+ * Soldes de toutes les inscriptions de l'année : attendu / payé / reste,
+ * prochaine échéance. Source unique des impayés (direction) et du guichet
+ * (solde affiché AVANT l'encaissement).
+ */
+export async function getStudentBalances(schoolId: string, academicYearId?: string) {
+  const supabase = await createClient()
+
+  const guard = await requireSchoolRole(supabase, { requestedSchoolId: schoolId })
+  if (!guard.ok) return denial(guard.reason, [])
+
+  const admin = createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+
+  let query = admin
+    .from("v_student_balances")
+    .select("*")
+    .eq("school_id", guard.context.schoolId)
+    .order("balance", { ascending: false })
+
+  if (academicYearId) {
+    query = query.eq("academic_year_id", academicYearId)
+  }
+
+  const { data, error } = await query
+  if (error) return { error: error.message, data: [] }
+  return { data: (data ?? []) as StudentBalance[] }
+}
+
+/** KPI du tableau de bord finance : tout en une seule lecture de la vue. */
+export async function getFinanceOverview(schoolId: string) {
+  const supabase = await createClient()
+
+  const guard = await requireSchoolRole(supabase, { requestedSchoolId: schoolId })
+  if (!guard.ok) return denial(guard.reason, null)
+
+  const admin = createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+
+  const { data: balances, error } = await admin
+    .from("v_student_balances")
+    .select("*")
+    .eq("school_id", guard.context.schoolId)
+
+  if (error) return { error: error.message, data: null }
+
+  const rows = (balances ?? []) as StudentBalance[]
+  const withItems = rows.filter((r) => r.has_fee_items)
+  const expected = withItems.reduce((s, r) => s + (r.expected_total || 0), 0)
+  const paid = withItems.reduce((s, r) => s + (r.paid_total || 0), 0)
+  const unpaid = withItems.filter((r) => r.balance > 0)
+  const weekAhead = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10)
+
+  // Encaissements du jour et du mois (espèces, MM, chèque, virement confondus).
+  const monthStartISO = new Date(
+    Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1)
+  ).toISOString()
+  const [payRes, sessionRes] = await Promise.all([
+    admin
+      .from("payments")
+      .select("amount, received_at")
+      .eq("school_id", guard.context.schoolId)
+      .is("deleted_at", null)
+      .gte("received_at", monthStartISO),
+    admin
+      .from("cash_sessions")
+      .select("id, opened_at, opening_amount, users ( full_name )")
+      .eq("school_id", guard.context.schoolId)
+      .eq("status", "open")
+      .is("deleted_at", null)
+      .maybeSingle(),
+  ])
+
+  const recent = (payRes.data ?? []) as Array<{ amount: number; received_at: string }>
+  const todayPrefix = new Date().toISOString().slice(0, 10)
+  const todayList = recent.filter((p) => p.received_at.slice(0, 10) === todayPrefix)
+
+  return {
+    data: {
+      expectedTotal: expected,
+      paidTotal: paid,
+      collectionRate: expected > 0 ? Math.round((paid / expected) * 100) : null,
+      enrollmentCount: rows.length,
+      unpaidCount: unpaid.length,
+      unpaidAmount: unpaid.reduce((s, r) => s + r.balance, 0),
+      topUnpaid: unpaid.slice(0, 10),
+      upcomingDue: withItems.filter(
+        (r) => r.balance > 0 && r.next_due_date && r.next_due_date <= weekAhead
+      ),
+      todayTotal: todayList.reduce((s, p) => s + p.amount, 0),
+      todayCount: todayList.length,
+      monthTotal: recent.reduce((s, p) => s + p.amount, 0),
+      openCashSession: sessionRes.data ?? null,
+    },
+  }
+}
+
+// ============================================ ANNULATION PAIEMENT ===============
+
+/**
+ * Annule un encaissement (erreur de saisie) : soft delete + motif OBLIGATOIRE.
+ * La ligne reste en base pour l'audit ; les soldes se recalculent seuls (les
+ * vues excluent deleted_at).
+ */
+export async function cancelPayment(formData: FormData): Promise<ActionResult> {
+  const supabase = await createClient()
+
+  // Annulation d'argent : direction / compta uniquement (pas la caisse).
+  const guard = await requireSchoolRole(supabase, { allowedRoles: [...PRICING_ROLES] })
+  if (!guard.ok) return { error: denial(guard.reason, []).error }
+  const { schoolId } = guard.context
+
+  const paymentId = formData.get("paymentId") as string
+  const reason = (formData.get("cancelReason") as string)?.trim()
+
+  if (!paymentId) return { error: "Paiement introuvable." }
+  if (!reason || reason.length < 5) {
+    return { error: "Un motif d'au moins 5 caractères est obligatoire pour annuler un encaissement." }
+  }
+
+  const admin = createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+
+  const { data: payment } = await admin
+    .from("payments")
+    .select("id, deleted_at")
+    .eq("id", paymentId)
+    .eq("school_id", schoolId)
+    .maybeSingle()
+
+  if (!payment) return { error: "Paiement introuvable dans cet établissement." }
+  if (payment.deleted_at) return { error: "Ce paiement est déjà annulé." }
+
+  const now = new Date().toISOString()
+  const { error: payError } = await admin
+    .from("payments")
+    .update({ deleted_at: now, cancel_reason: reason })
+    .eq("id", paymentId)
+
+  if (payError) return { error: payError.message }
+
+  // Le reçu correspondant est invalidé : la page publique /verify le signale.
+  await admin
+    .from("receipts")
+    .update({ deleted_at: now })
+    .eq("payment_id", paymentId)
+    .is("deleted_at", null)
+
+  revalidatePath("/dashboard/caisse")
+  revalidatePath("/dashboard/caisse/history")
+  revalidatePath("/dashboard/direction/finance")
+  return {}
+}
+
+// ============================================ ÉCHÉANCIERS MANQUANTS =============
+
+/**
+ * Génère les échéanciers manquants : pour chaque inscription de l'année sans
+ * student_fee_items, applique la grille tarifaire (plan annuel par défaut).
+ * Idempotent — les inscriptions déjà dotées sont ignorées.
+ */
+export async function generateMissingFeeItems(
+  formData: FormData
+): Promise<ActionResult<{ generated: number; withoutFee: number }>> {
+  const supabase = await createClient()
+
+  const guard = await requireSchoolRole(supabase, { allowedRoles: [...PRICING_ROLES] })
+  if (!guard.ok) return { error: denial(guard.reason, []).error }
+  const { schoolId } = guard.context
+
+  const academicYearId = formData.get("academicYearId") as string
+  if (!academicYearId) return { error: "Année académique requise." }
+
+  const admin = createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+
+  const { data: rows, error } = await admin
+    .from("v_student_balances")
+    .select("enrollment_id, grade_level_id, academic_year_id, has_fee_items")
+    .eq("school_id", schoolId)
+    .eq("academic_year_id", academicYearId)
+
+  if (error) return { error: error.message }
+
+  const targets = (rows ?? []).filter((r: { has_fee_items: boolean }) => !r.has_fee_items)
+  let generated = 0
+  let withoutFee = 0
+
+  for (const row of targets as Array<{ enrollment_id: string; grade_level_id: string }>) {
+    const result = await generateFeeItemsForEnrollment(admin, {
+      schoolId,
+      enrollmentId: row.enrollment_id,
+      academicYearId,
+      gradeLevelId: row.grade_level_id,
+      plan: "annuel",
+    })
+    if (result.ok) generated += result.items
+    else if (result.reason === "no_fee_schedule") withoutFee += 1
+  }
+
+  revalidatePath("/dashboard/direction/finance")
+  return { data: { generated, withoutFee } }
 }
