@@ -998,3 +998,26 @@ export async function createFinancialProfile(formData: FormData): Promise<Action
   revalidatePath("/dashboard/direction/finance")
   return {}
 }
+
+export async function getDirectorySnapshot() {
+  const supabase = await createClient()
+  const guard = await requireSchoolRole(supabase, {})
+  if (!guard.ok) return { error: denial(guard.reason, null).error }
+
+  const schoolId = guard.context.schoolId
+  const [preRes, stuRes, guardRes, enrollRes] = await Promise.all([
+    getPreEnrollments(schoolId),
+    getStudents(schoolId),
+    getGuardians(schoolId),
+    getEnrollments(schoolId),
+  ])
+
+  return {
+    data: {
+      students: stuRes.data ?? [],
+      guardians: guardRes.data ?? [],
+      enrollments: enrollRes.data ?? [],
+      preEnrollments: preRes.data ?? [],
+    },
+  }
+}

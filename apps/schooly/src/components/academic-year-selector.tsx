@@ -145,7 +145,7 @@ export function AcademicYearSelector({ schoolId }: { schoolId?: string | null })
   }
 
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex shrink-0 items-center gap-2">
       <CalendarIcon aria-hidden="true" className="h-4 w-4 text-muted-foreground" />
       <label htmlFor="academic-year" className="sr-only">Année académique affichée</label>
       <Select
@@ -153,7 +153,7 @@ export function AcademicYearSelector({ schoolId }: { schoolId?: string | null })
         onValueChange={handleChange}
         disabled={loading || creating}
       >
-        <SelectTrigger id="academic-year" ariaLabel="Année académique affichée" className="w-[220px] h-8 text-sm">
+        <SelectTrigger id="academic-year" ariaLabel="Année académique affichée" className="h-10 w-[168px] text-sm sm:w-[200px]">
           {/* Le SelectValue maison rend la valeur brute (uuid) : on affiche le label. */}
           <span className={selectedId ? "" : "text-muted-foreground"}>
             {activeYear?.label ?? "Année académique"}
@@ -179,7 +179,7 @@ export function AcademicYearSelector({ schoolId }: { schoolId?: string | null })
         </SelectContent>
       </Select>
       {activeYear && (
-        <span className="text-xs text-muted-foreground hidden md:inline">
+        <span className="hidden text-xs text-muted-foreground xl:inline">
           {activeYear.start_date ? `${activeYear.start_date.slice(8, 10)}/${activeYear.start_date.slice(5, 7)}/${activeYear.start_date.slice(0, 4)} → ${activeYear.end_date.slice(8, 10)}/${activeYear.end_date.slice(5, 7)}/${activeYear.end_date.slice(0, 4)}` : ""}
         </span>
       )}
