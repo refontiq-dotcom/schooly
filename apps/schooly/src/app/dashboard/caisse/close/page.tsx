@@ -69,10 +69,10 @@ export default function CloseCashSessionPage() {
     fetchData()
   }, [user])
 
-  if (loading) return <div className="p-6 text-center text-muted-foreground">Chargement...</div>
+  if (loading) return <div className="text-center text-muted-foreground">Chargement...</div>
 
   return (
-    <div className="p-6 space-y-6 max-w-2xl mx-auto">
+    <div className="space-y-6 max-w-2xl mx-auto">
       <div className="flex items-center gap-3">
         <ShieldCheck className="h-8 w-8 text-primary" />
         <div>

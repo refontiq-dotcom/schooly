@@ -7,7 +7,7 @@ export default async function MovementsPage() {
   const [result, activations] = await Promise.all([getMovementOverview(), getMovementActivations()])
   const data = result.data
   const available = data?.enrollments.filter(e => !data.requests.some(r => r.enrollment_id === e.id)) ?? []
-  return <main className="space-y-6 p-6">
+  return <main className="space-y-6">
     <Link href="/dashboard/direction/admissions" className="text-primary underline">Retour aux inscriptions</Link>
     <h1 className="text-2xl font-semibold">Préparer un mouvement TRF / ORT</h1>
     <p>Préparez une demande puis activez TRF administrativement pour 60 jours. Aucun quitus, aucune inscription d’accueil et aucun changement de tarif ne sont effectués. ORT reste à vérifier.</p>
