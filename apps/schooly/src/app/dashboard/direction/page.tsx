@@ -13,6 +13,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import { formatFCFA } from "@/lib/formatters"
+import { IntelligentGuidance } from "@/components/intelligent-guidance"
 import {
   AlertCircle,
   AlertTriangle,
@@ -152,6 +153,18 @@ function EmptyState() {
       </CardContent>
     </Card>
   )
+}
+
+function DirectionIntelligence({ dashboard }: { dashboard: DirectionDashboard }) {
+  const crowded = dashboard.students.byLevel.filter(level => (level.fillRate ?? 0) >= 90)
+  const pending = dashboard.actionQueue.filter(item => item.count > 0)
+  const items = [
+    ...(!dashboard.activeYear ? [{ id: "year", title: "Aucune année académique active", description: "La plupart des opérations pédagogiques et administratives dépendent d’une année en cours.", severity: "critical" as const, actionLabel: "Préparer la structure", href: "/dashboard/academic-structure" }] : []),
+    ...(crowded.length > 0 ? [{ id: "capacity", title: `${crowded.length} niveau(x) approchent de la capacité disponible`, description: "Schooly détecte un risque de saturation à partir des effectifs et capacités configurés. Vérifiez les classes avant de nouvelles admissions.", severity: "warning" as const, actionLabel: "Voir la structure", href: "/dashboard/academic-structure" }] : []),
+    ...(dashboard.finance.recoveryRate < 80 && dashboard.finance.debtorsCount > 0 ? [{ id: "recovery", title: "Le recouvrement mérite une action préventive", description: `${dashboard.finance.debtorsCount} élève(s) présentent encore un solde. Schooly vous propose de traiter les relances avant que les impayés ne s’aggravent.`, severity: "warning" as const, actionLabel: "Gérer les relances", href: "/dashboard/direction/finance/reminders" }] : []),
+    ...(pending.length > 0 ? [{ id: "queue", title: `${pending.length} décision(s) attendent votre intervention`, description: "Traitez d’abord les éléments en attente pour éviter qu’ils ne bloquent les étapes suivantes.", severity: "action" as const, actionLabel: "Voir les actions", href: "#actions-requises" }] : []),
+  ]
+  return <IntelligentGuidance items={items} title="Schooly anticipe les prochaines actions" />
 }
 
 function ActionQueue({ items }: { items: DirectionDashboard["actionQueue"] }) {
@@ -584,7 +597,8 @@ export default async function DirectionDashboard() {
           </div>
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-            <ActionQueue items={dashboard.actionQueue} />
+            <div id="actions-requises"><DirectionIntelligence dashboard={dashboard} />
+      <ActionQueue items={dashboard.actionQueue} /></div>
             <TopDebtors data={dashboard.finance} />
             <CashWidget cash={dashboard.cash} />
           </div>
