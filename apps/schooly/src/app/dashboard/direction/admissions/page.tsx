@@ -39,6 +39,15 @@ type PreEnrollment = {
   payment_method?: string | null
   payment_reference?: string | null
   grade_levels?: { name: string }
+  enrollment_type?: string | null
+  state_orientation?: string | null
+  orientation_number?: string | null
+  previous_matricule?: string | null
+  guardian_relation?: string | null
+  emergency_contact_name?: string | null
+  emergency_contact_phone?: string | null
+  previous_school?: string | null
+  previous_class?: string | null
 }
 
 type Student = {
@@ -47,6 +56,8 @@ type Student = {
   last_name: string
   date_of_birth: string
   status: string
+  previous_school?: string | null
+  previous_class?: string | null
   enrollments?: {
     grade_levels?: { name: string }
     classes?: { name: string }
@@ -58,6 +69,9 @@ type Guardian = {
   full_name: string
   phone: string
   email: string | null
+  relation?: string | null
+  emergency_contact_name?: string | null
+  emergency_contact_phone?: string | null
 }
 
 type Enrollment = {
@@ -65,11 +79,24 @@ type Enrollment = {
   matricule: string | null
   status: string
   enrollment_date: string
+  enrollment_type?: string | null
+  state_orientation?: string | null
+  orientation_number?: string | null
   students: { first_name: string; last_name: string }
   guardians: { full_name: string; phone: string }
   grade_levels: { name: string }
   classes: { name: string } | null
   academic_years: { label: string }
+}
+
+const ENROLLMENT_TYPE_LABELS: Record<string, string> = {
+  nouvelle: "Nouvelle inscription",
+  reinscription: "Réinscription",
+}
+
+const STATE_ORIENTATION_LABELS: Record<string, string> = {
+  oriente_etat: "Orienté(e) État",
+  non_oriente: "Non orienté(e)",
 }
 
 export default function AdmissionsPage() {
@@ -218,10 +245,37 @@ export default function AdmissionsPage() {
                       <p className="text-xs text-muted-foreground">
                         Né(e) le {pre.date_of_birth} · {pre.grade_levels?.name || "Niveau non spécifié"}
                       </p>
+                      {(pre.guardian_relation ||
+                        pre.emergency_contact_name ||
+                        pre.previous_school ||
+                        pre.enrollment_type === "reinscription") && (
+                        <p className="text-xs text-muted-foreground">
+                          {[
+                            pre.guardian_relation &&
+                              [pre.guardian_relation, pre.guardian_name].filter(Boolean).join(" : "),
+                            pre.emergency_contact_name &&
+                              `Urgence : ${pre.emergency_contact_name}${pre.emergency_contact_phone ? ` (${pre.emergency_contact_phone})` : ""}`,
+                            pre.previous_school &&
+                              `Venant de : ${pre.previous_school}${pre.previous_class ? ` (${pre.previous_class})` : ""}`,
+                            pre.enrollment_type === "reinscription" &&
+                              pre.previous_matricule &&
+                              `Ancien matricule : ${pre.previous_matricule}`,
+                            pre.orientation_number && `N° orientation : ${pre.orientation_number}`,
+                          ]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </p>
+                      )}
                       <div className="flex items-center gap-2">
                         <Badge variant={badgeStatus === "pending" ? "secondary" : badgeStatus === "validated" ? "default" : "destructive"}>
                           {badgeStatus === "pending" ? "En attente" : badgeStatus === "validated" ? "Validée" : "Expirée"}
                         </Badge>
+                        {pre.enrollment_type === "reinscription" && (
+                          <Badge variant="outline">Réinscription</Badge>
+                        )}
+                        {pre.state_orientation === "oriente_etat" && (
+                          <Badge variant="secondary">Orienté(e) État</Badge>
+                        )}
                         <span className="text-xs font-mono bg-muted px-2 py-0.5 rounded">{pre.code}</span>
                       </div>
                     </div>
@@ -275,6 +329,12 @@ export default function AdmissionsPage() {
                         {s.enrollments?.[0]?.grade_levels?.name ? ` · ${s.enrollments[0].grade_levels.name}` : ""}
                         {s.enrollments?.[0]?.classes?.name ? ` · ${s.enrollments[0].classes.name}` : ""}
                       </p>
+                      {(s.previous_school || s.previous_class) && (
+                        <p className="text-xs text-muted-foreground">
+                          Venant de : {s.previous_school || "—"}
+                          {s.previous_class ? ` (${s.previous_class})` : ""}
+                        </p>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -298,6 +358,17 @@ export default function AdmissionsPage() {
                     <div key={g.id} className="p-3 rounded-lg border text-sm">
                       <p className="font-medium">{g.full_name}</p>
                       <p className="text-xs text-muted-foreground">{g.phone}</p>
+                      {(g.relation || g.emergency_contact_name) && (
+                        <p className="text-xs text-muted-foreground">
+                          {[
+                            g.relation && `Lien : ${g.relation}`,
+                            g.emergency_contact_name &&
+                              `Urgence : ${g.emergency_contact_name}${g.emergency_contact_phone ? ` (${g.emergency_contact_phone})` : ""}`,
+                          ]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </p>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -326,10 +397,26 @@ export default function AdmissionsPage() {
                           {e.grade_levels?.name ? ` · ${e.grade_levels.name}` : ""}
                           {e.academic_years?.label ? ` · ${e.academic_years.label}` : ""}
                         </p>
+                        {(e.enrollment_type || e.state_orientation === "oriente_etat") && (
+                          <p className="text-xs text-muted-foreground">
+                            {[
+                              e.enrollment_type && (ENROLLMENT_TYPE_LABELS[e.enrollment_type] ?? e.enrollment_type),
+                              e.state_orientation === "oriente_etat" &&
+                                `Orienté(e) État${e.orientation_number ? ` (${e.orientation_number})` : ""}`,
+                            ]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </p>
+                        )}
                       </div>
-                      <Badge variant={e.status === "confirmed" || e.status === "active" ? "default" : "secondary"}>
-                        {e.status === "confirmed" || e.status === "active" ? "Confirmée" : e.status}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        {e.enrollment_type === "reinscription" && (
+                          <Badge variant="outline">Réinscription</Badge>
+                        )}
+                        <Badge variant={e.status === "confirmed" || e.status === "active" ? "default" : "secondary"}>
+                          {e.status === "confirmed" || e.status === "active" ? "Confirmée" : e.status}
+                        </Badge>
+                      </div>
                     </div>
                   ))}
                 </div>
