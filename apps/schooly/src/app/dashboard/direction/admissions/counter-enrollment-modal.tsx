@@ -196,7 +196,7 @@ export function CounterEnrollmentModal({
             <DialogDescription>
               {isFromPreEnrollment
                 ? "Verifiez les pieces, encaissez, puis confirmez. Le matricule et le recu QR sont generes ensemble."
-                : "Inscription directe au secretariat : identite, tuteur, encaissement immediat."}
+                : "Inscription directe au secretariat : identite, parent ou tuteur, encaissement immediat."}
             </DialogDescription>
           </DialogHeader>
 
@@ -297,7 +297,7 @@ export function CounterEnrollmentModal({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="guardianName">Nom du tuteur *</Label>
+              <Label htmlFor="guardianName">Nom du parent ou tuteur *</Label>
               <Input
                 id="guardianName"
                 name="guardianName"
@@ -308,7 +308,7 @@ export function CounterEnrollmentModal({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="guardianPhone">Telephone tuteur *</Label>
+              <Label htmlFor="guardianPhone">Telephone parent ou tuteur *</Label>
               <Input
                 id="guardianPhone"
                 name="guardianPhone"

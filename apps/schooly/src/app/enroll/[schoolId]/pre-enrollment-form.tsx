@@ -1,7 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { createPreEnrollment } from "@/app/dashboard/admissions/actions"
+import { capitalizeWords, calculateAge, formatGuardianPhone } from "@/app/dashboard/admissions/enrollment-utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -14,7 +15,7 @@ import {
 } from "@/components/ui/select"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { toast } from "sonner"
-import { CheckCircle2, Clock, CreditCard, FileText, Package } from "lucide-react"
+import { CheckCircle2, Clock, CreditCard, FileText, History, Package, Users } from "lucide-react"
 
 type GradeLevel = {
   id: string
@@ -73,6 +74,18 @@ export default function PreEnrollmentForm({
   const [providedDocuments, setProvidedDocuments] = useState<Record<string, boolean>>({})
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>("")
 
+  // ── Champs contrôlés : capitalisation des noms + formatage du téléphone ──
+  const [firstName, setFirstName] = useState("")
+  const [lastName, setLastName] = useState("")
+  const [dateOfBirth, setDateOfBirth] = useState("")
+  const [birthCertificateNumber, setBirthCertificateNumber] = useState("")
+  const [guardianName, setGuardianName] = useState("")
+  const [guardianPhone, setGuardianPhone] = useState("")
+  const [draftHydrated, setDraftHydrated] = useState(false)
+  const [draftRestored, setDraftRestored] = useState(false)
+
+  const DRAFT_KEY = `schooly-preenroll-draft-${schoolId}`
+
   const selectedGrade = gradeLevels.find((level) => level.id === selectedGradeLevel)
 
   const applicableDocuments = requiredDocuments.filter(
@@ -89,6 +102,85 @@ export default function PreEnrollmentForm({
   const formatFCFA = (amount: number | null) => {
     if (amount === null) return null
     return new Intl.NumberFormat("fr-FR").format(amount) + " FCFA"
+  }
+
+  // ── Brouillon local : la saisie survit à un refresh ou une fermeture d'onglet ──
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(DRAFT_KEY)
+      if (raw) {
+        const d = JSON.parse(raw) as Record<string, string>
+        setFirstName(d.firstName ?? "")
+        setLastName(d.lastName ?? "")
+        setDateOfBirth(d.dateOfBirth ?? "")
+        setBirthCertificateNumber(d.birthCertificateNumber ?? "")
+        setGuardianName(d.guardianName ?? "")
+        setGuardianPhone(d.guardianPhone ?? "")
+        setSelectedGradeLevel(d.gradeLevelId ?? "")
+        setDraftRestored(true)
+      }
+    } catch {
+      // brouillon corrompu ou stockage indisponible : formulaire vide
+    } finally {
+      setDraftHydrated(true)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    if (!draftHydrated) return
+    try {
+      const hasAnything =
+        firstName || lastName || dateOfBirth || birthCertificateNumber || guardianName || guardianPhone || selectedGradeLevel
+      if (!hasAnything) {
+        window.localStorage.removeItem(DRAFT_KEY)
+        return
+      }
+      window.localStorage.setItem(
+        DRAFT_KEY,
+        JSON.stringify({
+          firstName,
+          lastName,
+          dateOfBirth,
+          birthCertificateNumber,
+          guardianName,
+          guardianPhone,
+          gradeLevelId: selectedGradeLevel,
+        })
+      )
+    } catch {
+      // quota / navigation privée : le brouillon est un confort, jamais bloquant
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    draftHydrated,
+    firstName,
+    lastName,
+    dateOfBirth,
+    birthCertificateNumber,
+    guardianName,
+    guardianPhone,
+    selectedGradeLevel,
+  ])
+
+  const age = useMemo(() => calculateAge(dateOfBirth), [dateOfBirth])
+  const ageUnusual = age !== null && (age < 2 || age > 25)
+  const today = new Date().toISOString().slice(0, 10)
+
+  function clearDraft() {
+    setFirstName("")
+    setLastName("")
+    setDateOfBirth("")
+    setBirthCertificateNumber("")
+    setGuardianName("")
+    setGuardianPhone("")
+    setSelectedGradeLevel("")
+    setDraftRestored(false)
+    try {
+      window.localStorage.removeItem(DRAFT_KEY)
+    } catch {
+      // stockage indisponible
+    }
   }
 
   async function handleSubmit(formData: FormData) {
@@ -113,6 +205,13 @@ export default function PreEnrollmentForm({
       setCode(result.data.code)
       setSubmitted(true)
       toast.success("Pré-inscription enregistrée !")
+      // Brouillon servi : on le retire pour ne pas polluer une prochaine saisie.
+      setDraftRestored(false)
+      try {
+        window.localStorage.removeItem(DRAFT_KEY)
+      } catch {
+        // stockage indisponible : le succès n'en dépend pas
+      }
     }
     setLoading(false)
   }
@@ -151,28 +250,93 @@ export default function PreEnrollmentForm({
         </CardDescription>
       </CardHeader>
       <CardContent>
+        {draftRestored && (
+          <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-primary/30 bg-muted/40 px-3 py-2 text-xs">
+            <span className="flex items-center gap-2 text-muted-foreground">
+              <History className="h-3.5 w-3.5 shrink-0" />
+              Brouillon restauré automatiquement — vous pouvez reprendre la saisie.
+            </span>
+            <button
+              type="button"
+              onClick={clearDraft}
+              className="shrink-0 text-primary hover:underline"
+            >
+              Repartir de zéro
+            </button>
+          </div>
+        )}
         <form action={handleSubmit} className="space-y-5">
           <input type="hidden" name="schoolId" value={schoolId} />
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="firstName">Prénom *</Label>
-               <Input id="firstName" name="firstName" required disabled={loading} className="min-h-11" />
+              <Input
+                id="firstName"
+                name="firstName"
+                required
+                disabled={loading}
+                autoComplete="given-name"
+                value={firstName}
+                onChange={(e) => setFirstName(capitalizeWords(e.target.value))}
+                className="min-h-11"
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="lastName">Nom *</Label>
-              <Input id="lastName" name="lastName" required disabled={loading} className="min-h-11" />
+              <Input
+                id="lastName"
+                name="lastName"
+                required
+                disabled={loading}
+                autoComplete="family-name"
+                value={lastName}
+                onChange={(e) => setLastName(capitalizeWords(e.target.value))}
+                className="min-h-11"
+              />
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="dateOfBirth">Date de naissance *</Label>
-            <Input id="dateOfBirth" name="dateOfBirth" type="date" required disabled={loading} className="min-h-11" />
+            <div className="flex items-baseline justify-between gap-2">
+              <Label htmlFor="dateOfBirth">Date de naissance *</Label>
+              {age !== null && (
+                <span
+                  className={`text-xs font-medium ${ageUnusual ? "text-orange-700 dark:text-orange-400" : "text-muted-foreground"}`}
+                >
+                  {age} an{age > 1 ? "s" : ""}
+                </span>
+              )}
+            </div>
+            <Input
+              id="dateOfBirth"
+              name="dateOfBirth"
+              type="date"
+              required
+              disabled={loading}
+              autoComplete="bday"
+              max={today}
+              value={dateOfBirth}
+              onChange={(e) => setDateOfBirth(e.target.value)}
+              className="min-h-11"
+            />
+            {ageUnusual && (
+              <p className="text-xs text-orange-700 dark:text-orange-400">
+                Vérifiez la date saisie : {age} ans est inhabituel pour une scolarisation.
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="birthCertificateNumber">N acte de naissance</Label>
-            <Input id="birthCertificateNumber" name="birthCertificateNumber" disabled={loading} className="min-h-11" />
+            <Input
+              id="birthCertificateNumber"
+              name="birthCertificateNumber"
+              disabled={loading}
+              value={birthCertificateNumber}
+              onChange={(e) => setBirthCertificateNumber(e.target.value)}
+              className="min-h-11"
+            />
           </div>
 
           <div className="space-y-2">
@@ -304,31 +468,46 @@ export default function PreEnrollmentForm({
 
           <hr className="border-border" />
 
-          <div className="space-y-2">
-            <Label htmlFor="guardianName">Nom du tuteur *</Label>
-            <Input
-              id="guardianName"
-              name="guardianName"
-              required
-              disabled={loading}
-              className="min-h-11"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="guardianPhone">Téléphone du tuteur *</Label>
-            <Input
-              id="guardianPhone"
-              name="guardianPhone"
-              type="tel"
-              placeholder="+225 07 00 00 00 00"
-              required
-              disabled={loading}
-              className="min-h-11"
-            />
-            <p className="text-xs text-muted-foreground">
-              Ce numéro servira à identifier le tuteur et à envoyer les communications.
-            </p>
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 text-sm font-semibold">
+              <Users className="h-4 w-4 text-primary" />
+              Parent ou tuteur
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="guardianName">Nom du parent ou tuteur *</Label>
+                <Input
+                  id="guardianName"
+                  name="guardianName"
+                  required
+                  disabled={loading}
+                  autoComplete="name"
+                  placeholder="Ex. : KOUASSI Jean"
+                  value={guardianName}
+                  onChange={(e) => setGuardianName(capitalizeWords(e.target.value))}
+                  className="min-h-11"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="guardianPhone">Téléphone du parent ou tuteur *</Label>
+                <Input
+                  id="guardianPhone"
+                  name="guardianPhone"
+                  type="tel"
+                  inputMode="tel"
+                  placeholder="+225 07 00 00 00 00"
+                  required
+                  disabled={loading}
+                  autoComplete="tel"
+                  value={guardianPhone}
+                  onChange={(e) => setGuardianPhone(formatGuardianPhone(e.target.value))}
+                  className="min-h-11"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Ce numéro servira à identifier le parent ou tuteur et à envoyer les communications.
+                </p>
+              </div>
+            </div>
           </div>
 
           <Button

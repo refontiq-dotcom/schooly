@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest"
 import {
+  calculateAge,
+  capitalizeWords,
+  formatGuardianPhone,
   generateEnrollmentMatricule,
   isPaymentMethod,
   mapSchoolPaymentType,
@@ -60,5 +63,74 @@ describe("pickFeeAmount", () => {
 
   it("retourne 0 sans grille", () => {
     expect(pickFeeAmount(fees, "g9", "y1")).toBe(0)
+  })
+})
+
+describe("capitalizeWords", () => {
+  it("capitalise chaque mot séparé par espace, tiret ou apostrophe", () => {
+    expect(capitalizeWords("jean-paul kouassi")).toBe("Jean-Paul Kouassi")
+    expect(capitalizeWords("marie claire")).toBe("Marie Claire")
+    expect(capitalizeWords("n'guessan")).toBe("N'Guessan")
+    expect(capitalizeWords("jean")).toBe("Jean")
+  })
+
+  it("préserve les majuscules déjà tapées et les accents", () => {
+    expect(capitalizeWords("DIALLO")).toBe("DIALLO")
+    expect(capitalizeWords("éloge")).toBe("Éloge")
+    expect(capitalizeWords("déborah-lou")).toBe("Déborah-Lou")
+  })
+
+  it("ne casse pas une saisie vide ou numérique", () => {
+    expect(capitalizeWords("")).toBe("")
+    expect(capitalizeWords("42")).toBe("42")
+  })
+})
+
+describe("formatGuardianPhone", () => {
+  it("groupe les chiffres par 2 (format ivoirien)", () => {
+    expect(formatGuardianPhone("0700000000")).toBe("07 00 00 00 00")
+    expect(formatGuardianPhone("07 00 00 00 00")).toBe("07 00 00 00 00")
+  })
+
+  it("isole l'indicatif +225", () => {
+    expect(formatGuardianPhone("+2250700000000")).toBe("+225 07 00 00 00 00")
+    expect(formatGuardianPhone("+225 07 00 00 00 00")).toBe("+225 07 00 00 00 00")
+    // saisie en cours : « +225 » seul reste stable, pas de regroupement aberrant
+    expect(formatGuardianPhone("+225")).toBe("+225 ")
+  })
+
+  it("normalise le 00 international en +", () => {
+    expect(formatGuardianPhone("002250700000000")).toBe("+225 07 00 00 00 00")
+  })
+
+  it("reste déterministe : même saisie → même chaîne stockée", () => {
+    const a = formatGuardianPhone("0700000000")
+    const b = formatGuardianPhone("0700000000")
+    expect(a).toBe(b)
+  })
+
+  it("tolère une saisie sans chiffre et la vide", () => {
+    expect(formatGuardianPhone("")).toBe("")
+    expect(formatGuardianPhone("abc")).toBe("abc")
+  })
+})
+
+describe("calculateAge", () => {
+  const now = new Date("2026-09-18T12:00:00")
+
+  it("calcule l'âge en années révolues", () => {
+    expect(calculateAge("2015-06-10", now)).toBe(11)
+    expect(calculateAge("2015-12-31", now)).toBe(10) // anniversaire pas encore passé
+  })
+
+  it("gère anniversaire du jour et année de naissance = année courante", () => {
+    expect(calculateAge("2008-09-18", now)).toBe(18)
+    expect(calculateAge("2026-05-01", now)).toBe(0)
+  })
+
+  it("retourne null pour une date absente, future ou invalide", () => {
+    expect(calculateAge("", now)).toBeNull()
+    expect(calculateAge("2030-01-01", now)).toBeNull()
+    expect(calculateAge("pas-une-date", now)).toBeNull()
   })
 })
