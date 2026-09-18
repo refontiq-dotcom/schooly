@@ -45,105 +45,108 @@ export async function getMoratoriums(schoolId: string) {
   return { data: data || [] }
 }
 
-export async function createMoratorium(formData: FormData): Promise<ActionResult> {
+export async function getMoratoriumContext(enrollmentId: string): Promise<ActionResult<any>> {
   const supabase = await createClient()
+  const guard = await requireSchoolRole(supabase, { allowedRoles: [...MORATORIUM_ROLES] })
+  if (!guard.ok) return { error: denial(guard.reason, []).error }
+  const admin = createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+  const { data: enrollment } = await admin.from("enrollments")
+    .select("id, school_id, guardian_id, fee_expected, fee_paid, fee_balance, fee_status")
+    .eq("id", enrollmentId).single()
+  if (!enrollment || enrollment.school_id !== guard.context.schoolId) return { error: "Inscription introuvable ou accès non autorisé." }
+  const { data: active } = await admin.from("moratoriums")
+    .select("id, status, requested_amount, approved_amount, due_date")
+    .eq("enrollment_id", enrollmentId).is("deleted_at", null)
+    .in("status", ["pending","approved"]).limit(1)
+  const { data: history } = await admin.from("moratoriums")
+    .select("id, status, requested_amount, approved_amount, due_date, requested_at")
+    .eq("enrollment_id", enrollmentId).is("deleted_at", null)
+    .order("requested_at", { ascending: false }).limit(5)
+  return { data: { enrollment, active: active?.[0] ?? null, history: history ?? [] } }
+}
 
-  // Demande de moratoire sur une inscription : direction / compta uniquement.
+export async function createMoratorium(formData: FormData): Promise<ActionResult<any>> {
+  const supabase = await createClient()
   const guard = await requireSchoolRole(supabase, { allowedRoles: [...MORATORIUM_ROLES] })
   if (!guard.ok) return { error: denial(guard.reason, []).error }
   const { schoolId } = guard.context
-
-  const enrollmentId = formData.get("enrollmentId") as string
-  const reason = formData.get("reason") as string
-  const requestedAmount = parseInt(formData.get("requestedAmount") as string || "0")
-  const dueDate = formData.get("dueDate") as string
-
-  if (!enrollmentId || !reason || !requestedAmount || !dueDate) {
-    return { error: "Tous les champs sont requis." }
+  const enrollmentId = String(formData.get("enrollmentId") ?? "")
+  const reason = String(formData.get("reason") ?? "").trim()
+  const requestedAmount = Number(formData.get("requestedAmount") ?? 0)
+  const dueDate = String(formData.get("dueDate") ?? "")
+  if (!enrollmentId || reason.length < 5 || !Number.isInteger(requestedAmount) || requestedAmount <= 0 || !dueDate) {
+    return { error: "Élève, motif, montant et date limite sont requis." }
   }
-
-  const admin = createAdminClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
-
-  const { data: enrollment } = await admin
-    .from("enrollments")
-    .select("school_id, guardian_id")
-    .eq("id", enrollmentId)
-    .single()
-
-  if (!enrollment || enrollment.school_id !== schoolId) {
-    return { error: "Inscription introuvable ou accès non autorisé." }
-  }
-
-  const { error } = await admin.from("moratoriums").insert({
-    school_id: schoolId,
-    enrollment_id: enrollmentId,
-    guardian_id: enrollment.guardian_id,
-    reason,
-    requested_amount: requestedAmount,
-    due_date: dueDate,
-    status: "pending",
-  })
-
+  const admin = createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+  const { data: enrollment } = await admin.from("enrollments")
+    .select("school_id, guardian_id, fee_balance").eq("id", enrollmentId).single()
+  if (!enrollment || enrollment.school_id !== schoolId) return { error: "Inscription introuvable ou accès non autorisé." }
+  const balance = Number(enrollment.fee_balance ?? 0)
+  if (balance <= 0) return { error: "Aucun solde à rééchelonner pour cette inscription." }
+  if (requestedAmount > balance) return { error: `Le montant demandé ne peut pas dépasser le solde restant de ${balance.toLocaleString("fr-FR")} FCFA.` }
+  if (new Date(dueDate) <= new Date()) return { error: "La date limite doit être future." }
+  const { data: existing } = await admin.from("moratoriums").select("id").eq("enrollment_id", enrollmentId)
+    .is("deleted_at", null).in("status", ["pending","approved"]).limit(1)
+  if (existing?.length) return { error: "Un moratoire actif ou en attente existe déjà pour cet élève." }
+  const { data: created, error } = await admin.from("moratoriums").insert({
+    school_id: schoolId, enrollment_id: enrollmentId, guardian_id: enrollment.guardian_id,
+    reason, requested_amount: requestedAmount, due_date: dueDate, status: "pending",
+  }).select("id").single()
   if (error) return { error: error.message }
-
   revalidatePath("/dashboard/direction/finance")
-  return {}
+  revalidatePath("/dashboard/direction/finance/moratoriums")
+  return { data: created }
 }
 
-export async function reviewMoratorium(formData: FormData): Promise<ActionResult> {
+export async function reviewMoratorium(formData: FormData): Promise<ActionResult<any>> {
   const supabase = await createClient()
-
-  // Décision sur un moratoire (argent) : direction / compta uniquement.
   const guard = await requireSchoolRole(supabase, { allowedRoles: [...MORATORIUM_ROLES] })
   if (!guard.ok) return { error: denial(guard.reason, []).error }
   const { schoolId, userId } = guard.context
-
-  const moratoriumId = formData.get("moratoriumId") as string
-  const action = formData.get("action") as string
-  const approvedAmount = formData.get("approvedAmount") ? parseInt(formData.get("approvedAmount") as string) : null
-
-  if (!moratoriumId || !action) {
-    return { error: "ID de moratoire et action requis." }
+  const moratoriumId = String(formData.get("moratoriumId") ?? "")
+  const action = String(formData.get("action") ?? "")
+  const approvedAmount = Number(formData.get("approvedAmount") ?? 0)
+  const installmentCount = Number(formData.get("installmentCount") ?? 0)
+  if (!moratoriumId || !["approve","reject"].includes(action)) return { error: "Décision invalide." }
+  const admin = createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+  const { data: m } = await admin.from("moratoriums").select("*").eq("id", moratoriumId).single()
+  if (!m || m.school_id !== schoolId || m.status !== "pending") return { error: "Moratoire introuvable ou déjà traité." }
+  if (action === "reject") {
+    const { error } = await admin.from("moratoriums").update({ status:"rejected", approved_amount:null, reviewed_at:new Date().toISOString(), reviewed_by:userId }).eq("id", moratoriumId)
+    if (error) return { error:error.message }
+    revalidatePath("/dashboard/direction/finance"); revalidatePath("/dashboard/direction/finance/moratoriums")
+    return { data:{ nextAction:"relance_or_payment_plan" } }
   }
+  const amount = approvedAmount > 0 ? approvedAmount : Number(m.requested_amount)
+  if (!Number.isInteger(amount) || amount <= 0 || amount > Number(m.requested_amount)) return { error: "Le montant approuvé doit être positif et ne pas dépasser le montant demandé." }
+  const count = Number.isInteger(installmentCount) && installmentCount >= 1 && installmentCount <= 12 ? installmentCount : 3
+  const endDate = new Date(String(m.due_date))
+  const now = new Date()
+  const start = now > new Date() ? now : now
+  const rows = Array.from({length:count},(_,i)=> {
+    const d = new Date(start)
+    d.setMonth(d.getMonth()+i+1)
+    if (d > endDate) d.setTime(endDate.getTime())
+    return { moratorium_id: moratoriumId, installment_no:i+1, due_date:d.toISOString().slice(0,10), amount:Math.floor(amount/count)+(i < amount%count ? 1:0) }
+  })
+  const { error: updateError } = await admin.from("moratoriums").update({ status:"approved", approved_amount:amount, reviewed_at:new Date().toISOString(), reviewed_by:userId }).eq("id",moratoriumId)
+  if (updateError) return { error:updateError.message }
+  const { error: scheduleError } = await admin.from("moratorium_installments").insert(rows)
+  if (scheduleError) return { error:scheduleError.message }
+  revalidatePath("/dashboard/direction/finance"); revalidatePath("/dashboard/direction/finance/moratoriums")
+  return { data:{ nextAction:"monitor_installments", installmentCount:count } }
+}
 
-  const admin = createAdminClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
-
-  const { data: moratorium } = await admin
-    .from("moratoriums")
-    .select("*")
-    .eq("id", moratoriumId)
-    .single()
-
-  if (!moratorium) return { error: "Moratoire introuvable." }
-  // Cloisonnement : un moratoire d'une autre école est traité comme
-  // introuvable (pas de divulgation d'existence) — même classe d'IDOR
-  // que le P1-3 du socle, corrigée dans le cadre de l'audit Finance.
-  if (moratorium.school_id !== schoolId) {
-    return { error: "Moratoire introuvable." }
-  }
-
-  const newStatus = action === "approve" ? "approved" : "rejected"
-
-  const { error } = await admin
-    .from("moratoriums")
-    .update({
-      status: newStatus,
-      approved_amount: action === "approve" ? (approvedAmount || moratorium.requested_amount) : null,
-      reviewed_at: new Date().toISOString(),
-      reviewed_by: userId,
-    })
-    .eq("id", moratoriumId)
-
-  if (error) return { error: error.message }
-
-  revalidatePath("/dashboard/direction/finance")
-  return {}
+export async function getMoratoriumInstallments(moratoriumId: string) {
+  const supabase = await createClient()
+  const guard = await requireSchoolRole(supabase, { allowedRoles: [...MORATORIUM_ROLES] })
+  if (!guard.ok) return denial(guard.reason, [])
+  const admin = createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+  const { data:m } = await admin.from("moratoriums").select("school_id").eq("id",moratoriumId).single()
+  if (!m || m.school_id !== guard.context.schoolId) return { error:"Moratoire introuvable.", data:[] }
+  const { data, error } = await admin.from("moratorium_installments").select("*").eq("moratorium_id",moratoriumId).order("installment_no")
+  if (error) return { error:error.message, data:[] }
+  return { data:data ?? [] }
 }
 
 // ============================================ RELANCES ========================
