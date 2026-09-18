@@ -91,6 +91,9 @@ export async function POST(
   if (errLedger) return NextResponse.json({ error: "Erreur lecture écritures" }, { status: 500 })
   const entries = ledger ?? []
   const debitTotal = entries.reduce((s: number, e: Record<string, unknown>) => s + (Number(e.debit_amount) || 0), 0)
+  // En double entrée, total crédit = total débit (chaque écriture crédite 411
+  // du même montant qu'elle débite 571/521/601). On le calcule, pas un 0 dur.
+  const creditTotal = debitTotal
 
   // Grand-livre + contrôle
   const { data: control, error: errControl } = await supabase
@@ -100,14 +103,20 @@ export async function POST(
     .order("account", { ascending: true })
   if (errControl) return NextResponse.json({ error: "Erreur lecture contrôle" }, { status: 500 })
 
-  const journalRows = entries.map((e: Record<string, unknown>) => ({
-    date: e.transaction_date,
-    numero_compte: e.debit_account || e.credit_account,
-    libelle: e.ref_label || e.source_type,
-    ref: e.ref_id,
-    debit: e.debit_account ? fmt(Number(e.debit_amount) || 0) : "",
-    credit: e.credit_account ? fmt(Number(e.debit_amount) || 0) : "",
-  }))
+  const journalRows = entries.flatMap((e: Record<string, unknown>) => {
+    // Double entrée réelle : UNE ligne débit + UNE ligne crédit (pas une
+    // « ligne miroir » montant ×2). Le journal s'équilibre par écriture.
+    const amount = Number(e.debit_amount) || 0
+    const base = {
+      date: e.transaction_date,
+      libelle: e.ref_label || e.source_type,
+      ref: e.ref_id,
+    }
+    return [
+      { ...base, numero_compte: e.debit_account, debit: fmt(amount), credit: "" },
+      { ...base, numero_compte: e.credit_account, debit: "", credit: fmt(amount) },
+    ]
+  })
 
   const grandLivreRows = (control ?? []).map((c) => ({
     compte: c.account,
@@ -157,7 +166,7 @@ Total débit: ${fmt(debitTotal)}
       file_url: fileName,
       entries_count: entries.length,
       total_debit: debitTotal,
-      total_credit: 0,
+      total_credit: creditTotal,
     })
     .select("id")
     .single()

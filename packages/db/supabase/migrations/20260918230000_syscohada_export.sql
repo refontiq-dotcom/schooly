@@ -80,6 +80,33 @@ insert into public.syscohada_plan (account, label, account_type) values
 on conflict (account) do nothing;
 
 
+-- ─── 2b. Journal des exports (la route API lit/écrit cette table) ────────────
+create table if not exists public.syscohada_export_log (
+  id uuid primary key default gen_random_uuid(),
+  school_id uuid not null references public.schools(id) on delete cascade,
+  format text not null default 'general'
+    check (format in ('general', 'analytic', 'sage', 'csv')),
+  period_start date not null,
+  period_end date not null,
+  generated_by uuid references public.users(id),
+  file_url text,
+  entries_count integer not null default 0,
+  total_debit bigint not null default 0,
+  total_credit bigint not null default 0,
+  generated_at timestamptz not null default now()
+);
+
+alter table public.syscohada_export_log enable row level security;
+drop policy if exists syscohada_export_log_member_read on public.syscohada_export_log;
+create policy syscohada_export_log_member_read on public.syscohada_export_log for select
+  using (is_super_admin() or is_school_member(school_id));
+drop policy if exists syscohada_export_log_write on public.syscohada_export_log;
+create policy syscohada_export_log_write on public.syscohada_export_log for all
+  using (has_school_role(school_id, array['direction', 'compta', 'super_admin']));
+
+grant select on public.syscohada_export_log to authenticated;
+
+
 -- ─── 3. Vue agrégée : écritures SYSCOHADA réelles ─────────────────────────
 -- Source : receipts ↔ payments (tables EXISTANTES).
 -- Un paiement = une écriture d'encaissement :
@@ -112,12 +139,14 @@ cash as (
   where p.deleted_at is null and r.deleted_at is null
 ),
 discounts as (
+  -- La date de transaction des remises est figée dans la ligne (created_at) —
+  -- pas now() (qui empêcherait tout exercice clôturé de se stabiliser).
   select
     fd.school_id,
     fd.id as discount_id,
     fd.enrollment_id,
     fd.amount,
-    now()::date as transaction_date,
+    (fd.created_at)::date as transaction_date,
     '601' as debit_account,
     '411' as credit_account
   from public.fee_discounts fd
@@ -129,7 +158,7 @@ unioned as (
          debit_account, credit_account, 'payment' as source_type
   from cash
   union all
-  select school_id, discount_id, 'REMISE-' || id::text,
+  select school_id, discount_id as ref_id, 'REMISE-' || discount_id::text as ref_label,
          enrollment_id, amount, transaction_date,
          debit_account, credit_account, 'discount'
   from discounts
