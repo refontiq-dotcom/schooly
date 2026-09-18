@@ -38,6 +38,32 @@ pnpm dev:admin
 pnpm dev:parent
 ```
 
+### 2.1 Environnement déjà en service — mise à jour
+
+Sur une installation qui tourne déjà (école déjà en production, base déjà remplie),
+les évolutions du 18/09/2026 s'appliquent avec **un seul script**, sans
+redéploiement ni perte de données :
+
+```
+packages/db/supabase/migrations/20260918180000_catchup_18_09.sql
+```
+
+1. Ouvrir Supabase → **SQL Editor**, coller le contenu du fichier, exécuter.
+2. Le script est **idempotent** : le relancer ne casse rien (utile si l'on ne sait
+   plus ce qui a déjà été appliqué).
+3. Se **déconnecter puis reconnecter** chaque utilisateur (le temps que la session
+   soit relue).
+4. Vérifier `/api/health` → `"db": "connected"`.
+
+Il ajoute les colonnes du parcours d'inscription (lien de parenté, contact
+d'urgence, scolarité antérieure, type d'inscription, orientation État, origine du
+dossier), la normalisation des téléphones et les droits de lecture manquants.
+Le détail est dans `docs/deployment/migrations-18-09.md`.
+
+> **Si l'onglet Structure académique affiche « Aucune école rattachée »** pour un
+> compte pourtant rattaché, c'est que ce script n'a pas encore été appliqué — voir
+> la FAQ (§9).
+
 ---
 
 ## 3. Configuration initiale (Onboarding Wizard)
@@ -215,3 +241,17 @@ R : Il dépend du mode choisi : obligatoire pour un **chèque**, facultatif pour
 
 **Q : À quoi sert le contact d'urgence au dossier ?**  
 R : Il est saisi dès l'inscription (par défaut le parent lui-même) et reste attaché à la fiche du tuteur. La surveillance ou l'infirmerie l'a donc immédiatement, sans appeler le secrétariat.
+
+**Q : « Aucune école rattachée » s'affiche alors que l'utilisateur est bien rattaché. Que faire ?**  
+R : C'est un symptôme connu, corrigé le 18/09/2026 : les droits de lecture manquants en base empêchaient l'application de lire le rattachement (l'erreur technique était masquée par un message trompeur). Deux vérifications :
+
+1. Vérifier que le compte est bien actif : Supabase → SQL Editor →
+   `select role_code, is_active from public.user_school_roles where user_id = '<id de l'utilisateur>';`
+   (`is_active` doit être `true`, et le `role_code` correspondre à la fonction — `direction` ou `super_admin` pour la structure académique).
+2. Appliquer le **script de rattrapage** `20260918180000_catchup_18_09.sql` (§2.1), puis se reconnecter.
+
+Après correction, les messages sont désormais **distincts** et orientent le diagnostic : « Non autorisé » (session à renouveler), « Action réservée à un rôle supérieur » (mauvais rôle), « Aucune école rattachée » (compte non rattaché), « Erreur serveur » (incident technique à signaler).
+
+**Q : Deux parents au même numéro de téléphone créent-ils deux dossiers ?**  
+R : Non. Le numéro est **normalisé en base** (`+225` + chiffres) : `0700000000`, `+225 07 00 00 00 00` et `002250700000000` désignent le même parent. Les tuteurs en doublon créés avant le 18/09/2026 sont automatiquement rapprochés par le script de rattrapage (§2.1).
+
