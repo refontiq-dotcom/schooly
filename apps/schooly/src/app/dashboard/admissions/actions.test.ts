@@ -138,6 +138,26 @@ describe("createPreEnrollment", () => {
     expect(writes).toHaveLength(0)
   })
 
+  it("exige la derniere classe avec l'ecole precedente", async () => {
+    const res = await createPreEnrollment(
+      form({
+        schoolId: SCHOOL_ID,
+        firstName: "Awa",
+        lastName: "Kone",
+        dateOfBirth: "2012-01-01",
+        gradeLevelId: GRADE_ID,
+        guardianPhone: "+2250700000000",
+        guardianRelation: "Mère",
+        emergencyContactName: "Ibrahim Kone",
+        emergencyContactPhone: "+2250600000000",
+        previousSchool: "EPP Bingerville 1",
+        previousClass: "",
+      })
+    )
+    expect(res.error).toBe("L'école précédente et la dernière classe fréquentée vont ensemble.")
+    expect(writes).toHaveLength(0)
+  })
+
   it("exige le lien avec l'eleve", async () => {
     const res = await createPreEnrollment(
       form({
@@ -192,6 +212,8 @@ describe("createPreEnrollment", () => {
         guardianRelation: "Mère",
         emergencyContactName: "Ibrahim Kone",
         emergencyContactPhone: "+2250600000000",
+        previousSchool: "EPP Bingerville 1",
+        previousClass: "CM2",
         birthCertificateNumber: "ACTE-1",
         paymentMethodId: "pm-1",
         acceptedChecklist: '["c1"]',
@@ -207,6 +229,8 @@ describe("createPreEnrollment", () => {
       guardian_relation: "Mère",
       emergency_contact_name: "Ibrahim Kone",
       emergency_contact_phone: "+2250600000000",
+      previous_school: "EPP Bingerville 1",
+      previous_class: "CM2",
       birth_certificate_number: "ACTE-1",
       payment_method: "cash",
       accepted_checklist: ["c1"],
@@ -258,6 +282,8 @@ describe("validatePreEnrollment", () => {
           guardian_relation: "Père",
           emergency_contact_name: "Moussa Kone",
           emergency_contact_phone: "+2250500000000",
+          previous_school: "EPP Bingerville 1",
+          previous_class: "CM2",
         },
       },
       { data: { id: PRE_ID } }
@@ -283,6 +309,11 @@ describe("validatePreEnrollment", () => {
       relation: "Père",
       emergency_contact_name: "Moussa Kone",
       emergency_contact_phone: "+2250500000000",
+    })
+    const studentInsert = writes.find((w) => w.table === "students" && w.op === "insert")
+    expect(studentInsert?.payload).toMatchObject({
+      previous_school: "EPP Bingerville 1",
+      previous_class: "CM2",
     })
   })
 

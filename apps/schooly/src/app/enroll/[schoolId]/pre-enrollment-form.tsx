@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/select"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { toast } from "sonner"
-import { CheckCircle2, Clock, CreditCard, FileText, History, Package, Users } from "lucide-react"
+import { CheckCircle2, Clock, CreditCard, FileText, History, Package, School, Users } from "lucide-react"
 
 type GradeLevel = {
   id: string
@@ -92,10 +92,15 @@ export default function PreEnrollmentForm({
   const [sameEmergencyContact, setSameEmergencyContact] = useState(true)
   const [emergencyName, setEmergencyName] = useState("")
   const [emergencyPhone, setEmergencyPhone] = useState("")
+  const [firstEnrollment, setFirstEnrollment] = useState(false)
+  const [previousSchool, setPreviousSchool] = useState("")
+  const [previousClass, setPreviousClass] = useState("")
+  const [previousClassTouched, setPreviousClassTouched] = useState(false)
 
   const DRAFT_KEY = `schooly-preenroll-draft-${schoolId}`
 
   const selectedGrade = gradeLevels.find((level) => level.id === selectedGradeLevel)
+  const previousClassLevel = gradeLevels.find((level) => level.id === previousClass)
 
   const applicableDocuments = requiredDocuments.filter(
     (doc) => !doc.applicable_to_level_id || doc.applicable_to_level_id === selectedGradeLevel
@@ -131,6 +136,10 @@ export default function PreEnrollmentForm({
         setSameEmergencyContact(d.sameEmergencyContact !== false)
         setEmergencyName(str(d.emergencyName))
         setEmergencyPhone(str(d.emergencyPhone))
+        setFirstEnrollment(d.firstEnrollment === true)
+        setPreviousSchool(str(d.previousSchool))
+        setPreviousClass(str(d.previousClass))
+        setPreviousClassTouched(Boolean(str(d.previousClass)))
         setSelectedGradeLevel(str(d.gradeLevelId))
         setDraftRestored(true)
       }
@@ -155,6 +164,7 @@ export default function PreEnrollmentForm({
         guardianRelation ||
         guardianRelationDetail ||
         (sameEmergencyContact ? false : emergencyName || emergencyPhone) ||
+        (!firstEnrollment ? previousSchool || previousClass : false) ||
         selectedGradeLevel
       if (!hasAnything) {
         window.localStorage.removeItem(DRAFT_KEY)
@@ -174,6 +184,9 @@ export default function PreEnrollmentForm({
           sameEmergencyContact,
           emergencyName,
           emergencyPhone,
+          firstEnrollment,
+          previousSchool,
+          previousClass,
           gradeLevelId: selectedGradeLevel,
         })
       )
@@ -194,6 +207,9 @@ export default function PreEnrollmentForm({
     sameEmergencyContact,
     emergencyName,
     emergencyPhone,
+    firstEnrollment,
+    previousSchool,
+    previousClass,
     selectedGradeLevel,
   ])
 
@@ -213,6 +229,10 @@ export default function PreEnrollmentForm({
     setSameEmergencyContact(true)
     setEmergencyName("")
     setEmergencyPhone("")
+    setFirstEnrollment(false)
+    setPreviousSchool("")
+    setPreviousClass("")
+    setPreviousClassTouched(false)
     setSelectedGradeLevel("")
     setDraftRestored(false)
     try {
@@ -399,7 +419,16 @@ export default function PreEnrollmentForm({
             <Label htmlFor="gradeLevelId">Niveau souhaité *</Label>
             <Select
               value={selectedGradeLevel}
-              onValueChange={setSelectedGradeLevel}
+              onValueChange={(value) => {
+                setSelectedGradeLevel(value)
+                // Suggestion intelligente : la classe juste avant le niveau
+                // souhaité, tant que l'utilisateur n'a pas déjà choisi lui-même.
+                const target = gradeLevels.find((level) => level.id === value)
+                const suggestion = target
+                  ? gradeLevels.find((level) => level.level === target.level - 1)
+                  : undefined
+                if (!previousClassTouched) setPreviousClass(suggestion ? suggestion.id : "")
+              }}
               name="gradeLevelId"
               required
               displayLabel={selectedGrade ? `${selectedGrade.name} — ${selectedGrade.cycle}` : undefined}
@@ -415,6 +444,71 @@ export default function PreEnrollmentForm({
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="space-y-3 rounded-lg border p-4">
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={firstEnrollment}
+                onChange={(e) => setFirstEnrollment(e.target.checked)}
+                disabled={loading}
+                className="h-4 w-4 mt-0.5"
+              />
+              <span className="text-sm flex items-center gap-2">
+                <School className="h-4 w-4 text-primary shrink-0" />
+                Première scolarisation — l'élève n'a jamais été scolarisé
+              </span>
+            </label>
+
+            {!firstEnrollment && (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="previousSchool">École précédente *</Label>
+                  <Input
+                    id="previousSchool"
+                    name="previousSchool"
+                    required
+                    disabled={loading}
+                    placeholder="Ex. : EPP Bingerville 1"
+                    value={previousSchool}
+                    onChange={(e) => setPreviousSchool(capitalizeWords(e.target.value))}
+                    className="min-h-11"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="previousClass">Dernière classe fréquentée *</Label>
+                  <Select
+                    value={previousClass}
+                    onValueChange={(value) => {
+                      setPreviousClass(value)
+                      setPreviousClassTouched(true)
+                    }}
+                    name="previousClass"
+                    required
+                    displayLabel={
+                      previousClassLevel
+                        ? `${previousClassLevel.name} — ${previousClassLevel.cycle}`
+                        : undefined
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Sélectionner la classe" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {gradeLevels.map((level) => (
+                        <SelectItem key={level.id} value={level.id}>
+                          {level.name} — {level.cycle}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Pré-rempli avec la classe juste avant le niveau souhaité — modifiez si l'école précédente nomme différemment.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
 
           {checklistItems.length > 0 && (
@@ -656,6 +750,7 @@ export default function PreEnrollmentForm({
               !guardianRelation ||
               (guardianRelation === "Autre" && !guardianRelationDetail.trim()) ||
               (!sameEmergencyContact && (!emergencyName.trim() || !emergencyPhone.trim())) ||
+              (!firstEnrollment && (!previousSchool.trim() || !previousClass)) ||
               requiredChecklistMissing ||
               requiredDocumentsMissing
             }

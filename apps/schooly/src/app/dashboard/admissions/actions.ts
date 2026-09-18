@@ -64,6 +64,8 @@ export async function createPreEnrollment(formData: FormData): Promise<ActionRes
   const guardianRelation = ((formData.get("guardianRelation") as string) || "").trim()
   const emergencyContactName = ((formData.get("emergencyContactName") as string) || "").trim()
   const emergencyContactPhone = ((formData.get("emergencyContactPhone") as string) || "").trim()
+  const previousSchool = ((formData.get("previousSchool") as string) || "").trim()
+  const previousClass = ((formData.get("previousClass") as string) || "").trim()
   const paymentMethodId = (formData.get("paymentMethodId") as string) || null
   const paymentReference = ((formData.get("paymentReference") as string) || "").trim() || null
   const acceptedChecklist = parseIdList(formData.get("acceptedChecklist") as string | null)
@@ -77,6 +79,11 @@ export async function createPreEnrollment(formData: FormData): Promise<ActionRes
   }
   if (!emergencyContactName || !emergencyContactPhone) {
     return { error: "Le contact d'urgence (nom et téléphone) est requis." }
+  }
+  // L'élève peut être en première scolarisation (rien à déclarer) ou venir
+  // d'un autre établissement — dans ce cas, école ET dernière classe ensemble.
+  if ((previousSchool && !previousClass) || (!previousSchool && previousClass)) {
+    return { error: "L'école précédente et la dernière classe fréquentée vont ensemble." }
   }
 
   const admin = adminClient()
@@ -147,6 +154,8 @@ export async function createPreEnrollment(formData: FormData): Promise<ActionRes
     guardian_relation: guardianRelation,
     emergency_contact_name: emergencyContactName,
     emergency_contact_phone: emergencyContactPhone,
+    previous_school: previousSchool || null,
+    previous_class: previousClass || null,
     birth_certificate_number: birthCertificateNumber,
     payment_method: paymentMethod,
     payment_reference: paymentReference,
@@ -454,6 +463,8 @@ export async function validatePreEnrollment(
     last_name: preEnrollment.last_name,
     date_of_birth: preEnrollment.date_of_birth,
     birth_certificate_number: preEnrollment.birth_certificate_number || null,
+    previous_school: (preEnrollment.previous_school as string | null) || null,
+    previous_class: (preEnrollment.previous_class as string | null) || null,
     status: "active",
   })
   if (studentError) return { error: studentError.message }
