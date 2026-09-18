@@ -6,35 +6,28 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Select } from "@/components/ui/select"
 import {
   BookOpen,
-  Users,
-  GraduationCap,
   ClipboardList,
-  Plus,
   Calendar,
   FileText,
-  AlertCircle,
 } from "lucide-react"
-import { ActionForm } from "@/components/action-form"
 import {
   getCourseSessions,
-  createCourseSession,
   getHomeworks,
-  createHomework,
   getAcademicDecisions,
-  createAcademicDecision,
   getClassesForSchool,
   getSubjectsForSchool,
   getTeachersForSchool,
   getAcademicYearsForSchool,
+  getEnrollmentsForSchool,
   type CourseSessionRow,
   type HomeworkRow,
   type AcademicDecisionRow,
 } from "./actions"
+import { CreateSessionModal } from "./session-modal"
+import { CreateHomeworkModal } from "./homework-modal"
+import { CreateDecisionModal } from "./decision-modal"
 import { useSupabaseUser } from "@/hooks/use-supabase-user"
 import { IntelligentGuidance } from "@/components/intelligent-guidance"
 
@@ -54,7 +47,9 @@ export default function PedagogieDashboard() {
   const [subjects, setSubjects] = useState<{ id: string; name: string }[]>([])
   const [teachers, setTeachers] = useState<{ id: string; full_name: string }[]>([])
   const [academicYears, setAcademicYears] = useState<{ id: string; label: string; status: string }[]>([])
+  const [enrollments, setEnrollments] = useState<Array<{ id: string; label: string }>>([])
   const [loadingData, setLoadingData] = useState(true)
+  const [refreshKey, setRefreshKey] = useState(0)
 
   const currentYear = academicYears.find(y => y.status === "en_cours")
   const plannedYear = academicYears.find(y => y.status === "planifiee")
@@ -86,11 +81,19 @@ export default function PedagogieDashboard() {
       const yearsRes = await getAcademicYearsForSchool()
       if (yearsRes.data) setAcademicYears(yearsRes.data)
 
+      const enrollRes = await getEnrollmentsForSchool()
+      if (enrollRes.data) {
+        setEnrollments((enrollRes.data as any[]).map((e: any) => ({
+          id: e.id,
+          label: `${e.students?.last_name ?? ""} ${e.students?.first_name ?? ""}${e.classes?.name ? ` — ${e.classes.name}` : ""}`.trim(),
+        })))
+      }
+
       setLoadingData(false)
     }
 
     loadAllData()
-  }, [user])
+  }, [user, refreshKey])
 
   const formatDate = (dateStr: string) => {
     const d = new Date(dateStr)
@@ -124,9 +127,6 @@ export default function PedagogieDashboard() {
             Gestion des cours, appels, notes et bulletins pour l&apos;année académique en cours.
           </p>
         </div>
-        {(user?.role === "professeur" || user?.role === "direction") && (
-          <Button><Plus className="h-4 w-4 mr-2" />Nouveau cours</Button>
-        )}
       </div>
 
       {!currentYear && (
@@ -173,12 +173,25 @@ export default function PedagogieDashboard() {
 
         <TabsContent value="sessions" className="space-y-4">
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="h-5 w-5" />
-                Sessions de cours
-              </CardTitle>
-              <CardDescription>Planning des cours programmés pour cette période.</CardDescription>
+            <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Calendar className="h-5 w-5" />
+                  Sessions de cours
+                </CardTitle>
+                <CardDescription>Planning des cours programmés pour cette période.</CardDescription>
+              </div>
+              {(user?.role === "professeur" || user?.role === "direction") && (
+                <CreateSessionModal
+                  classes={classes}
+                  subjects={subjects}
+                  teachers={teachers}
+                  years={academicYears}
+                  currentYearId={currentYear?.id}
+                  defaultTeacherId={user?.id}
+                  onSuccess={() => setRefreshKey((k) => k + 1)}
+                />
+              )}
             </CardHeader>
             <CardContent>
               {sessions.length === 0 ? (
@@ -220,75 +233,25 @@ export default function PedagogieDashboard() {
               )}
             </CardContent>
           </Card>
-
-          {(user?.role === "professeur" || user?.role === "direction") && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Plus className="h-5 w-5" />
-                  Planifier une session
-                </CardTitle>
-                <CardDescription>Programmez un nouveau cours pour vos élèves.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ActionForm action={createCourseSession} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                  <div className="space-y-1">
-                    <Label htmlFor="classId">Classe</Label>
-                    <Select id="classId" name="classId" required>
-                      <option value="">Sélectionner</option>
-                      {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                    </Select>
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="subjectId">Matière</Label>
-                    <Select id="subjectId" name="subjectId" required>
-                      <option value="">Sélectionner</option>
-                      {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                    </Select>
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="teacherId">Professeur</Label>
-                    <Select id="teacherId" name="teacherId" required defaultValue={user?.id}>
-                      <option value="">Sélectionner</option>
-                      {teachers.map(t => <option key={t.id} value={t.id}>{t.full_name}</option>)}
-                    </Select>
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="academicYearId">Année</Label>
-                    <Select id="academicYearId" name="academicYearId" required defaultValue={currentYear?.id}>
-                      <option value="">Sélectionner</option>
-                      {academicYears.map(y => <option key={y.id} value={y.id}>{y.label}</option>)}
-                    </Select>
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="startsAt">Heure de début</Label>
-                    <Input id="startsAt" name="startsAt" type="datetime-local" required />
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="endsAt">Heure de fin</Label>
-                    <Input id="endsAt" name="endsAt" type="datetime-local" required />
-                  </div>
-                  <div className="space-y-1 sm:col-span-2">
-                    <Label htmlFor="room">Salle (optionnel)</Label>
-                    <Input id="room" name="room" placeholder="Ex: Salle 101" />
-                  </div>
-                  <Button type="submit" className="sm:col-span-2">
-                    <Plus className="h-4 w-4 mr-2" />Planifier
-                  </Button>
-                </ActionForm>
-              </CardContent>
-            </Card>
-          )}
         </TabsContent>
 
         <TabsContent value="homeworks" className="space-y-4">
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <BookOpen className="h-5 w-5" />
-                Cahier de texte
-              </CardTitle>
-              <CardDescription>Devoirs et travaux assignés aux élèves.</CardDescription>
+            <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <BookOpen className="h-5 w-5" />
+                  Cahier de texte
+                </CardTitle>
+                <CardDescription>Devoirs et travaux assignés aux élèves.</CardDescription>
+              </div>
+              {(user?.role === "professeur" || user?.role === "direction") && (
+                <CreateHomeworkModal
+                  classes={classes}
+                  subjects={subjects}
+                  onSuccess={() => setRefreshKey((k) => k + 1)}
+                />
+              )}
             </CardHeader>
             <CardContent>
               {homeworks.length === 0 ? (
@@ -337,65 +300,26 @@ export default function PedagogieDashboard() {
               )}
             </CardContent>
           </Card>
-
-          {(user?.role === "professeur" || user?.role === "direction") && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Plus className="h-5 w-5" />
-                  Ajouter un devoir
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ActionForm action={createHomework} className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-1">
-                    <Label htmlFor="homeworkClassId">Classe</Label>
-                    <Select id="homeworkClassId" name="classId" required>
-                      <option value="">Sélectionner</option>
-                      {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                    </Select>
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="homeworkSubjectId">Matière</Label>
-                    <Select id="homeworkSubjectId" name="subjectId" required>
-                      <option value="">Sélectionner</option>
-                      {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                    </Select>
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="title">Titre du devoir</Label>
-                    <Input id="title" name="title" placeholder="Ex: Exercices sur les fractions" required />
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="dueDate">Date d&apos;échéance</Label>
-                    <Input id="dueDate" name="dueDate" type="date" required />
-                  </div>
-                  <div className="space-y-1 sm:col-span-2">
-                    <Label htmlFor="description">Description (optionnel)</Label>
-                    <textarea
-                      id="description"
-                      name="description"
-                      className="h-20 rounded-md border border-input bg-background px-3 py-2 text-sm resize-none"
-                      placeholder="Instructions détaillées pour les élèves..."
-                    />
-                  </div>
-                  <Button type="submit" className="sm:col-span-2">
-                    <Plus className="h-4 w-4 mr-2" />Créer le devoir
-                  </Button>
-                </ActionForm>
-              </CardContent>
-            </Card>
-          )}
         </TabsContent>
 
         <TabsContent value="decisions" className="space-y-4">
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <ClipboardList className="h-5 w-5" />
-                Décisions du conseil de classe
-              </CardTitle>
-              <CardDescription>Admissions, redoublements et exclusions validées.</CardDescription>
+            <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <ClipboardList className="h-5 w-5" />
+                  Décisions du conseil de classe
+                </CardTitle>
+                <CardDescription>Admissions, redoublements et exclusions validées.</CardDescription>
+              </div>
+              {(user?.role === "direction" || user?.role === "super_admin") && (
+                <CreateDecisionModal
+                  students={enrollments}
+                  years={academicYears}
+                  currentYearId={currentYear?.id}
+                  onSuccess={() => setRefreshKey((k) => k + 1)}
+                />
+              )}
             </CardHeader>
             <CardContent>
               {decisions.length === 0 ? (
@@ -437,68 +361,6 @@ export default function PedagogieDashboard() {
               )}
             </CardContent>
           </Card>
-
-          {(user?.role === "direction" || user?.role === "super_admin") && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Plus className="h-5 w-5" />
-                  Enregistrer une décision
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ActionForm action={createAcademicDecision} className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-1">
-                    <Label>Décision</Label>
-                    <div className="flex gap-2">
-                      {["admitted", "repeated", "excluded", "pending"].map(d => (
-                        <label key={d} className="flex-1 cursor-pointer">
-                          <input
-                            type="radio"
-                            name="decision"
-                            value={d}
-                            className="sr-only"
-                          />
-                          <div className={`p-3 rounded-lg border-2 text-center text-sm font-medium transition-colors ${d === "admitted" ? "border-green-500 bg-green-50 text-green-700" : d === "repeated" ? "border-orange-500 bg-orange-50 text-orange-700" : d === "excluded" ? "border-red-500 bg-red-50 text-red-700" : "border-gray-300 bg-gray-50 text-gray-600"}`}>
-                            {d === "admitted" ? "Admis" : d === "repeated" ? "Redouble" : d === "excluded" ? "Exclu" : "En attente"}
-                          </div>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="decisionEnrollmentId">Élève</Label>
-                    <Select id="decisionEnrollmentId" name="enrollmentId" required>
-                      <option value="">Sélectionner un élève</option>
-                    </Select>
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="decisionYearId">Année académique</Label>
-                    <Select id="decisionYearId" name="academicYearId" required defaultValue={currentYear?.id}>
-                      <option value="">Sélectionner</option>
-                      {academicYears.map(y => <option key={y.id} value={y.id}>{y.label}</option>)}
-                    </Select>
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="average">Moyenne générale (optionnel)</Label>
-                    <Input id="average" name="average" type="number" step="0.01" min="0" max="20" placeholder="Ex: 12.50" />
-                  </div>
-                  <div className="space-y-1 sm:col-span-2">
-                    <Label htmlFor="observations">Observations</Label>
-                    <textarea
-                      id="observations"
-                      name="observations"
-                      className="h-20 rounded-md border border-input bg-background px-3 py-2 text-sm resize-none"
-                      placeholder="Observations du conseil de classe..."
-                    />
-                  </div>
-                  <Button type="submit" className="sm:col-span-2">
-                    <Plus className="h-4 w-4 mr-2" />Enregistrer la décision
-                  </Button>
-                </ActionForm>
-              </CardContent>
-            </Card>
-          )}
         </TabsContent>
       </Tabs>
     </div>
