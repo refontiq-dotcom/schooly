@@ -6,15 +6,13 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { useSupabaseUser } from "@/hooks/use-supabase-user"
-import { ActionForm } from "@/components/action-form"
 import {
   getMoratoriums,
   reviewMoratorium,
 } from "@/app/dashboard/finance/moratoriums/actions"
 import { getEnrollments } from "@/app/dashboard/admissions/actions"
 import { toast } from "sonner"
-import { CheckCircle2, XCircle } from "lucide-react"
-import { AddMoratoriumModal } from "./add-moratorium-modal"
+import { AddMoratoriumModal } from "./add-moratorium-modal"\nimport { ReviewMoratoriumModal } from "./review-moratorium-modal"
 
 type Moratorium = {
   id: string
@@ -172,22 +170,16 @@ export default function MoratoriumsPage() {
                      m.status === "rejected" ? "Rejeté" : m.status}
                   </Badge>
                   {m.status === "pending" && (
-                    <div className="flex gap-1">
-                      <ActionForm action={handleReviewMoratorium} className="flex items-center gap-1">
-                        <input type="hidden" name="moratoriumId" value={m.id} />
-                        <input type="hidden" name="action" value="approve" />
-                        <Button type="submit" size="sm" variant="ghost" className="h-8 w-8 p-0">
-                          <CheckCircle2 className="h-4 w-4 text-green-600" />
-                        </Button>
-                      </ActionForm>
-                      <ActionForm action={handleReviewMoratorium} className="flex items-center gap-1">
-                        <input type="hidden" name="moratoriumId" value={m.id} />
-                        <input type="hidden" name="action" value="reject" />
-                        <Button type="submit" size="sm" variant="ghost" className="h-8 w-8 p-0">
-                          <XCircle className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </ActionForm>
-                    </div>
+                    <ReviewMoratoriumModal
+                      moratorium={{
+                        id: m.id,
+                        requested_amount: m.requested_amount,
+                        reason: m.reason,
+                        due_date: m.due_date,
+                        student: `${m.enrollments?.students?.last_name ?? ""} ${m.enrollments?.students?.first_name ?? ""}`.trim(),
+                      }}
+                      onSuccess={() => { void refreshMoratoriums() }}
+                    />
                   )}
                 </div>
               </div>
