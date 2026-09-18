@@ -43,6 +43,7 @@ export type DeniedReason =
   | "NO_SCHOOL" // authentifié mais sans rattachement actif
   | "FORBIDDEN_ROLE" // rôle hors de la liste autorisée
   | "CROSS_TENANT" // school_id demandé ≠ école de la session
+  | "SERVER_ERROR" // échec SQL de lecture du rattachement (ex. 42501 GRANT manquant)
 
 export type GuardOutcome =
   | { ok: true; context: AuthContext }
@@ -53,6 +54,7 @@ export const ERROR_BY_REASON: Record<DeniedReason, string> = {
   NO_SCHOOL: "Aucune école rattachée",
   FORBIDDEN_ROLE: "Action réservée à un rôle supérieur.",
   CROSS_TENANT: "Accès non autorisé.",
+  SERVER_ERROR: "Erreur serveur — réessayez.",
 }
 
 export type RequireRoleOptions = {
@@ -105,13 +107,24 @@ export async function requireSchoolRole(
   } = await supabase.auth.getUser()
   if (!user) return { ok: false, reason: "UNAUTHENTICATED" }
 
-  const { data: role } = (await supabase
+  const { data: role, error: roleError } = (await supabase
     .from("user_school_roles")
     .select("school_id, role_code")
     .eq("user_id", user.id)
     .eq("is_active", true)
     .limit(1)
     .maybeSingle()) as RoleQueryResult & { error?: unknown }
+
+  // Une erreur SQL (ex. 42501 permission denied : GRANT authenticated manquant)
+  // n'est PAS « pas d'école » : la masquer en NO_SCHOOL fait accuser à tort le
+  // compte utilisateur au lieu du schéma. On la logge et on la distingue.
+  if (roleError) {
+    console.error(
+      "[requireSchoolRole] lecture user_school_roles échouée :",
+      roleError
+    )
+    return { ok: false, reason: "SERVER_ERROR" }
+  }
 
   if (!role?.school_id) return { ok: false, reason: "NO_SCHOOL" }
 
