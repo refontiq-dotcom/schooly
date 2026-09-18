@@ -8,6 +8,7 @@ import {
   CalendarDays,
   Clock,
   ShieldCheck,
+  Clock,
   Settings,
   LogOut,
   ChevronLeft,

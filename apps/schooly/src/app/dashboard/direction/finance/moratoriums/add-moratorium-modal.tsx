@@ -29,15 +29,35 @@ export function AddMoratoriumModal({
   enrollments: Array<{ id: string; matricule: string | null; label: string }>
   onSuccess?: () => void
 }) {
-  const [open, setOpen] = useState(false)\n  const [context, setContext] = useState<{ balance:number; active:boolean } | null>(null)
+  const [open, setOpen] = useState(false)
+  const [context, setContext] = useState<{ balance: number; active: boolean } | null>(null)
+  const [submitted, setSubmitted] = useState(0)
 
-  async function handleSelect(enrollmentId: string) {\n    if (!enrollmentId) { setContext(null); return }\n    const result = await getMoratoriumContext(enrollmentId)\n    if (result.error) { toast.error(result.error); setContext(null); return }\n    setContext({ balance: Number(result.data?.enrollment?.fee_balance ?? 0), active: Boolean(result.data?.active) })\n  }\n\n  async function handleSubmit(formData: FormData) {
+  async function handleSelect(enrollmentId: string) {
+    if (!enrollmentId) {
+      setContext(null)
+      return
+    }
+    const result = await getMoratoriumContext(enrollmentId)
+    if (result.error) {
+      toast.error(result.error)
+      setContext(null)
+      return
+    }
+    setContext({
+      balance: Number(result.data?.enrollment?.fee_balance ?? 0),
+      active: Boolean(result.data?.active),
+    })
+  }
+
+  async function handleSubmit(formData: FormData) {
     const result = await createMoratorium(formData)
     if (result?.error) {
       toast.error(result.error)
       return
     }
     toast.success("Demande enregistrée — en attente d'arbitrage par la direction.")
+    setSubmitted((c) => c + 1)
     setOpen(false)
     onSuccess?.()
   }
@@ -56,7 +76,7 @@ export function AddMoratoriumModal({
           </DialogDescription>
         </DialogHeader>
         <DialogContent>
-          <ActionForm action={handleSubmit}>
+          <ActionForm action={handleSubmit} key={submitted}>
             <div className="space-y-4">
               <div className="space-y-1">
                 <Label htmlFor="mor-enrollment">Élève *</Label>
@@ -67,6 +87,13 @@ export function AddMoratoriumModal({
                   ))}
                 </select>
               </div>
+              {context && (
+                <p className={`text-xs rounded-md px-3 py-2 border ${context.active ? "border-orange-300 bg-orange-50 text-orange-800 dark:border-orange-800 dark:bg-orange-950/30 dark:text-orange-200" : "border-input bg-muted text-muted-foreground"}`}>
+                  {context.active
+                    ? "Un moratoire est déjà en cours pour cet élève."
+                    : `Solde actuel de l'élève : ${context.balance.toLocaleString("fr-FR")} FCFA`}
+                </p>
+              )}
               <div className="space-y-1">
                 <Label htmlFor="mor-reason">Motif *</Label>
                 <Input id="mor-reason" name="reason" required placeholder="Ex : difficultés temporaires…" />

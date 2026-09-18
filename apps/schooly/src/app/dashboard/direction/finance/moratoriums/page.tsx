@@ -10,7 +10,8 @@ import {
   getMoratoriums,
 } from "@/app/dashboard/finance/moratoriums/actions"
 import { getEnrollments } from "@/app/dashboard/admissions/actions"
-import { AddMoratoriumModal } from "./add-moratorium-modal"\nimport { ReviewMoratoriumModal } from "./review-moratorium-modal"
+import { AddMoratoriumModal } from "./add-moratorium-modal"
+import { ReviewMoratoriumModal } from "./review-moratorium-modal"
 
 type Moratorium = {
   id: string
@@ -74,4 +75,107 @@ export default function MoratoriumsPage() {
     if (res.data) setMoratoriums(res.data as Moratorium[])
   }
 
+  const pendingMoratoriums = moratoriums.filter(m => m.status === "pending")
 
+  if (loading) return <div className="p-6 text-center text-muted-foreground">Chargement...</div>
+
+  return (
+    <div className="p-6 space-y-6">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Moratoires</h1>
+          <p className="text-muted-foreground text-sm mt-1">
+            Demandes de report de paiement ({moratoriums.length})
+          </p>
+        </div>
+        <AddMoratoriumModal
+          enrollments={enrollments.map((e) => ({
+            id: e.id,
+            matricule: e.matricule ?? null,
+            label: `${e.matricule ? `${e.matricule} — ` : ""}${e.students?.last_name ?? ""} ${e.students?.first_name ?? ""}`.trim(),
+          }))}
+          onSuccess={() => { void refreshMoratoriums() }}
+        />
+      </div>
+
+      {/* Statistiques */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card>
+          <CardContent className="pt-5">
+            <p className="text-sm text-muted-foreground">En attente</p>
+            <p className="text-2xl font-bold mt-1">{pendingMoratoriums.length}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-5">
+            <p className="text-sm text-muted-foreground">Approuvés</p>
+            <p className="text-2xl font-bold mt-1">{moratoriums.filter(m => m.status === "approved").length}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-5">
+            <p className="text-sm text-muted-foreground">Rejetés</p>
+            <p className="text-2xl font-bold mt-1">{moratoriums.filter(m => m.status === "rejected").length}</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Liste des moratoires */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Demandes de moratoire</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2">
+            {moratoriums.map(m => (
+              <div key={m.id} className="flex items-center justify-between p-4 rounded-lg border">
+                <div className="space-y-1">
+                  <p className="font-medium">
+                    {m.enrollments?.students?.last_name} {m.enrollments?.students?.first_name}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Tuteur: {m.enrollments?.guardians?.full_name} · {m.enrollments?.guardians?.phone}
+                  </p>
+                  <p className="text-xs text-muted-foreground">{m.reason}</p>
+                  <div className="flex items-center gap-2 text-xs">
+                    <span>Demandé: {m.requested_amount.toLocaleString("fr-FR")} FCFA</span>
+                    {m.approved_amount && (
+                      <span>Approuvé: {m.approved_amount.toLocaleString("fr-FR")} FCFA</span>
+                    )}
+                    <span>Échéance: {m.due_date}</span>
+                  </div>
+                </div>
+                <div className="flex flex-col items-end gap-2">
+                  <Badge variant={
+                    m.status === "pending" ? "secondary" :
+                    m.status === "approved" ? "default" :
+                    m.status === "rejected" ? "destructive" : "outline"
+                  }>
+                    {m.status === "pending" ? "En attente" :
+                     m.status === "approved" ? "Approuvé" :
+                     m.status === "rejected" ? "Rejeté" : m.status}
+                  </Badge>
+                  {m.status === "pending" && (
+                    <ReviewMoratoriumModal
+                      moratorium={{
+                        id: m.id,
+                        requested_amount: m.requested_amount,
+                        reason: m.reason,
+                        due_date: m.due_date,
+                        student: `${m.enrollments?.students?.last_name ?? ""} ${m.enrollments?.students?.first_name ?? ""}`.trim(),
+                      }}
+                      onSuccess={() => { void refreshMoratoriums() }}
+                    />
+                  )}
+                </div>
+              </div>
+            ))}
+            {moratoriums.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-4">Aucune demande de moratoire.</p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
