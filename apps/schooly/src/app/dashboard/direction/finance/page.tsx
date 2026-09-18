@@ -8,9 +8,11 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ActionForm } from "@/components/action-form"
-import { getFinanceOverview, getFinanceConfig, generateMissingFeeItems, applySiblingDiscounts, generateDueReminders } from "@/app/dashboard/finance/actions"
-import { SIBLING_DEFAULT_RATE } from "@/lib/discounts"
+import { getFinanceOverview, getFinanceConfig, generateMissingFeeItems, generateDueReminders } from "@/app/dashboard/finance/actions"
 import { FeeScheduleManager, type ScheduleRow } from "./fee-schedule-manager"
+import { AddFeeScheduleModal } from "./add-fee-schedule-modal"
+import { DuplicateFeeScheduleModal } from "./duplicate-fee-schedule-modal"
+import { SiblingDiscountModal } from "./sibling-discount-modal"
 import { AlertTriangle, CalendarClock, Landmark, PieChart, Wallet } from "lucide-react"
 
 export default async function FinancePage() {
@@ -189,12 +191,27 @@ export default async function FinancePage() {
 
       {/* Gestion de la grille tarifaire (ajout / duplication / suppression) */}
       {config ? (
-        <FeeScheduleManager
-          schedules={config.schedules as ScheduleRow[]}
-          profiles={config.profiles}
-          gradeLevels={config.gradeLevels}
-          years={config.years}
-        />
+        <Card>
+          <CardHeader className="flex flex-row items-start justify-between gap-3">
+            <div>
+              <CardTitle className="text-base">Grille tarifaire ({config.schedules.length} ligne(s))</CardTitle>
+              <CardDescription>
+                Niveau × profil financier × année. Les tarifs servent à générer le « dû » de chaque élève.
+              </CardDescription>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <AddFeeScheduleModal
+                profiles={config.profiles}
+                gradeLevels={config.gradeLevels}
+                years={config.years}
+              />
+              <DuplicateFeeScheduleModal years={config.years} />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <FeeScheduleManager schedules={config.schedules} />
+          </CardContent>
+        </Card>
       ) : (
         <Card>
           <CardContent className="pt-5">
@@ -215,27 +232,12 @@ export default async function FinancePage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <ActionForm action={applySiblingDiscounts} className="flex flex-wrap items-end gap-3">
-                <input type="hidden" name="academicYearId" value={config.years[0]?.id ?? ""} />
-                <div className="space-y-1">
-                  <Label htmlFor="siblingRate">Taux appliqué par l&apos;établissement (%)</Label>
-                  <Input
-                    id="siblingRate"
-                    name="rate"
-                    type="number"
-                    min="1"
-                    max="50"
-                    required
-                    placeholder={String(SIBLING_DEFAULT_RATE)}
-                    className="w-28"
-                    aria-describedby="siblingRateHint"
-                  />
-                  <p id="siblingRateHint" className="text-xs text-muted-foreground">
-                    À saisir à chaque application (1 à 50 %). Laisser vide = aucune remise.
-                  </p>
-                </div>
-                <Button type="submit" variant="secondary">Appliquer les remises fratrie</Button>
-              </ActionForm>
+              <div className="flex flex-wrap items-center gap-3">
+                <SiblingDiscountModal academicYearId={config.years[0]?.id ?? ""} />
+                <span className="text-xs text-muted-foreground">
+                  Parents de 2+ enfants → remise au 2e et suivants.
+                </span>
+              </div>
             </CardContent>
           </Card>
           <Card>
@@ -246,9 +248,14 @@ export default async function FinancePage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <ActionForm action={generateDueReminders}>
-                <Button type="submit" variant="secondary">Générer les relances du jour</Button>
-              </ActionForm>
+              <div className="flex flex-wrap items-center gap-3">
+                <ActionForm action={generateDueReminders}>
+                  <Button type="submit" variant="secondary">Générer les relances du jour</Button>
+                </ActionForm>
+                <Button type="button" variant="ghost" size="sm" asChild>
+                  <a href="/dashboard/direction/finance/reminders">Voir l&apos;historique</a>
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -280,6 +287,9 @@ export default async function FinancePage() {
               </div>
               <Button type="submit" variant="secondary">Générer les échéanciers manquants</Button>
             </ActionForm>
+            <Button type="button" variant="ghost" size="sm" asChild>
+              <a href="/dashboard/direction/finance/moratoriums">Gérer les moratoires</a>
+            </Button>
           </CardContent>
         </Card>
       )}

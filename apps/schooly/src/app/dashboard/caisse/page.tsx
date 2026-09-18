@@ -5,26 +5,17 @@ import { createClient } from "@/utils/supabase/browser"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { useSupabaseUser } from "@/hooks/use-supabase-user"
-import { ActionForm } from "@/components/action-form"
 import {
-  createPayment,
   getPayments,
   getOpenCashSession,
   getStudentBalances,
 } from "@/app/dashboard/finance/actions"
 import { getEnrollments } from "@/app/dashboard/admissions/actions"
-import { toast } from "sonner"
-import { CreditCard, Search, Wallet } from "lucide-react"
+import { PayModal } from "./pay-modal"
+import { OpenSessionModal } from "./open-session-modal"
+import { Search, ShieldCheck } from "lucide-react"
 
 type Enrollment = {
   id: string
@@ -54,209 +45,214 @@ type CashSession = {
   opened_at: string
 }
 
+type BalanceInfo = {
+  balance: number
+  hasFeeItems: boolean
+  nextDueAmount: number | null
+  nextDueDate: string | null
+}
+
 export default function CaissePage() {
   const user = useSupabaseUser()
-  const [schoolId, setSchoolId] = useState<string>("")
   const [enrollments, setEnrollments] = useState<Enrollment[]>([])
   const [payments, setPayments] = useState<Payment[]>([])
   const [session, setSession] = useState<CashSession | null>(null)
+  const [balanceByEnrollment, setBalanceByEnrollment] = useState<Record<string, BalanceInfo>>({})
   const [search, setSearch] = useState("")
   const [loading, setLoading] = useState(false)
-  const [selectedEnrollment, setSelectedEnrollment] = useState("")
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState("")
-  const [balances, setBalances] = useState<Record<string, number>>({})
-  const [amount, setAmount] = useState("")
+  const [refreshKey, setRefreshKey] = useState(0)
 
   useEffect(() => {
     if (!user) return
+    let cancelled = false
     const fetchData = async () => {
       setLoading(true)
-      const supabase = await createClient()
-      const { data: { user: authUser } } = await supabase.auth.getUser()
-      if (!authUser) return
+      try {
+        const supabase = await createClient()
+        const { data: { user: authUser } } = await supabase.auth.getUser()
+        if (!authUser || cancelled) return
 
-      // Lecture du rattachement via le client navigateur (session utilisateur,
-      // politique RLS usr_read) — jamais de clé service role côté client.
-      const { data: roleData } = await supabase
-        .from("user_school_roles")
-        .select("school_id")
-        .eq("user_id", authUser.id)
-        .eq("is_active", true)
-        .limit(1)
-        .single()
+        // Lecture du rattachement via le client navigateur (session utilisateur,
+        // politique RLS usr_read) — jamais de clé service role côté client.
+        const { data: roleData } = await supabase
+          .from("user_school_roles")
+          .select("school_id")
+          .eq("user_id", authUser.id)
+          .eq("is_active", true)
+          .limit(1)
+          .single()
 
-      if (!roleData?.school_id) return
-      setSchoolId(roleData.school_id)
+        if (!roleData?.school_id || cancelled) return
 
-      const [enrollRes, payRes, sessionRes, balancesRes] = await Promise.all([
-        getEnrollments(roleData.school_id),
-        getPayments(roleData.school_id),
-        getOpenCashSession(roleData.school_id),
-        getStudentBalances(roleData.school_id),
-      ])
+        const [enrollRes, payRes, sessionRes, balancesRes] = await Promise.all([
+          getEnrollments(roleData.school_id),
+          getPayments(roleData.school_id),
+          getOpenCashSession(roleData.school_id),
+          getStudentBalances(roleData.school_id),
+        ])
 
-      if (enrollRes.data) {
-        const mapped = (enrollRes.data as any[]).map((e: any) => ({
-          id: e.id,
-          matricule: e.matricule,
-          students: e.students,
-          guardians: e.guardians,
-          grade_levels: e.grade_levels,
-        }))
-        setEnrollments(mapped)
+        if (cancelled) return
+        if (enrollRes.data) {
+          setEnrollments((enrollRes.data as any[]).map((e: any) => ({
+            id: e.id,
+            matricule: e.matricule ?? null,
+            students: e.students,
+            guardians: e.guardians,
+            grade_levels: e.grade_levels,
+          })))
+        }
+        if (payRes.data) setPayments(payRes.data as Payment[])
+        if (sessionRes.data) setSession(sessionRes.data as CashSession)
+        if (balancesRes.data) {
+          const map: Record<string, BalanceInfo> = {}
+          for (const row of balancesRes.data as any[]) {
+            map[row.enrollment_id] = {
+              balance: Number(row.balance ?? 0),
+              hasFeeItems: Boolean(row.has_fee_items),
+              nextDueAmount: row.next_due_amount != null ? Number(row.next_due_amount) : null,
+              nextDueDate: row.next_due_date ?? null,
+            }
+          }
+          setBalanceByEnrollment(map)
+        }
+      } finally {
+        if (!cancelled) setLoading(false)
       }
-      if (payRes.data) setPayments(payRes.data as Payment[])
-      if (sessionRes.data) setSession(sessionRes.data as CashSession)
-      if (balancesRes.data) {
-        const map: Record<string, number> = {}
-        for (const b of balancesRes.data) map[b.enrollment_id] = b.balance
-        setBalances(map)
-      }
-
-      setLoading(false)
     }
     fetchData()
-  }, [user])
+    return () => { cancelled = true }
+  }, [user, refreshKey])
 
-  const filteredEnrollments = enrollments.filter(e => {
-    const term = search.toLowerCase()
-    return (
-      (e.matricule?.toLowerCase() || "").includes(term) ||
-      `${e.students.last_name} ${e.students.first_name}`.toLowerCase().includes(term) ||
-      e.guardians.phone.includes(term)
-    )
-  })
+  const needle = search.trim().toLowerCase()
+  const filtered = needle
+    ? enrollments.filter((e) => {
+        const hay = [
+          e.students?.first_name ?? "",
+          e.students?.last_name ?? "",
+          e.matricule ?? "",
+          e.guardians?.phone ?? "",
+          e.grade_levels?.name ?? "",
+        ].join(" ").toLowerCase()
+        return hay.includes(needle)
+      })
+    : enrollments
+  const visible = filtered.slice(0, 10)
 
-  const todayPayments = payments.filter(p => {
-    const today = new Date().toISOString().split("T")[0]
-    return p.received_at.startsWith(today)
-  })
-  const todayTotal = todayPayments.reduce((sum, p) => sum + p.amount, 0)
+  const today = new Date().toISOString().slice(0, 10)
+  const todayPayments = payments.filter((p) => (p.received_at ?? "").slice(0, 10) === today)
+  const todayTotal = todayPayments.reduce((sum, p) => sum + (p.amount ?? 0), 0)
 
   if (loading) return <div className="p-6 text-center text-muted-foreground">Chargement...</div>
 
   return (
     <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
+      {/* En-tête : statut de la session + actions */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Caisse</h1>
-          <p className="text-muted-foreground text-sm mt-1">Encaissement et gestion des paiements</p>
+          <p className="text-muted-foreground text-sm mt-1">
+            {session
+              ? `Session ouverte depuis ${new Date(session.opened_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} — fond ${(session.opening_amount ?? 0).toLocaleString("fr-FR")} FCFA`
+              : "Aucune session ouverte — obligatoire pour encaisser en espèces."}
+          </p>
         </div>
-        {session && (
-          <Badge variant="outline" className="text-green-600 border-green-600">
-            ● Session ouverte
-          </Badge>
-        )}
+        <div className="flex items-center gap-2">
+          {session ? (
+            <>
+              <Badge variant="default" className="bg-green-800">
+                <ShieldCheck className="h-3 w-3 mr-1" /> Session ouverte
+              </Badge>
+              <Button type="button" variant="outline" size="sm" asChild>
+                <a href="/dashboard/caisse/close">Clôturer</a>
+              </Button>
+            </>
+          ) : (
+            <OpenSessionModal onOpened={() => setRefreshKey((k) => k + 1)} />
+          )}
+          <Button type="button" variant="ghost" size="sm" asChild>
+            <a href="/dashboard/caisse/history">Historique</a>
+          </Button>
+        </div>
       </div>
 
-      {!session && (
-        <Card className="border-orange-200 bg-orange-50 dark:border-orange-900 dark:bg-orange-950/20">
-          <CardContent className="pt-6">
-            <p className="text-sm text-orange-800 dark:text-orange-200">
-              Aucune session de caisse ouverte. Ouvrez une session avant d’effectuer des encaissements.
-            </p>
-          </CardContent>
-        </Card>
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Formulaire d’encaissement */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CreditCard className="h-4 w-4" /> Nouvel encaissement
-            </CardTitle>
-            <CardDescription>Enregistrer un paiement pour un élève</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {!session ? (
-              <p className="text-sm text-muted-foreground"> Ouvrez une session de caisse pour commencer.</p>
-            ) : (
-              <ActionForm action={createPayment} className="space-y-4">
-                <input type="hidden" name="cashSessionId" value={session.id} />
-                <div className="space-y-1">
-                  <Label htmlFor="enrollmentId">Élève / Matricule</Label>
-                  <Select value={selectedEnrollment} onValueChange={setSelectedEnrollment} name="enrollmentId">
-                    <SelectTrigger>
-                      <SelectValue placeholder="Rechercher un élève..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {filteredEnrollments.map(e => (
-                        <SelectItem key={e.id} value={e.id}>
-                          {e.matricule ? `${e.matricule} — ` : ""}{e.students.last_name} {e.students.first_name} ({e.grade_levels.name})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                {selectedEnrollment && (
-                  <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/40 text-sm">
-                    <span className="text-muted-foreground">Solde de l’élève</span>
-                    <span className="font-mono font-semibold">
-                      {(balances[selectedEnrollment] ?? null) === null
-                        ? "…"
-                        : `${(balances[selectedEnrollment] ?? 0).toLocaleString("fr-FR")} FCFA`}
-                    </span>
-                  </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Recherche + liste : le formulaire d encaissement vit dans la modale */}
+        <div className="lg:col-span-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Encaisser pour un élève</CardTitle>
+              <CardDescription>
+                Recherchez par nom, matricule ou téléphone du parent — le solde s&apos;affiche avant tout encaissement.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="relative">
+                <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Nom, matricule ou téléphone du parent…"
+                  className="pl-9"
+                  aria-label="Rechercher un élève"
+                />
+              </div>
+              <div className="space-y-2">
+                {visible.map((e) => {
+                  const info = balanceByEnrollment[e.id]
+                  const balance = info?.balance ?? 0
+                  const defaultAmount =
+                    info?.nextDueAmount != null && info.nextDueAmount > 0
+                      ? String(info.nextDueAmount)
+                      : balance > 0
+                        ? String(balance)
+                        : ""
+                  return (
+                    <div key={e.id} className="flex items-center justify-between gap-3 p-3 rounded-lg border">
+                      <div className="min-w-0">
+                        <p className="font-medium truncate">
+                          {e.students?.last_name} {e.students?.first_name}
+                          {e.matricule && (
+                            <span className="text-xs text-muted-foreground ml-2">{e.matricule}</span>
+                          )}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {e.grade_levels?.name}
+                          {e.guardians?.phone ? ` · ${e.guardians.phone}` : ""}
+                        </p>
+                        {info?.hasFeeItems && (
+                          <p className="text-xs mt-0.5">
+                            {balance > 0 ? (
+                              <span className="text-orange-700 dark:text-orange-300">
+                                Reste à payer : {balance.toLocaleString("fr-FR")} FCFA
+                                {info.nextDueDate ? ` (échéance ${info.nextDueDate})` : ""}
+                              </span>
+                            ) : (
+                              <span className="text-green-800 dark:text-green-300">Solde soldé</span>
+                            )}
+                          </p>
+                        )}
+                      </div>
+                      <PayModal
+                        enrollment={{ id: e.id, matricule: e.matricule, students: e.students }}
+                        balance={balance}
+                        hasFeeItems={Boolean(info?.hasFeeItems)}
+                        defaultAmount={defaultAmount}
+                        onSuccess={() => setRefreshKey((k) => k + 1)}
+                      />
+                    </div>
+                  )
+                })}
+                {visible.length === 0 && (
+                  <p className="text-sm text-muted-foreground text-center py-6">
+                    {needle
+                      ? "Aucun élève ne correspond à cette recherche."
+                      : "Aucune inscription enregistrée."}
+                  </p>
                 )}
-                <div className="space-y-1">
-                  <Label htmlFor="amount">Montant (FCFA)</Label>
-                  <Input
-                    name="amount"
-                    type="number"
-                    required
-                    min={1}
-                    placeholder="Ex: 15000"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                  />
-                  {selectedEnrollment && Number(amount) > 0 && (balances[selectedEnrollment] ?? Infinity) < Number(amount) && (
-                    <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <input type="checkbox" name="allowOverpay" /> Enregistrer comme avance volontaire (au-delà du solde)
-                    </label>
-                  )}
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="paymentMethod">Mode de paiement</Label>
-                  <Select value={selectedPaymentMethod} onValueChange={setSelectedPaymentMethod} name="paymentMethod">
-                    <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="cash">Espèces</SelectItem>
-                      <SelectItem value="mobile_money">Mobile Money</SelectItem>
-                      <SelectItem value="check">Chèque</SelectItem>
-                      <SelectItem value="transfer">Virement</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                {selectedPaymentMethod !== "cash" && selectedPaymentMethod !== "" && (
-                  <div className="space-y-1">
-                    <Label htmlFor="reference">
-                      {selectedPaymentMethod === "check"
-                        ? "N° de chèque *"
-                        : selectedPaymentMethod === "mobile_money"
-                          ? "N° de transaction (optionnel)"
-                          : "Référence du virement (optionnel)"}
-                    </Label>
-                    <Input
-                      name="reference"
-                      required={selectedPaymentMethod === "check"}
-                      placeholder={
-                        selectedPaymentMethod === "check"
-                          ? "Numéro figurant sur le chèque"
-                          : "Optionnel — pour le rapprochement"
-                      }
-                    />
-                  </div>
-                )}
-                <Button type="submit" className="w-full">
-                  <Wallet className="h-4 w-4 mr-2" /> Encaisser
-                </Button>
-              </ActionForm>
-            )}
-          </CardContent>
-        </Card>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
 
         {/* Résumé */}
         <div className="space-y-4">
@@ -276,11 +272,15 @@ export default function CaissePage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
-                {payments.slice(0, 5).map(p => (
+                {payments.slice(0, 5).map((p) => (
                   <div key={p.id} className="flex items-center justify-between p-2 rounded-lg border text-sm">
-                    <div>
-                      <p className="font-medium">{p.enrollments?.students?.last_name} {p.enrollments?.students?.first_name}</p>
-                      <p className="text-xs text-muted-foreground">{p.payment_method} · {new Date(p.received_at).toLocaleString("fr-FR")}</p>
+                    <div className="min-w-0">
+                      <p className="font-medium truncate">
+                        {p.enrollments?.students?.last_name} {p.enrollments?.students?.first_name}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {p.payment_method} · {new Date(p.received_at).toLocaleString("fr-FR")}
+                      </p>
                     </div>
                     <span className="font-mono font-semibold">{p.amount.toLocaleString("fr-FR")}</span>
                   </div>

@@ -4,26 +4,17 @@ import { useState, useEffect } from "react"
 import { createClient } from "@/utils/supabase/browser"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { useSupabaseUser } from "@/hooks/use-supabase-user"
 import { ActionForm } from "@/components/action-form"
 import {
-  createMoratorium,
   getMoratoriums,
   reviewMoratorium,
 } from "@/app/dashboard/finance/moratoriums/actions"
 import { getEnrollments } from "@/app/dashboard/admissions/actions"
 import { toast } from "sonner"
-import { CheckCircle2, XCircle, Clock, AlertTriangle } from "lucide-react"
+import { CheckCircle2, XCircle } from "lucide-react"
+import { AddMoratoriumModal } from "./add-moratorium-modal"
 
 type Moratorium = {
   id: string
@@ -81,17 +72,10 @@ export default function MoratoriumsPage() {
     fetchData()
   }, [user])
 
-  async function handleCreateMoratorium(formData: FormData) {
-    const result = await createMoratorium(formData)
-    if (result.error) {
-      toast.error(result.error)
-    } else {
-      toast.success("Demande de moratoire créée !")
-      if (schoolId) {
-        const res = await getMoratoriums(schoolId)
-        if (res.data) setMoratoriums(res.data as Moratorium[])
-      }
-    }
+  async function refreshMoratoriums() {
+    if (!schoolId) return
+    const res = await getMoratoriums(schoolId)
+    if (res.data) setMoratoriums(res.data as Moratorium[])
   }
 
   async function handleReviewMoratorium(formData: FormData) {
@@ -113,13 +97,21 @@ export default function MoratoriumsPage() {
 
   return (
     <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Moratoires</h1>
           <p className="text-muted-foreground text-sm mt-1">
-            Gestion des demandes de report de paiement
+            Demandes de report de paiement ({moratoriums.length})
           </p>
         </div>
+        <AddMoratoriumModal
+          enrollments={enrollments.map((e) => ({
+            id: e.id,
+            matricule: e.matricule ?? null,
+            label: `${e.matricule ? `${e.matricule} — ` : ""}${e.students?.last_name ?? ""} ${e.students?.first_name ?? ""}`.trim(),
+          }))}
+          onSuccess={() => { void refreshMoratoriums() }}
+        />
       </div>
 
       {/* Statistiques */}
@@ -143,46 +135,6 @@ export default function MoratoriumsPage() {
           </CardContent>
         </Card>
       </div>
-
-      {/* Formulaire de création */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Nouvelle demande de moratoire</CardTitle>
-          <CardDescription>
-            Créer une demande de report de paiement pour un élève.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ActionForm action={handleCreateMoratorium} className="space-y-4">
-            <div className="space-y-1">
-              <Label htmlFor="enrollmentId">Élève</Label>
-              <select name="enrollmentId" required className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm">
-                <option value="">Sélectionner</option>
-                {enrollments.map(e => (
-                  <option key={e.id} value={e.id}>
-                    {e.matricule ? `${e.matricule} — ` : ""}{e.students?.last_name} {e.students?.first_name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="reason">Raison</Label>
-              <Input name="reason" placeholder="Ex: difficultés financières temporaires" required />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <Label htmlFor="requestedAmount">Montant demandé (FCFA)</Label>
-                <Input name="requestedAmount" type="number" required min={1} />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="dueDate">Date limite</Label>
-                <Input name="dueDate" type="date" required />
-              </div>
-            </div>
-            <Button type="submit">Soumettre la demande</Button>
-          </ActionForm>
-        </CardContent>
-      </Card>
 
       {/* Liste des moratoires */}
       <Card>

@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { useSupabaseUser } from "@/hooks/use-supabase-user"
 import { ActionForm } from "@/components/action-form"
+import { OpenSessionModal } from "../open-session-modal"
 import {
   getOpenCashSession,
   getCashSessions,
@@ -35,6 +36,7 @@ export default function CloseCashSessionPage() {
   const [sessions, setSessions] = useState<CashSession[]>([])
   const [closingAmount, setClosingAmount] = useState("")
   const [loading, setLoading] = useState(false)
+  const [refreshKey, setRefreshKey] = useState(0)
 
   useEffect(() => {
     if (!user) return
@@ -67,7 +69,7 @@ export default function CloseCashSessionPage() {
       setLoading(false)
     }
     fetchData()
-  }, [user])
+  }, [user, refreshKey])
 
   if (loading) return <div className="p-6 text-center text-muted-foreground">Chargement...</div>
 
@@ -85,10 +87,11 @@ export default function CloseCashSessionPage() {
 
       {!session ? (
         <Card className="border-orange-200 bg-orange-50 dark:border-orange-900 dark:bg-orange-950/20">
-          <CardContent className="pt-6">
+          <CardContent className="pt-6 flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-orange-800 dark:text-orange-200">
               Aucune session ouverte. Ouvrez une session de caisse pour commencer.
             </p>
+            <OpenSessionModal onOpened={() => setRefreshKey((k) => k + 1)} />
           </CardContent>
         </Card>
       ) : (
