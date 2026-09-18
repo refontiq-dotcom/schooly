@@ -134,8 +134,6 @@ next_item as (
 agg as (
   select
     enrollment_id,
-    max(school_id) as school_id,
-    max(academic_year_id) as academic_year_id,
     sum(amount) as expected_total,
     max(paid_total) as paid_total
   from items
