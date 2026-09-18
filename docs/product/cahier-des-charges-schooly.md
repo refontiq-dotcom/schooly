@@ -2,11 +2,14 @@
 
 *SaaS de gestion scolaire multi-établissements — Côte d'Ivoire / Afrique de l'Ouest*
 *Document de référence pour l'agent IA de développement*
+*Version 1.6 — 18/09/2026 — **compte parent permanent / autorisation scolaire annuelle** : le téléphone n'est plus un droit d'accès mais une clé d'éligibilité et un identifiant de connexion ; l'accès aux données est déduit de la relation parent ↔ élève ↔ établissement ↔ **année scolaire** (§4.3, §4.5), avec années clôturées en lecture seule et parcours « numéro perdu » validé par l'école. Voir `architecture-compte-parent.md`.*
 *Version 1.5 — 18/09/2026 — consolidation : troisième enseignement de production (§9.1) — une fonction SQL `security definer` peut se créer sans erreur et échouer à 100 % ; contact d'urgence rattaché au module Vie scolaire (§7.4).*
 *Version 1.4 — 18/09/2026 — parcours d'inscription & réinscription : formulaire public intelligent et facultatif, réinscription en 1 clic, vérification des places en temps réel, contact d'urgence, scolarité antérieure, orientation État, accès parent par le téléphone. Ajout des synthèses « état livré » (§7.1, §7.2, §7.8), des règles d'accessibilité (§8.1) et des enseignements de production (§9.1).*
 *Version 1.3 — ajout des spécifications du module d'évaluation intelligente : configuration, calculs, temporalité, saisie temps réel et bulletins*
 
-> ⚠️ **À lire avant toute reprise de développement** : deux documents transverses ont été créés après la version initiale de ce cahier des charges — `refontiq-architecture-ecosysteme.md` et `refontiq-plan-de-travail-prompts.md`. Ils introduisent des composants partagés à l'échelle de tout l'écosystème Refontiq (pas seulement Schooly), qui remplacent ou complètent certaines sections ci-dessous. Les sections concernées sont annotées. En cas de doute, les documents d'écosystème font foi sur les questions transverses (facturation, identité, alertes internes).
+> ⚠️ **À lire avant toute reprise de développement** : trois documents de référence encadrent ce cahier des charges.
+> - `refontiq-architecture-ecosysteme.md` et `refontiq-plan-de-travail-prompts.md` — composants partagés à l'échelle de tout l'écosystème Refontiq (pas seulement Schooly). En cas de doute, les documents d'écosystème font foi sur les questions transverses (facturation, identité, alertes internes).
+> - **`architecture-compte-parent.md`** — frontière **identité parent (permanente)** / **autorisation scolaire (annuelle)**, parcours « numéro perdu ou changé », dashboard parent multi-années et cible RLS. **À lire obligatoirement avant toute modification** des policies RLS, de la table `guardians` ou de la PWA parent.
 
 ## Sommaire
 1. Vision & positionnement
@@ -89,27 +92,88 @@ Ces principes doivent guider **chaque** décision technique de l'agent, y compri
 | Chef Comptable | Email + mot de passe | `/dashboard/compta` |
 | Caissier | Email + PIN 4 chiffres (session rapide) | `/dashboard/caisse` |
 | Surveillant / Enseignant | Email ou identifiant | `/dashboard/pedagogie` |
-| Parent / Tuteur | Téléphone + OTP WhatsApp (passwordless) | `/parent` (PWA) |
+| Parent / Tuteur | **Téléphone (clé d'éligibilité) + mot de passe** choisi au premier accès | `/parent` (PWA) |
 
-### 4.3 Identité globale du parent
-Le numéro de téléphone est la clé unique du compte tuteur, **indépendante de l'établissement**. Un parent avec des enfants dans 3 écoles Schooly différentes garde un seul compte, un seul OTP, et bascule entre écoles via un sélecteur. Chaque transaction financière reste néanmoins strictement cloisonnée par établissement (compte marchand, reçu, RLS).
+> **Le téléphone n'est pas un droit d'accès** (cf. §4.5) : il sert à **vérifier que le parent est connu de l'école**, puis de **identifiant de connexion** combiné à un mot de passe. Un numéro inconnu de tout établissement ne permet pas de créer un compte.
+
+### 4.3 Identité globale du parent — permanente par construction
+
+Le **compte parent est permanent** : il ne dépend ni de l'année scolaire, ni de l'établissement. Un parent avec des enfants dans 3 écoles Schooly différentes garde **un seul compte**, un seul mot de passe, et bascule entre enfants et établissements via un sélecteur. Chaque transaction financière reste néanmoins strictement cloisonnée par établissement (compte marchand, reçu, RLS).
+
+**Ce qui expire, ce n'est pas le parent : c'est son autorisation scolaire, rattachée à une année** (cf. §4.5).
+
+```
+COMPTE PARENT ───────────────────────────────────────────► PERMANENT
+  (téléphone + mot de passe + identité)
+  │
+  └── RATTACHEMENTS SCOLAIRES ──────────────────────────► PAR ANNÉE
+        ├── 2025-2026 · École A · Enfant 1 · terminée   → lecture seule
+        ├── 2026-2027 · École A · Enfant 1 · active     → accès complet
+        └── 2027-2028 · en attente d'inscription        → aucun accès
+```
+
+- **Pendant les vacances**, le parent se connecte normalement et consulte notes, bulletins et reçus de l'année écoulée en **lecture seule**. Il ne voit pas l'année suivante tant que l'école ne l'a pas validée.
+- **À la rentrée**, dès que l'école valide la nouvelle inscription, **le même compte** retrouve l'accès complet. Le parent **ne recrée rien** et **ne change pas de numéro**.
+- **Changement d'établissement** : même compte, mêmes liens ; l'historique de chaque école reste consultable, année par année.
+
+> Le détail de conception (frontière identité / autorisation, parcours « numéro perdu », cible RLS et plan d'implémentation) est fixé dans **`docs/product/architecture-compte-parent.md`** — document à lire avant toute modification des policies RLS, de la table `guardians` ou de la PWA parent.
 
 ### 4.4 Routage par rôle
 Le middleware Next.js lit les custom claims du JWT Supabase (`role`, `school_id`) et redirige. Toute tentative d'accès à une route hors périmètre déclenche un retour automatique à la page d'accueil du rôle.
 
-### 4.5 Contrôle d'accès parent (gating par inscription)
-Il n'existe **aucune inscription ouverte** au portail parent : un numéro de téléphone ne débloque un accès que s'il est rattaché à au moins une fiche `enrollments`/`pre_enrollments` (table `guardians`, cf §5).
+### 4.5 Contrôle d'accès parent — gating par inscription, jamais par le téléphone
 
-Flux :
-1. Saisie du numéro sur la PWA.
-2. Le backend **normalise le numéro** puis le cherche parmi les tuteurs liés à une inscription, toutes écoles confondues.
-3. Trouvé → envoi de l'OTP → session ouverte, accès à tous les enfants/écoles liés (identité globale, §4.3).
-4. Non trouvé → aucun accès ; message neutre (« code envoyé si ce numéro est reconnu ») pour ne pas révéler l'existence ou non d'un compte (anti-énumération).
+> **Règle fondatrice** : le téléphone n'est **pas** un droit d'accès. C'est une **clé d'éligibilité** et un **identifiant de connexion**.
+
+Trois fonctions distinctes, à ne jamais confondre :
+
+| Fonction | Quand | Ce qu'elle prouve | Ce qu'elle ne prouve **pas** |
+|---|---|---|---|
+| **Clé d'éligibilité** | Premier accès | « Ce numéro correspond à un parent connu d'au moins une école Schooly » | Que la personne devant l'écran est bien ce parent |
+| **Identifiant de connexion** | Chaque connexion | Rien à lui seul — il doit être **combiné à un mot de passe** | L'identité, à lui seul |
+| **Clé de rapprochement** | Numéro perdu / changé | Point de départ d'une procédure **validée par l'école** | Que le numéro appartient encore au parent |
+
+**Conséquence technique** : `guardians.phone` (et son miroir `phone_norm`) ne doit **jamais** apparaître seul dans une condition d'autorisation. Il sert à *trouver* le compte, pas à *l'autoriser*.
+
+#### 4.5.1 Création du compte — aucune inscription ouverte
+
+1. Le parent saisit son numéro sur la PWA.
+2. Le backend **normalise le numéro** (`phone_norm`, cf. §7.8.4) puis le cherche parmi les tuteurs liés à au moins une inscription, toutes écoles confondues.
+3. **Numéro inconnu → accès refusé** : impossible de créer un compte parent avec un numéro que l'école n'a jamais vu. Message neutre (« code envoyé si ce numéro est reconnu ») pour empêcher l'énumération des familles.
+4. **Numéro connu → autorisation de créer le compte** : le parent **choisit son mot de passe**. À partir de là, il se connecte par **numéro + mot de passe** ; l'OTP WhatsApp reste un canal de **vérification du numéro**, jamais le seul facteur d'accès.
+
+#### 4.5.2 Autorisation = relation parent ↔ élève ↔ établissement ↔ année
+
+L'accès aux données n'est jamais déduit du numéro : il est déduit de la chaîne
+
+```
+Parent connecté → son guardian_id → élèves rattachés → inscriptions (enrollments)
+   → école + année scolaire → statut de l'année → droits
+```
+
+| Statut de l'année | Droits du parent |
+|---|---|
+| `en_cours` | Accès complet (notes, bulletins, paiements, absences) ; paiement en ligne possible |
+| `cloturee` | **Lecture seule** — historique consultable, aucune écriture |
+| `planifiee`, ou aucune inscription | **Aucun accès** aux données de cette année |
+
+`enrollments` porte déjà les quatre clés (`guardian_id`, `student_id`, `school_id`, `academic_year_id`) : la relation est donc **native**, sans table de droits à maintenir.
 
 **Mise en œuvre livrée** :
-- La recherche s'appuie sur `guardians.phone_norm` (**numéro canonique indexé**, cf §7.8.4), jamais sur le numéro saisi : `0700000000`, `+225 07 00 00 00 00` et `002250700000000` désignent **le même parent**. Sans cela, un parent ayant été saisi au guichet dans un format différent de celui du formulaire en ligne aurait pu se voir refuser l'accès à son propre dossier.
-- `guardians.user_id` rattache la fiche tuteur au **compte Auth** du parent, avec une **unicité garantie** (un compte parent ↔ une fiche tuteur). Le téléphone devient réellement la clé d'accès : c'est le numéro donné à l'inscription qui ouvre le tableau de bord parent.
-- Comme le numéro est déjà connu par l'école, le parent **n'a rien à créer ni à mémoriser** — il reçoit un code et entre.
+- `guardians.phone_norm` : **numéro canonique indexé** — `0700000000`, `+225 07 00 00 00 00` et `002250700000000` désignent **le même parent**. Sans cela, un parent saisi au guichet dans un format différent de celui du formulaire en ligne aurait pu se voir refuser l'accès à son propre dossier.
+- `guardians.user_id → auth.users` : rattache la fiche tuteur au **compte Auth** du parent, avec **unicité garantie** (un compte parent ↔ une fiche tuteur).
+- Helpers RLS `current_guardian_id()`, `parent_owns_enrollment()`, `parent_can_write_enrollment()` : l'autorisation est **revérifiée en base à chaque requête**, jamais côté client (migration `20260918190000`).
+- **Moindre privilège** : le parent n'a **aucune** écriture sur les données académiques. Il n'écrit que sur ses propres coordonnées et, dans une année `en_cours`, un paiement.
+
+#### 4.5.3 Numéro perdu ou changé — le compte et les liens survivent
+
+Le compte parent **n'est jamais supprimé** parce que le numéro change. On modifie le numéro **du compte**, pas l'identité du parent ni ses liens scolaires (enfants, inscriptions, historique).
+
+| Situation | Parcours |
+|---|---|
+| Parent **connecté** | Réglages → Compte → Numéro de téléphone → **mot de passe actuel** + nouveau numéro. L'école reçoit une notification (« le numéro du parent de [élève] a été modifié »). |
+| Parent **déconnecté**, ancien numéro perdu | « Je n'ai plus accès à mon numéro » → vérification **par l'administration de l'école** (jamais une simple question secrète) → remplacement du numéro. |
+| Cas explicitement interdit | Nouveau numéro + ancien mot de passe **ne donne pas** accès automatiquement : un ancien numéro recyclé ne doit jamais permettre de reprendre un compte. |
 
 > Note coût : l'OTP relève de la catégorie « authentication », déjà facturée par Meta. Prévoir des sessions longues (ex. 90 jours) pour limiter le nombre d'OTP envoyés par foyer et par an.
 
@@ -391,7 +455,7 @@ Parent / Élève : notification → bulletin officiel ; décision validée → b
 - Export comptable SYSCOHADA (mode synthétique/analytique, formats Sage/Excel/CSV), équilibre débit=crédit vérifié automatiquement.
 
 ### 7.6 Portails utilisateurs dédiés
-- **Parent (PWA)** : sélecteur enfant/établissement, situation financière en temps réel, paiement Mobile Money en 1 clic, téléchargement reçus/bulletins, demande de moratoire, mode hors-ligne.
+- **Parent (PWA)** : **compte permanent** (téléphone + mot de passe), **sélecteur d'année scolaire** (année en cours = accès complet, années clôturées = **lecture seule**, cf. §4.3 et §4.5), sélecteur enfant/établissement, situation financière en temps réel, paiement Mobile Money en 1 clic, téléchargement reçus/bulletins, demande de moratoire, mode hors-ligne.
 - **Élève** : planning, devoirs, notes.
 - **Professeur** : appel rapide, cahier de texte, saisie de notes.
 
@@ -549,7 +613,9 @@ Cahier de texte, saisie de notes isolée par professeur, bulletins PDF.
 Appel, discipline, scan QR, anti-passback.
 
 **Phase 8 — Portails dédiés**
-PWA Parent (multi-enfants/multi-écoles), portail élève, portail professeur.
+PWA Parent, portail élève, portail professeur.
+**Compte parent (spécifié, cf. `architecture-compte-parent.md`)** : compte **permanent** identifié par le téléphone + mot de passe choisi au premier accès (éligibilité vérifiée en base, aucune inscription ouverte) ; **sélecteur d'année scolaire** — année `en_cours` = accès complet, année `cloturee` = **lecture seule**, année `planifiee` = aucun accès ; multi-enfants **et** multi-établissements sur un même compte ; parcours « numéro perdu / changé » validé par l'administration de l'école.
+*Acceptation* : un parent suit son enfant d'une année sur l'autre et change d'établissement **sans jamais recréer de compte** ; les données d'une année clôturée restent consultables mais non modifiables.
 
 **Phase 9 — Modules complémentaires** *(piste parallèle possible)*
 Transport, cantine, internat, bibliothèque, infirmerie, inventaire, anti-vol tenues — activables via `school_features`.
@@ -691,13 +757,13 @@ Prévoir un compte dédié dans le mapping SYSCOHADA de chaque école (ex. « Fr
 | Le secrétariat retape les mêmes informations pour chaque année, chaque frère et sœur | Une information saisie **une fois** suit l'élève et sa famille : scolarité antérieure, lien de parenté, contact d'urgence, tuteur |
 | En cas d'urgence, personne ne sait qui appeler | Le **contact d'urgence est au dossier**, saisi dès l'inscription (et par défaut : le parent lui-même) |
 | Le suivi des élèves orientés par l'État se perd dans les cahiers | Chaque dossier indique s'il est **orienté par l'État** ou non, avec le numéro de notification — filtrable et exportable |
-| Le parent n'a aucun moyen de suivre son enfant sans appeler l'école | Le **même numéro de téléphone** donné à l'inscription ouvre le tableau de bord parent (notes, paiements, absence) |
+| Le parent n'a aucun moyen de suivre son enfant sans appeler l'école | Le **même numéro de téléphone** donné à l'inscription **identifie** le parent et ouvre son tableau de bord (notes, paiements, absences), année par année — sans rien recréer à chaque rentrée |
 | Les dossiers créés via un partenaire finissent en doublons | Le téléphone est normalisé : un parent = **un seul dossier**, quel que soit le canal qui l'a saisi |
 | Le secrétariat se bloque sur des erreurs techniques incompréhensibles | Les messages sont **en français et parlants** : « action réservée à un rôle supérieur », « aucune école rattachée », jamais « erreur 42501 » |
 
 ### 16.2 Trois arguments de vente à retenir
 
-1. **« Vos familles n'ont rien à apprendre. »** Pas de compte à créer, pas d'application à installer, pas de matricule à retrouver : le téléphone du parent est son identifiant. La réinscription se fait en un seul bouton.
+1. **« Vos familles n'ont rien à apprendre — et ne recreent jamais leur compte. »** Le parent **s'identifie par son numéro** (déjà connu de l'école) et choisit une fois son mot de passe : ni application à installer, ni matricule à retrouver, ni inscription à refaire chaque année. La réinscription se fait en un seul bouton, et le compte suit l'enfant même s'il change d'établissement.
 2. **« Votre secrétariat ne ressaisit jamais deux fois la même information. »** Ce que le parent déclare circule automatiquement jusqu'au dossier définitif de l'élève et du tuteur.
 3. **« Vous ne promettez jamais plus de places que vous n'en avez. »** L'école déclare la capacité de ses classes une fois ; le système refuse automatiquement toute inscription au-delà, partout — guichet, lien public, Trouvetou.
 
@@ -720,7 +786,7 @@ Tableau honnête à montrer tel quel à un établissement : ce qui est **utilisa
 | Réinscription en 1 clic | ✅ en service | Le parent confirme par téléphone, la classe suivante est pré-calculée |
 | Places disponibles | ✅ en service | Calcul en temps réel depuis la capacité déclarée des classes ; refus automatique au-delà, guichet comme en ligne |
 | Dossier famille | ✅ en service | Lien de parenté, contact d'urgence, scolarité antérieure, orientation État, tuteur unique anti-doublon |
-| Accès parent (téléphone) | ✅ mécanisme livré | Rattachement tuteur ↔ compte parent et normalisation du numéro en base ; l'écran d'accès PWA suit la Phase 8 de la roadmap |
+| Accès parent (compte permanent) | ✅ mécanisme livré | Rattachement tuteur ↔ compte parent, numéro normalisé (`phone_norm`) et **autorisation par année scolaire** (année en cours = accès complet, année clôturée = lecture seule) via la migration `20260918190000` ; l'écran d'accès PWA suit la Phase 8 de la roadmap |
 | Structure académique | ✅ en service | Années, niveaux, classes, matières, affectations, bascule d'année |
 | Finance | ✅ socle en service | Tarification, encaissement, reçus, caisse, référence de paiement adaptée au mode |
 | Pédagogie & bulletins | 🔜 spécifié | Module d'évaluation intelligente entièrement spécifié (§7.3), implémentation en cours |
