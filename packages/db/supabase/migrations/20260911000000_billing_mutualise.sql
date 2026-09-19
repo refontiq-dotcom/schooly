@@ -345,10 +345,10 @@ INSERT INTO public.billing_configs (
   'XOF',
   1000,
   '["enrollment_confirmed"]'::jsonb,
-  'M_ci_RImDyQYI8ccj',
+  NULL,
   '',
-  '8882268453:AAGNSyYytK2Wyo57sKAlw2Vps1HNBg11ZvE',
-  '8958821599',
+  NULL,
+  NULL,
   'https://admin.schooly.ci/billing',
   true
 )
