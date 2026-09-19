@@ -27,12 +27,6 @@ export type NavItem = {
 }
 
 export const NAV_BY_ROLE: Record<string, NavItem[]> = {
-  super_admin: [
-    { label: "Vue Globale", href: "/dashboard/super-admin", icon: LayoutDashboard },
-    { label: "Établissements", href: "/dashboard/super-admin/schools", icon: School },
-    { label: "Utilisateurs", href: "/dashboard/super-admin/users", icon: Users },
-    { label: "Facturation", href: "/dashboard/billing", icon: CreditCard },
-  ],
   direction: [
     { label: "Tableau de bord", href: "/dashboard/direction", icon: LayoutDashboard },
     { label: "Personnel & rôles", href: "/dashboard/direction/staff", icon: Users },
