@@ -33,40 +33,57 @@ export function AddStaffModal() {
         <DialogHeader>
           <DialogTitle>Ajouter un membre du personnel</DialogTitle>
           <DialogDescription>
-            Créez son accès Schooly et choisissez sa fonction. Ses menus et permissions seront adaptés automatiquement.
+            Créez son identité et son rôle. Aucun mot de passe n&apos;est demandé : le collaborateur activera lui-même son compte.
           </DialogDescription>
         </DialogHeader>
-        <ActionForm action={createStaffMember} onSuccess={() => { toast.success("Accès créé"); setOpen(false) }} onError={(error) => toast.error(error)}>
+
+        <ActionForm
+          action={createStaffMember}
+          onSuccess={() => {
+            toast.success("Accès créé — invitation d'activation envoyée")
+            setOpen(false)
+          }}
+          onError={(error) => toast.error(error)}
+        >
           <div className="space-y-4">
             <div>
               <Label htmlFor="fullName">Nom complet</Label>
               <Input id="fullName" name="fullName" required placeholder="Ex. Jean Kouassi" />
             </div>
+
             <div>
-              <Label htmlFor="email">Email professionnel</Label>
-              <Input id="email" name="email" type="email" required placeholder="jean@etablissement.ci" />
+              <Label htmlFor="email">Email professionnel (recommandé)</Label>
+              <Input id="email" name="email" type="email" placeholder="jean@etablissement.ci" autoComplete="email" />
             </div>
+
             <div>
-              <Label htmlFor="phone">Téléphone (facultatif)</Label>
-              <Input id="phone" name="phone" placeholder="+225 ..." />
+              <Label htmlFor="phone">Téléphone professionnel</Label>
+              <Input id="phone" name="phone" placeholder="+225 ..." autoComplete="tel" />
+              <p className="mt-1 text-xs text-muted-foreground">Indiquez au moins un email ou un téléphone.</p>
             </div>
+
             <div>
               <Label>Fonction</Label>
               <Select name="roleCode" value={role} onValueChange={setRole}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {ROLE_OPTIONS.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}
+                  {ROLE_OPTIONS.map((item) => (
+                    <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <Label htmlFor="password">Mot de passe initial</Label>
-              <Input id="password" name="password" type="password" minLength={8} required placeholder="8 caractères minimum" />
-              <p className="mt-1 text-xs text-muted-foreground">Communiquez-le au membre par un canal privé. Il pourra ensuite utiliser son propre accès.</p>
+
+            <div className="rounded-xl border border-primary/15 bg-primary/5 p-3 text-sm text-muted-foreground">
+              <p className="font-medium text-foreground">Activation intelligente</p>
+              <p className="mt-1">
+                Schooly enverra un code de vérification au collaborateur. Après vérification, il choisira son propre mot de passe. La direction ne connaît jamais ce mot de passe.
+              </p>
             </div>
           </div>
+
           <DialogFooter className="mt-6">
-            <Button type="submit">Créer l'accès</Button>
+            <Button type="submit">Créer et inviter</Button>
           </DialogFooter>
         </ActionForm>
       </DialogContent>
