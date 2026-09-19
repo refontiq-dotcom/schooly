@@ -17,7 +17,7 @@ export async function updateSession(request: NextRequest) {
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
     {
       cookies: {
         getAll() {
@@ -111,7 +111,7 @@ async function resolveRoleCode(
 
   const adminClient = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    process.env.SUPABASE_SECRET_KEY!,
   )
   const { data } = await adminClient
     .from("user_school_roles")
@@ -159,7 +159,7 @@ async function resolveHomePath(
   // 2. Repli : résolution en base (service_role), comportement historique.
   const adminClient = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    process.env.SUPABASE_SECRET_KEY!,
   )
 
   const { data: roleData } = await adminClient
