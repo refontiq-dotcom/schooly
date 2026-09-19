@@ -8,7 +8,7 @@ import { redirect } from "next/navigation"
 type OnboardingResult = { error: string | null }
 
 // Rôles autorisés à configurer l'établissement (fondateur = direction).
-const SETUP_ROLES = ["direction", "super_admin"]
+const SETUP_ROLES = ["direction"]
 
 // Valeurs valides de l'enum public.school_type (mirror de la migration 00001).
 const VALID_SCHOOL_TYPES = [
