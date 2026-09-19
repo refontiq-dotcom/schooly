@@ -30,11 +30,16 @@ export default async function DashboardLayout({
     .select("role_code, school_id")
     .eq("user_id", user.id)
     .eq("is_active", true)
+    .order("created_at", { ascending: true })
     .limit(1)
-    .single()
+    .maybeSingle()
 
-  const role = roleData?.role_code ?? "direction"
-  const schoolId = roleData?.school_id
+  if (!roleData?.role_code || !roleData.school_id) {
+    redirect("/login")
+  }
+
+  const role = roleData.role_code
+  const schoolId = roleData.school_id
 
     // Récupérer le nom de l'école + état d'onboarding
   let schoolName = "Schooly"
