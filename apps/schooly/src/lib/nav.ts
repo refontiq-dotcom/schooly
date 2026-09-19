@@ -60,6 +60,7 @@ export const NAV_BY_ROLE: Record<string, NavItem[]> = {
   informatique: [
     { label: "Tableau de bord", href: "/dashboard/informatique", icon: LayoutDashboard },
     { label: "Configuration", href: "/dashboard/academic-structure", icon: Wrench },
+    { label: "Emploi du temps", href: "/dashboard/informatique/emploi-du-temps", icon: CalendarDays },
     { label: "Paramètres établissement", href: "/dashboard/direction/settings", icon: Settings },
     { label: "Bulletins & rapports", href: "/dashboard/direction/reports", icon: BookOpen },
   ],
