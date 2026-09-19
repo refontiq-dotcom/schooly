@@ -250,6 +250,26 @@ export async function previewAdmissionAssignment(schoolId: string, academicYearI
   }
 }
 
+
+export async function saveAdmissionAssignmentPreview(
+  schoolId: string,
+  batchId: string,
+  rows: Array<{ id: string; classId: string | null; position: number }>
+) {
+  const auth = await guardSchool(schoolId, ASSIGNMENT_ROLES)
+  if ("error" in auth) return auth
+  const { admin } = auth
+  for (const row of rows) {
+    const { error } = await admin
+      .from("admission_assignment_rows")
+      .update({ class_id: row.classId, position: row.position })
+      .eq("id", row.id)
+      .eq("assignment_batch_id", batchId)
+    if (error) return { error: error.message }
+  }
+  return { data: { saved: rows.length } }
+}
+
 export async function getAssignmentPreview(schoolId: string, batchId: string) {
   const auth = await guardSchool(schoolId, ASSIGNMENT_ROLES)
   if ("error" in auth) return auth
