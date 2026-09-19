@@ -13,7 +13,6 @@ export default async function TrouvetouAdminPage() {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
 
-  // Recuperer le role et l ecole
   const { data: roleData } = await admin
     .from("user_school_roles")
     .select("role_code, school_id")
@@ -27,14 +26,12 @@ export default async function TrouvetouAdminPage() {
 
   const schoolId = roleData.school_id
 
-  // Infos ecole
   const { data: school } = await admin
     .from("schools")
-    .select("id, name, city, published_to_trouvetou, description_publique, latitude, longitude, itineraire, photos_360, video_url, grille_tarifaire_publique")
+    .select("id, name, city, published_to_trouvetou, description_publique, latitude, longitude, itineraire, photos_360, video_url, grille_tarifaire_publique, cover_photo_url, gallery_photos, public_address, public_phone, public_email, public_website_url, public_highlights, admission_notes")
     .eq("id", schoolId)
     .single()
 
-  // Reservations recentes
   const { data: reservations } = await admin
     .from("trouvetou_reservations")
     .select("id, student_full_name, parent_full_name, parent_phone, status, created_at, grade_level_id")
@@ -42,7 +39,6 @@ export default async function TrouvetouAdminPage() {
     .order("created_at", { ascending: false })
     .limit(20)
 
-  // Publicites
   const { data: ads } = await admin
     .from("trouvetou_ads")
     .select("id, title, message, image_url, target_url, start_date, end_date, is_active, created_at")
@@ -50,13 +46,12 @@ export default async function TrouvetouAdminPage() {
     .order("created_at", { ascending: false })
     .limit(10)
 
-  // Niveaux pour le formulaire de tarifs
   const { data: levels } = await admin
     .from("grade_levels")
-    .select("id, label, capacity")
+    .select("id, name, level, cycle")
     .eq("school_id", schoolId)
     .is("deleted_at", null)
-    .order("sort_order", { ascending: true })
+    .order("level", { ascending: true })
 
   return (
     <TrouvetouAdminClient
