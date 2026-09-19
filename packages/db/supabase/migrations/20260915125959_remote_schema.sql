@@ -1,0 +1,4 @@
+-- Historical migration marker.
+-- The remote database already records version 20260915125959 as applied.
+-- The executable schema is maintained by the canonical migrations in this directory.
+-- Intentionally empty: do not re-run the historical remote schema snapshot.
