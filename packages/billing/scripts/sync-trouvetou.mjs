@@ -27,7 +27,7 @@ function loadDotEnvLocal() {
 loadDotEnvLocal();
 
 const schoolyUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const schoolyKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const schoolyKey = process.env.SUPABASE_SECRET_KEY;
 const syncUrl = (process.env.TROUVETOU_SYNC_URL || "").replace(/\/$/, "");
 const apiKey = process.env.TROUVETOU_API_KEY;
 const instanceUrl = process.env.TROUVETOU_INSTANCE_URL || "https://admin.schooly.ci";
