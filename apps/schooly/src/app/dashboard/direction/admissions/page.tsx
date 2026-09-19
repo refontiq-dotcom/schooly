@@ -201,6 +201,12 @@ export default function AdmissionsPage() {
               Transferts / orientations
             </Link>
           </Button>
+          <Button asChild type="button" variant="outline" className="min-h-11 gap-2">
+            <Link href="/dashboard/direction/admissions/intake">
+              <FileText className="h-4 w-4" />
+              Affectations Ministère
+            </Link>
+          </Button>
           <Button type="button" className="min-h-11 gap-2" onClick={() => openCounter()}>
             <Wallet className="h-4 w-4" />
             Inscrire au guichet
