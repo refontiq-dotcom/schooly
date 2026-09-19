@@ -34,6 +34,7 @@ export const NAV_BY_ROLE: Record<string, NavItem[]> = {
   ],
   direction: [
     { label: "Tableau de bord", href: "/dashboard/direction", icon: LayoutDashboard },
+    { label: "Personnel & rôles", href: "/dashboard/direction/staff", icon: Users },
     { label: "Inscriptions", href: "/dashboard/direction/admissions", icon: Users },
     { label: "Structure académique", href: "/dashboard/academic-structure", icon: GraduationCap },
     { label: "Finance", href: "/dashboard/direction/finance", icon: CreditCard },
@@ -44,10 +45,15 @@ export const NAV_BY_ROLE: Record<string, NavItem[]> = {
     { label: "Paramètres", href: "/dashboard/direction/settings", icon: Settings },
     { label: "Trouvetou", href: "/dashboard/admin/trouvetou", icon: Megaphone },
   ],
-  compta: [
-    { label: "Tableau de bord", href: "/dashboard/direction", icon: LayoutDashboard },
-    { label: "Finance", href: "/dashboard/direction/finance", icon: CreditCard },
+  secretariat: [
+    { label: "Inscriptions", href: "/dashboard/direction/admissions", icon: Users },
+    { label: "Structure académique", href: "/dashboard/academic-structure", icon: GraduationCap },
     { label: "Services", href: "/dashboard/services/transport", icon: Bus },
+  ],
+  compta: [
+    { label: "Tableau de bord financier", href: "/dashboard/direction/finance", icon: LayoutDashboard },
+    { label: "Finance", href: "/dashboard/direction/finance", icon: CreditCard },
+    { label: "Relances", href: "/dashboard/direction/finance/reminders", icon: Bell },
     { label: "Rapports", href: "/dashboard/direction/reports", icon: BookOpen },
   ],
   caisse: [
