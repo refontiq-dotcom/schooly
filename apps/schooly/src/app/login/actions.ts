@@ -41,7 +41,7 @@ export async function loginAction(
   // Récupérer le rôle actif via la base de données (sans dépendre du hook JWT)
   const adminClient = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SECRET_KEY!
   )
 
   const { data: roleData } = await adminClient
