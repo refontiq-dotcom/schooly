@@ -27,7 +27,6 @@ export function Sidebar({ role, schoolName, userName }: SidebarProps) {
     .sort((a, b) => b.href.length - a.href.length)[0]?.href
 
   const roleLabels: Record<string, string> = {
-    super_admin: "Super Admin",
     direction: "Direction",
     secretariat: "Secrétariat",
     compta: "Comptabilité",
