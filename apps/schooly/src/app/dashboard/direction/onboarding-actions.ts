@@ -23,7 +23,7 @@ const VALID_SCHOOL_TYPES = [
 async function resolveSchoolId(userId: string): Promise<string | null> {
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SECRET_KEY!
   )
   const { data, error } = await admin
     .from("user_school_roles")
@@ -71,7 +71,7 @@ export async function completeOnboardingAction(
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SECRET_KEY!
   )
 
   // 1. Configuration de base de l'établissement + marquage comme configurée
