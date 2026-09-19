@@ -47,7 +47,7 @@ function generateCode(length = 6) {
 function adminClient() {
   return createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SECRET_KEY!
   )
 }
 
@@ -196,7 +196,7 @@ export async function getPreEnrollments(schoolId: string) {
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SECRET_KEY!
   )
 
   const { data, error } = await admin
@@ -223,7 +223,7 @@ export async function getPreEnrollmentByCode(schoolId: string, code: string) {
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SECRET_KEY!
   )
 
   const { data } = await admin
@@ -765,7 +765,7 @@ export async function getGuardians(schoolId: string) {
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SECRET_KEY!
   )
 
   const { data, error } = await admin
@@ -799,7 +799,7 @@ export async function createGuardian(formData: FormData): Promise<ActionResult> 
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SECRET_KEY!
   )
 
   const { error } = await admin.from("guardians").insert({
@@ -829,7 +829,7 @@ export async function getStudents(schoolId: string) {
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SECRET_KEY!
   )
 
   const { data, error } = await admin
@@ -859,7 +859,7 @@ export async function createStudent(formData: FormData): Promise<ActionResult> {
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SECRET_KEY!
   )
 
   const firstName = formData.get("firstName") as string
@@ -902,7 +902,7 @@ export async function getEnrollments(schoolId: string) {
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SECRET_KEY!
   )
 
   const { data, error } = await admin
@@ -930,7 +930,7 @@ export async function createEnrollment(formData: FormData): Promise<ActionResult
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SECRET_KEY!
   )
 
   const studentId = formData.get("studentId") as string
@@ -978,7 +978,7 @@ export async function getFinancialProfiles(schoolId: string) {
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SECRET_KEY!
   )
 
   const { data, error } = await admin
@@ -1004,7 +1004,7 @@ export async function createFinancialProfile(formData: FormData): Promise<Action
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SECRET_KEY!
   )
 
   const { error } = await admin.from("financial_profiles").insert({
