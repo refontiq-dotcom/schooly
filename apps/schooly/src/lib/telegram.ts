@@ -19,7 +19,7 @@ async function mirrorToControlCenter(message: string, level: TelegramAlertLevel,
   if (!base || !secret) return
 
   try {
-    await fetch(`${base}/api/telegram-alerts/ingest`, {
+    await fetch(${base}/api/telegram-alerts/ingest, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -44,15 +44,16 @@ async function mirrorToControlCenter(message: string, level: TelegramAlertLevel,
  */
 export async function sendTelegramAlert(
   message: string,
-  level: TelegramAlertLevel = "info"
+  level: TelegramAlertLevel = "info",
+  title = "Alerte Schooly"
 ): Promise<void> {
   const token = process.env.TELEGRAM_BOT_TOKEN
   const chatId = process.env.TELEGRAM_CHAT_ID
   const emoji = LEVEL_EMOJI[level]
-  const text = `${emoji} *Schooly*\n\n${message}`
+  const text = `${emoji} *Schooly*\\n\\n${message}`
 
   await Promise.allSettled([
-    mirrorToControlCenter(message, level),
+    mirrorToControlCenter(message, level, title),
     (async () => {
       if (!token || !chatId) {
         console.warn("[Telegram] TELEGRAM_BOT_TOKEN ou TELEGRAM_CHAT_ID manquant — alerte non envoyée")
@@ -81,55 +82,34 @@ export async function sendTelegramAlert(
   ])
 }
 
-// ─── Helpers métier typés ────────────────────────────────────────────────────
-
-export function alertEnrollmentConfirmed(opts: {
-  schoolName: string
-  studentName: string
-  amount: number
-}) {
+export function alertEnrollmentConfirmed(opts: { schoolName: string; studentName: string; amount: number }) {
   return sendTelegramAlert(
-    `✅ *Nouvelle inscription confirmée*\nÉcole : ${opts.schoolName}\nÉlève : ${opts.studentName}\nCommission due : ${opts.amount.toLocaleString("fr-FR")} FCFA`,
+    `✅ *Nouvelle inscription confirmée*\\nÉcole : ${opts.schoolName}\\nÉlève : ${opts.studentName}\\nCommission due : ${opts.amount.toLocaleString("fr-FR")} FCFA`,
     "info",
     "Nouvelle inscription confirmée"
   )
 }
 
-export function alertCashSessionDifference(opts: {
-  schoolName: string
-  difference: number
-  closedBy: string
-}) {
+export function alertCashSessionDifference(opts: { schoolName: string; difference: number; closedBy: string }) {
   const level: TelegramAlertLevel = Math.abs(opts.difference) > 5000 ? "error" : "warning"
   return sendTelegramAlert(
-    `💰 *Écart de caisse détecté*\nÉcole : ${opts.schoolName}\nÉcart : ${opts.difference.toLocaleString("fr-FR")} FCFA\nClôturé par : ${opts.closedBy}`,
+    `💰 *Écart de caisse détecté*\\nÉcole : ${opts.schoolName}\\nÉcart : ${opts.difference.toLocaleString("fr-FR")} FCFA\\nClôturé par : ${opts.closedBy}`,
     level,
     "Écart de caisse détecté"
   )
 }
 
-export function alertRolloverCompleted(opts: {
-  schoolName: string
-  oldYear: string
-  newYear: string
-  promoted: number
-  repeated: number
-  excluded: number
-}) {
+export function alertRolloverCompleted(opts: { schoolName: string; oldYear: string; newYear: string; promoted: number; repeated: number; excluded: number }) {
   return sendTelegramAlert(
-    `🔄 *Bascule d'année terminée*\nÉcole : ${opts.schoolName}\n${opts.oldYear} → ${opts.newYear}\nPromus : ${opts.promoted} · Redoublants : ${opts.repeated} · Exclus : ${opts.excluded}`,
+    `🔄 *Bascule d'année terminée*\\nÉcole : ${opts.schoolName}\\n${opts.oldYear} → ${opts.newYear}\\nPromus : ${opts.promoted} · Redoublants : ${opts.repeated} · Exclus : ${opts.excluded}`,
     "info",
     "Bascule d'année terminée"
   )
 }
 
-export function alertNewSchoolRegistered(opts: {
-  schoolName: string
-  city?: string
-  adminEmail: string
-}) {
+export function alertNewSchoolRegistered(opts: { schoolName: string; city?: string; adminEmail: string }) {
   return sendTelegramAlert(
-    `🏫 *Nouvelle école inscrite*\nNom : ${opts.schoolName}\n${opts.city ? `Ville : ${opts.city}\n` : ""}Admin : ${opts.adminEmail}`,
+    `🏫 *Nouvelle école inscrite*\\nNom : ${opts.schoolName}\\n${opts.city ? `Ville : ${opts.city}\\n` : ""}Admin : ${opts.adminEmail}`,
     "info",
     "Nouvelle école inscrite"
   )
