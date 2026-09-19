@@ -41,6 +41,7 @@ export function TrouvetouAdminClient({
   const [activeTab, setActiveTab] = useState("overview")
   const [modal, setModal] = useState<Modal>(null)
   const [selectedReservation, setSelectedReservation] = useState<any>(null)
+  const [qualificationLoading, setQualificationLoading] = useState(false)
 
   const [published, setPublished] = useState(Boolean(school?.published_to_trouvetou))
   const [description, setDescription] = useState(school?.description_publique || "")
@@ -195,6 +196,34 @@ export function TrouvetouAdminClient({
       setLoading(false)
     }
   }, [adTitle, adMessage, adImageUrl, adTargetUrl, adStartDate, adEndDate, router])
+
+  const updateReservation = useCallback(async () => {
+    if (!selectedReservation) return
+    setQualificationLoading(true)
+    try {
+      const res = await fetch("/api/v1/admin/trouvetou/reservations/update", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          reservation_id: selectedReservation.id,
+          student_full_name: selectedReservation.student_full_name,
+          student_birthdate: selectedReservation.student_birthdate,
+          parent_full_name: selectedReservation.parent_full_name,
+          parent_phone: selectedReservation.parent_phone,
+          parent_email: selectedReservation.parent_email,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Impossible de mettre à jour la demande")
+      setSelectedReservation(data.reservation)
+      toast.success("Dossier qualifié et mis à jour")
+      router.refresh()
+    } catch (error: any) {
+      toast.error(error.message || "Erreur de qualification")
+    } finally {
+      setQualificationLoading(false)
+    }
+  }, [selectedReservation, router])
 
   const removeItem = (setter: React.Dispatch<React.SetStateAction<string[]>>, index: number) => {
     setter(prev => prev.filter((_, i) => i !== index))
@@ -355,8 +384,18 @@ export function TrouvetouAdminClient({
       <Dialog open={modal === "reservation"} onOpenChange={(open)=>setModal(open ? "reservation" : null)} label="Détails de la demande">
         <DialogContent>
           <DialogHeader><DialogTitle>Demande de pré-inscription</DialogTitle><DialogDescription>Informations reçues depuis Trouvetou.</DialogDescription></DialogHeader>
-          {selectedReservation && <div className="space-y-3 py-4"><InfoLine icon={<Users />} label="Élève" value={selectedReservation.student_full_name} /><InfoLine icon={<Users />} label="Parent" value={selectedReservation.parent_full_name} /><InfoLine icon={<Phone />} label="Téléphone" value={selectedReservation.parent_phone} /><InfoLine icon={<CheckCircle2 />} label="Statut" value={reservationLabel(selectedReservation.status)} /><InfoLine icon={<Info />} label="Reçue le" value={new Date(selectedReservation.created_at).toLocaleString("fr-FR")} /></div>}
-          <DialogFooter><Button variant="outline" onClick={()=>setModal(null)}>Fermer</Button></DialogFooter><DialogClose onClick={()=>setModal(null)} />
+          {selectedReservation && <div className="space-y-4 py-4">
+            <div className="rounded-xl bg-muted/60 p-3 text-sm"><Sparkles className="mr-1 inline h-4 w-4" />Qualification intelligente : complète les informations critiques avant de finaliser l'inscription.</div>
+            <Field label="Nom complet de l'élève"><Input value={selectedReservation.student_full_name || ""} onChange={e=>setSelectedReservation((v:any)=>({...v,student_full_name:e.target.value}))} /></Field>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Date de naissance"><Input type="date" value={selectedReservation.student_birthdate || ""} onChange={e=>setSelectedReservation((v:any)=>({...v,student_birthdate:e.target.value}))} /></Field>
+              <Field label="Téléphone parent"><Input value={selectedReservation.parent_phone || ""} onChange={e=>setSelectedReservation((v:any)=>({...v,parent_phone:e.target.value}))} /></Field>
+            </div>
+            <Field label="Nom complet du parent"><Input value={selectedReservation.parent_full_name || ""} onChange={e=>setSelectedReservation((v:any)=>({...v,parent_full_name:e.target.value}))} /></Field>
+            <Field label="Email parent"><Input type="email" value={selectedReservation.parent_email || ""} onChange={e=>setSelectedReservation((v:any)=>({...v,parent_email:e.target.value}))} /></Field>
+            <div className="grid gap-3 sm:grid-cols-2"><InfoLine icon={<CheckCircle2 />} label="Statut" value={reservationLabel(selectedReservation.status)} /><InfoLine icon={<Info />} label="Reçue le" value={selectedReservation.created_at ? new Date(selectedReservation.created_at).toLocaleString("fr-FR") : "—"} /></div>
+          </div>}
+          <DialogFooter><Button variant="outline" onClick={()=>setModal(null)}>Fermer</Button>{selectedReservation && ["pending_payment","reserved"].includes(selectedReservation.status) && <Button onClick={updateReservation} disabled={qualificationLoading}>{qualificationLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Enregistrer la qualification</Button>}</DialogFooter><DialogClose onClick={()=>setModal(null)} />
         </DialogContent>
       </Dialog>
 
