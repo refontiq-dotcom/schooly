@@ -82,7 +82,7 @@ export default async function BillingPage() {
                       Demande déjà soumise
                     </p>
                     <p className="text-xs text-amber-700 mt-1">
-                      Votre demande de {formatFCFA(billing.pendingSum)} est en cours de validation par le Super Admin.
+                      Votre demande de {formatFCFA(billing.pendingSum)} est en cours de validation par le Centre de Contrôle.
                       Vous pourrez soumettre une nouvelle demande une fois validée ou rejetée.
                     </p>
                   </div>
