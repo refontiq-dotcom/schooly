@@ -31,7 +31,7 @@ export default async function CaisseHistoryPage() {
   const { data: payments } = await getPayments(roleData.school_id)
 
   const total = (payments || []).reduce((sum: number, p: any) => sum + p.amount, 0)
-  const canCancel = ["direction", "compta", "super_admin"].includes(roleData.role_code)
+  const canCancel = ["direction", "compta"].includes(roleData.role_code)
 
   return (
     <div className="p-6 space-y-6">
