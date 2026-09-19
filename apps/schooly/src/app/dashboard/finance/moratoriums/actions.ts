@@ -24,7 +24,7 @@ export async function getMoratoriums(schoolId: string) {
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SECRET_KEY!
   )
 
   const { data, error } = await admin
@@ -49,7 +49,7 @@ export async function getMoratoriumContext(enrollmentId: string): Promise<Action
   const supabase = await createClient()
   const guard = await requireSchoolRole(supabase, { allowedRoles: [...MORATORIUM_ROLES] })
   if (!guard.ok) return { error: denial(guard.reason, []).error }
-  const admin = createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+  const admin = createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SECRET_KEY!)
   const { data: enrollment } = await admin.from("enrollments")
     .select("id, school_id, guardian_id, fee_expected, fee_paid, fee_balance, fee_status")
     .eq("id", enrollmentId).single()
@@ -77,7 +77,7 @@ export async function createMoratorium(formData: FormData): Promise<ActionResult
   if (!enrollmentId || reason.length < 5 || !Number.isInteger(requestedAmount) || requestedAmount <= 0 || !dueDate) {
     return { error: "Élève, motif, montant et date limite sont requis." }
   }
-  const admin = createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+  const admin = createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SECRET_KEY!)
   const { data: enrollment } = await admin.from("enrollments")
     .select("school_id, guardian_id, fee_balance").eq("id", enrollmentId).single()
   if (!enrollment || enrollment.school_id !== schoolId) return { error: "Inscription introuvable ou accès non autorisé." }
@@ -108,7 +108,7 @@ export async function reviewMoratorium(formData: FormData): Promise<ActionResult
   const approvedAmount = Number(formData.get("approvedAmount") ?? 0)
   const installmentCount = Number(formData.get("installmentCount") ?? 0)
   if (!moratoriumId || !["approve","reject"].includes(action)) return { error: "Décision invalide." }
-  const admin = createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+  const admin = createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SECRET_KEY!)
   const { data: m } = await admin.from("moratoriums").select("*").eq("id", moratoriumId).single()
   if (!m || m.school_id !== schoolId || m.status !== "pending") return { error: "Moratoire introuvable ou déjà traité." }
   if (action === "reject") {
@@ -141,7 +141,7 @@ export async function getMoratoriumInstallments(moratoriumId: string) {
   const supabase = await createClient()
   const guard = await requireSchoolRole(supabase, { allowedRoles: [...MORATORIUM_ROLES] })
   if (!guard.ok) return denial(guard.reason, [])
-  const admin = createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+  const admin = createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SECRET_KEY!)
   const { data:m } = await admin.from("moratoriums").select("school_id").eq("id",moratoriumId).single()
   if (!m || m.school_id !== guard.context.schoolId) return { error:"Moratoire introuvable.", data:[] }
   const { data, error } = await admin.from("moratorium_installments").select("*").eq("moratorium_id",moratoriumId).order("installment_no")
@@ -160,7 +160,7 @@ export async function getPaymentReminders(schoolId: string) {
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SECRET_KEY!
   )
 
   const { data, error } = await admin
@@ -198,7 +198,7 @@ export async function sendPaymentReminder(formData: FormData): Promise<ActionRes
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SECRET_KEY!
   )
 
   const { data: enrollment } = await admin
@@ -253,7 +253,7 @@ export async function getFamilyReliabilityScores(schoolId: string) {
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SECRET_KEY!
   )
 
   const { data, error } = await admin
@@ -281,7 +281,7 @@ export async function updateFamilyReliabilityScore(schoolId: string, guardianId:
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SECRET_KEY!
   )
 
   const { data: moratoriums } = await admin
