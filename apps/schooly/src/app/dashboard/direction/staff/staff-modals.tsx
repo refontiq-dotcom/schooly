@@ -11,6 +11,7 @@ import { toast } from "sonner"
 import { createStaffMember } from "./actions"
 
 const ROLE_OPTIONS = [
+  { value: "direction", label: "Direction" },
   { value: "professeur", label: "Professeur / Enseignant" },
   { value: "compta", label: "Comptabilité" },
   { value: "secretariat", label: "Secrétariat" },
