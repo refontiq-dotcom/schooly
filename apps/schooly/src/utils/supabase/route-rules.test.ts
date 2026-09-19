@@ -21,7 +21,6 @@ import {
 
 // Catalogue officiel des rôles (migration 20260908090000_tenancy_auth.sql).
 const ROLE_CATALOG = [
-  "super_admin",
   "direction",
   "secretariat",
   "compta",
