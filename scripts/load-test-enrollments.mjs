@@ -13,7 +13,7 @@
  *   concurrency: lots paralleles (defaut 20)
  *
  * Variables (.env.local a la racine du workspace schooly) :
- *   NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+ *   NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SECRET_KEY
  *
  * Metriques sortiees en JSON sur stdout (syslog/metrics).
  */
@@ -52,9 +52,9 @@ if (!schoolId) {
 }
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const key = process.env.SUPABASE_SECRET_KEY;
 if (!url || !key) {
-  console.error("[load-test] NEXT_PUBLIC_SUPABASE_URL et SUPABASE_SERVICE_ROLE_KEY requis");
+  console.error("[load-test] NEXT_PUBLIC_SUPABASE_URL et SUPABASE_SECRET_KEY requis");
   process.exit(1);
 }
 
@@ -101,7 +101,7 @@ function uniqueMatricule() {
  *   concurrency: lots paralleles (defaut 20)
  *
  * Variables (.env.local a la racine du workspace schooly) :
- *   NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+ *   NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SECRET_KEY
  */
 
 async function fetchJson(path, init = {}) {
