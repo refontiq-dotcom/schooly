@@ -159,7 +159,7 @@ begin
 
     insert into public.pre_enrollments(
       school_id, first_name, last_name, date_of_birth, grade_level_id,
-      guardian_phone, code, status, expires_at, import_row_id, suggested_class_id,
+      guardian_phone, code, status, expires_at, import_row_id, suggested_class_id, source,
       created_at, updated_at
     )
     values (
@@ -175,7 +175,8 @@ begin
       v_row.import_row_id,
       v_row.class_id,
       now(),
-      now()
+      now(),
+      'ministere'
     );
 
     v_created := v_created + 1;
