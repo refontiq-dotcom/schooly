@@ -14,7 +14,7 @@ export default async function ReportsPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect("/login")
-  const guard = await requireSchoolRole(supabase, { allowedRoles: ["direction", "informatique", "compta", "super_admin"] })
+  const guard = await requireSchoolRole(supabase, { allowedRoles: ["direction", "informatique", "compta"] })
   if (!guard.ok) redirect("/login")
   const admin = createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SECRET_KEY!)
   const schoolId = guard.context.schoolId
