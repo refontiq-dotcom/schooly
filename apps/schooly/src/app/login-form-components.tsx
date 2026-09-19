@@ -31,8 +31,8 @@ export function SchoolLoginForm({
   completeActivationState: State
   completeActivationPending: boolean
 }) {
-  const mode = state.mode ?? activationVerifyState.mode ?? completeActivationState.mode ?? "password"
-  const contact = state.contact ?? activationVerifyState.contact ?? ""
+  const mode = completeActivationState.mode ?? activationVerifyState.mode ?? state.mode ?? "password"
+  const contact = completeActivationState.contact ?? activationVerifyState.contact ?? state.contact ?? ""
 
   if (mode === "activation_verify") {
     return (
