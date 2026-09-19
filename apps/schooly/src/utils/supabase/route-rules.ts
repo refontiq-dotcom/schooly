@@ -92,7 +92,6 @@ export function legacyRedirectFor(pathname: string): string | null {
  * parente (`apps/pwa-parent`), il n'a pas de tableau de bord dans cette app.
  */
 export const ROLE_HOME: Readonly<Record<string, string>> = {
-  super_admin: "/dashboard/super-admin",
   direction: "/dashboard/direction",
   compta: "/dashboard/direction/finance",
   secretariat: "/dashboard/direction/admissions",
@@ -116,7 +115,6 @@ export function roleHome(roleCode: string | null | undefined): string | null {
 }
 
 export const ROLE_ALLOWED_PATHS: Readonly<Record<string, readonly string[]>> = {
-  super_admin: ["/dashboard/super-admin", "/dashboard/billing"],
   direction: ["/dashboard/direction", "/dashboard/academic-structure", "/dashboard/services", "/dashboard/billing", "/dashboard/admin", "/dashboard/pedagogie", "/dashboard/caisse"],
   secretariat: ["/dashboard/direction/admissions", "/dashboard/academic-structure", "/dashboard/services"],
   informatique: ["/dashboard/informatique", "/dashboard/academic-structure", "/dashboard/direction/settings", "/dashboard/direction/reports", "/dashboard/informatique/emploi-du-temps"],
