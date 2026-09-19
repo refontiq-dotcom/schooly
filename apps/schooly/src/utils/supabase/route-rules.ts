@@ -119,7 +119,7 @@ export const ROLE_ALLOWED_PATHS: Readonly<Record<string, readonly string[]>> = {
   super_admin: ["/dashboard/super-admin", "/dashboard/billing"],
   direction: ["/dashboard/direction", "/dashboard/academic-structure", "/dashboard/services", "/dashboard/billing", "/dashboard/admin", "/dashboard/pedagogie", "/dashboard/caisse"],
   secretariat: ["/dashboard/direction/admissions", "/dashboard/academic-structure", "/dashboard/services"],
-  informatique: ["/dashboard/informatique", "/dashboard/academic-structure", "/dashboard/direction/settings", "/dashboard/direction/reports"],
+  informatique: ["/dashboard/informatique", "/dashboard/academic-structure", "/dashboard/direction/settings", "/dashboard/direction/reports", "/dashboard/informatique/emploi-du-temps"],
   compta: ["/dashboard/direction/finance", "/dashboard/direction/reports", "/dashboard/billing"],
   caisse: ["/dashboard/caisse"],
   professeur: ["/dashboard/pedagogie"],
