@@ -15,7 +15,6 @@ const ROLE_LABELS: Record<string, string> = {
   informatique: "Informatique / Administration Schooly",
   surveillance: "Surveillance",
   direction: "Direction",
-  super_admin: "Super Admin",
 }
 
 export default async function StaffPage() {
