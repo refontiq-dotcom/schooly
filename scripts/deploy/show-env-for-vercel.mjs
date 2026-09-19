@@ -45,13 +45,12 @@ for (const key of WANT) {
   } else if (val === "") {
     console.log(`${key}=<VIDE>`);
   } else {
-    const display = val.length > 40 ? val.slice(0, 12) + "..." + val.slice(-6) : val;
-    console.log(`${key}=${display}`);
+    console.log(`${key}=<VALEUR_PRÉSENTE>`);
   }
 }
 
 console.log("\n=== Vérifications ===");
-const anon = env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || "";
-console.log("  Clé anon JWT valide :", anon.startsWith("eyJhbGciOiJIUzI1NiIs") ? "✅" : "❌");
+const publishable = env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || "";
+console.log("  Clé publishable présente :", publishable.startsWith("sb_publishable_") ? "✅" : "❌");
 console.log("  URL Supabase présente :", env.NEXT_PUBLIC_SUPABASE_URL?.includes(".supabase.co") ? "✅" : "❌");
-console.log("  Service role key présente :", env.SUPABASE_SECRET_KEY ? "✅" : "❌");
+console.log("  Clé secret backend présente :", env.SUPABASE_SECRET_KEY ? "✅" : "❌");
