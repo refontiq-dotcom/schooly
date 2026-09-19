@@ -6,7 +6,7 @@
  * variables d'environnement vers la table `billing_configs` (Supabase).
  *
  * Source : `.env.local` à la racine du monorepo schooly
- *   NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (connexion DB)
+ *   NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SECRET_KEY (connexion DB)
  *   TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, TELEGRAM_ADMIN_URL
  *   WAVE_MERCHANT_ID, WAVE_WEBHOOK_SECRET
  *
@@ -56,11 +56,11 @@ function loadDotEnvLocal() {
 const env = loadDotEnvLocal();
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const serviceRoleKey = process.env.SUPABASE_SECRET_KEY;
 
 if (!supabaseUrl || !serviceRoleKey) {
   console.error(
-    "[billing:sync] NEXT_PUBLIC_SUPABASE_URL et SUPABASE_SERVICE_ROLE_KEY sont requis (.env.local)."
+    "[billing:sync] NEXT_PUBLIC_SUPABASE_URL et SUPABASE_SECRET_KEY sont requis (.env.local)."
   );
   process.exit(1);
 }
