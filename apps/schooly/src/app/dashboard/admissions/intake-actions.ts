@@ -161,7 +161,7 @@ export async function previewAdmissionAssignment(schoolId: string, academicYearI
   if (rowError) return { error: rowError.message }
 
   const { data: classes, error: classError } = await admin
-    .from("classes").select("id,name,capacity,grade_level_id").eq("school_id", schoolId).eq("grade_level_id", gradeLevelId).is("deleted_at", null).order("name")
+    .from("classes").select("id,name,capacity,grade_level_id,required_options").eq("school_id", schoolId).eq("grade_level_id", gradeLevelId).is("deleted_at", null).order("name")
   if (classError) return { error: classError.message }
   if (!classes?.length) return { error: "Aucune classe disponible pour ce niveau." }
   if (!rows?.length) return { error: "Aucun élève importé pour ce niveau." }
@@ -189,7 +189,7 @@ export async function previewAdmissionAssignment(schoolId: string, academicYearI
   }))
 
   for (const [index, student] of ordered.entries()) {
-    const candidates = classState.filter((c) => c.remaining > 0)
+    const candidates = classState.filter((c) => c.remaining > 0 && (Array.isArray(c.required_options) ? c.required_options : []).every((required: string) => (Array.isArray(student.required_options) ? student.required_options : []).map((x: string) => x.toLowerCase()).includes(required.toLowerCase())))
     if (!candidates.length) {
       assignment.push({ import_row_id: student.id, class_id: null, position: index + 1, hard_valid: false, soft_score: 0, constraint_reason: "Capacité atteinte." })
       continue
