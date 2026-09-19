@@ -50,7 +50,7 @@ Ne jamais copier une valeur secrète dans ce document. Les valeurs ci-dessous so
 vercel login
 cd apps/schooly
 vercel link
-vercel env add SUPABASE_SERVICE_ROLE_KEY production
+vercel env add SUPABASE_SECRET_KEY production
 vercel env add TELEGRAM_BOT_TOKEN production
 vercel env add TROUVETOU_API_KEY production
 vercel --prod
