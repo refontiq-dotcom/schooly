@@ -1,53 +1,36 @@
-# Vercel - Variables environnement (Production + Preview)
+# Vercel — Variables d'environnement (Production + Preview)
 
-Copier chaque bloc dans Vercel > Projet > Settings > Environment Variables.
+Ce document contient uniquement des **placeholders**. Les vraies valeurs doivent être stockées dans Vercel, Supabase ou le gestionnaire de secrets approprié — jamais dans Git.
 
-```
-NEXT_PUBLIC_SUPABASE_URL=https://xoihidpejrzknmkvlceo.supabase.co
-```
+Dans Vercel → Project → Settings → Environment Variables, configurer les variables pour **Production** et **Preview** selon les besoins.
 
 ```
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhvaWhpZHBlanJ6a25ta3ZsY2VvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk5NjkyNDcsImV4cCI6MjA5NTU0NTI0N30.IQVhlUabnjAt8rb6nyrU7ZSC8qmL6ly-lztdZeNYogE
+NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<supabase-publishable-key>
+SUPABASE_SERVICE_ROLE_KEY=<supabase-secret-key>
+TELEGRAM_BOT_TOKEN=<telegram-bot-token>
+TELEGRAM_CHAT_ID=<telegram-chat-id>
+TELEGRAM_ADMIN_URL=https://<schooly-admin-domain>/billing
+WAVE_MERCHANT_ID=<wave-merchant-id>
+WAVE_WEBHOOK_SECRET=<wave-webhook-secret>
+TROUVETOU_API_KEY=<trouvetou-api-key>
+METRICS_PUSH_SECRET=<metrics-push-secret>
+CONTROL_CENTER_URL=https://<control-center-domain>
 ```
 
-```
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhvaWhpZHBlanJ6a25ta3ZsY2VvIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3OTk2OTI0NywiZXhwIjoyMDk1NTQ1MjQ3fQ.8BuDtCwE_7k-DISrFSfo_xHXcCO9ebh877Nxy-UzDGk
-```
+## Règles
 
-```
-TELEGRAM_BOT_TOKEN=8882268453:AAGNSyYytK2Wyo57sKAlw2Vps1HNBg11ZvE
-```
+- `NEXT_PUBLIC_SUPABASE_URL` peut être documentée.
+- La clé Supabase côté client doit utiliser une clé **publishable** dès que la migration est effectuée.
+- `SUPABASE_SERVICE_ROLE_KEY` est une clé legacy sensible : elle ne doit jamais être commitée, affichée dans les logs ou exposée au navigateur.
+- Préférer à terme `SUPABASE_SECRET_KEY` pour le backend, conformément aux nouvelles clés Supabase.
+- Tous les tokens, secrets webhook, clés API et secrets de push doivent rester hors du dépôt.
+- Les valeurs de production doivent être saisies directement dans Vercel/Supabase.
 
-```
-TELEGRAM_CHAT_ID=8958821599
-```
+## Rotation urgente
 
-```
-TELEGRAM_ADMIN_URL=https://admin.schooly.ci/billing
-```
+Les valeurs qui figuraient auparavant dans ce fichier ont été considérées comme exposées. Voir `docs/security/secret-rotation-schooly.md` pour la procédure de rotation.
 
-```
-WAVE_MERCHANT_ID=M_ci_RImDyQYI8ccj
-```
+## Développement local
 
-```
-WAVE_WEBHOOK_SECRET=votre_wave_webhook_secret
-```
-
-```
-TROUVETOU_API_KEY=tv_live_79402646-081e-490e-9096-e1cd3caa7a8c.vK3y2tbrEe__uRMYg7YB55mUI_4plz1bKZajM5cMuog
-```
-
-```
-METRICS_PUSH_SECRET=e4f6a8b2c0d1e3f5a7b9c1d3e5f7a9b1c3d5e7f9a1b3c5d7e9f1a3b5c7d9e1f3
-```
-
-```
-CONTROL_CENTER_URL=http://localhost:3000
-```
-
-## Notes
-
-- WAVE_WEBHOOK_SECRET: placeholder, a remplacer quand API Wave disponible
-- CONTROL_CENTER_URL: localhost:3000 = dev, changer pour https://admin.refontiq.com en prod
-- Domaine post-deploy: admin.schooly.ci (CNAME > cname.vercel-dns.com)
+Créer `.env.local` localement à partir de `.env.example`. Ne jamais committer `.env.local`.
