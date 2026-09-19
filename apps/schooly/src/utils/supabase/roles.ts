@@ -20,6 +20,7 @@ export const ALL_STAFF_ROLES = [
   "caisse",
   "professeur",
   "surveillance",
+  "informatique",
 ] as const
 export type StaffRole = (typeof ALL_STAFF_ROLES)[number]
 
@@ -46,6 +47,8 @@ export const REMINDER_ROLES = ["direction", "compta", "secretariat", "super_admi
 // ─── Pédagogie ─────────────────────────────────────────────────────────────
 /** Écritures pédagogiques : le professeur est l'acteur principal. */
 export const TEACHING_ROLES = ["professeur", "direction", "super_admin"] as const
+/** Gestion de l’emploi du temps : configuration technique déléguée à l’informatique, pilotable aussi par la direction. */
+export const TIMETABLE_ADMIN_ROLES = ["direction", "informatique", "super_admin"] as const
 /** Décisions académiques : passage, redoublement, exclusion → acte de direction. */
 export const DECISION_ROLES = ["direction", "super_admin"] as const
 /** Lectures du référentiel : la vie scolaire (surveillance) suit les élèves. */
