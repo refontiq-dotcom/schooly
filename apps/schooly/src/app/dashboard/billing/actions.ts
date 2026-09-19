@@ -42,7 +42,6 @@ export async function getBillingContext() {
     userId: user.id,
     schoolId: role.school_id,
     roleCode: role.role_code,
-    isSuperAdmin: role.role_code === "super_admin",
     school: school as { id: string; name: string; city: string | null } | null,
   }
 }
@@ -172,7 +171,7 @@ export async function getMyPaymentRequests(): Promise<ActionResult<Array<{
     .eq("product_id", "schooly")
     .order("created_at", { ascending: false })
 
-  if (!ctx.isSuperAdmin && ctx.schoolId) {
+  if (ctx.schoolId) {
     query = query.eq("tenant_id", ctx.schoolId)
   }
 
@@ -180,77 +179,4 @@ export async function getMyPaymentRequests(): Promise<ActionResult<Array<{
   if (error) return { error: error.message, data: [] }
 
   return { data: data ?? [] }
-}
-
-// ─── Valider une demande (Super Admin) ────────────────────────────────────
-
-export async function validatePaymentRequest(requestId: string): Promise<ActionResult> {
-  const { userId } = await getBillingContext().catch(() => {
-    throw new Error("NOT_AUTHENTICATED")
-  })
-
-  const admin = getAdmin()
-  const { error } = await admin.rpc("validate_subscription_payment", {
-    p_request_id: requestId,
-    p_validator_id: userId,
-  })
-
-  if (error) return { error: error.message }
-  revalidatePath("/dashboard/billing")
-  return {}
-}
-
-// ─── Rejeter une demande (Super Admin) ────────────────────────────────────
-
-export async function rejectPaymentRequest(requestId: string): Promise<ActionResult> {
-  const { userId } = await getBillingContext().catch(() => {
-    throw new Error("NOT_AUTHENTICATED")
-  })
-
-  const admin = getAdmin()
-  const { error } = await admin.rpc("reject_subscription_payment", {
-    p_request_id: requestId,
-    p_validator_id: userId,
-  })
-
-  if (error) return { error: error.message }
-  revalidatePath("/dashboard/billing")
-  return {}
-}
-
-// ─── Toutes les demandes (Super Admin) ────────────────────────────────────
-
-export async function getAllPendingRequests(): Promise<ActionResult<Array<{
-  id: string
-  amount: number
-  status: string
-  sender_phone: string
-  created_at: string
-  tenant_id: string
-  tenant_name: string
-}>>> {
-  const admin = getAdmin()
-  const { data, error } = await admin
-    .from("subscription_payment_requests")
-    .select(`
-      id, amount, status, sender_phone, created_at, tenant_id,
-      schools!inner (name)
-    `)
-    .eq("product_id", "schooly")
-    .in("status", ["pending"])
-    .order("created_at", { ascending: false })
-
-  if (error) return { error: error.message, data: [] }
-
-  const requests = (data ?? []).map((r: any) => ({
-    id: r.id,
-    amount: r.amount,
-    status: r.status,
-    sender_phone: r.sender_phone,
-    created_at: r.created_at,
-    tenant_id: r.tenant_id,
-    tenant_name: r.schools?.name || "Établissement",
-  }))
-
-  return { data: requests }
 }
