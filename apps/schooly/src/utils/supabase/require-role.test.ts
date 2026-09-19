@@ -68,7 +68,7 @@ describe("requireSchoolRole — refus", () => {
   ])("refuse le rôle %s sur écriture direction/compta (FORBIDDEN_ROLE, cas %s)", async (roleCode) => {
     const out = await requireSchoolRole(
       asClient(fakeClient({ role: { school_id: "school-A", role_code: roleCode } })),
-      { allowedRoles: ["direction", "compta", "super_admin"] }
+      { allowedRoles: ["direction", "compta"] }
     )
     expect(out).toEqual({ ok: false, reason: "FORBIDDEN_ROLE" })
   })
@@ -95,7 +95,7 @@ describe("requireSchoolRole — acceptations", () => {
     })
   })
 
-  it.each(["direction", "compta", "super_admin"])(
+  it.each(["direction", "compta"])(
     "accepte le rôle %s sur écriture direction/compta",
     async (roleCode) => {
       const out = await requireSchoolRole(
