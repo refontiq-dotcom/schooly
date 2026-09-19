@@ -31,39 +31,38 @@ export const PRICING_ROLES = FINANCE_DECISION_ROLES
 export const MORATORIUM_ROLES = FINANCE_DECISION_ROLES
 export const FINANCIAL_PROFILE_ROLES = FINANCE_DECISION_ROLES
 /** Encaissements : la caisse intervient en plus de la décision financière. */
-export const CASHIER_ROLES = ["direction", "compta", "caisse", "super_admin"] as const
+export const CASHIER_ROLES = ["direction", "compta", "caisse"] as const
 /** Contexte facturation Schooly (résumé, versements, historique). */
 export const FINANCE_CONTEXT_ROLES = [
   "direction",
   "secretariat",
   "compta",
   "caisse",
-  "super_admin",
 ] as const
 /** Relances / rappels de paiement : le secrétariat participe. */
-export const REMINDER_ROLES = ["direction", "compta", "secretariat", "super_admin"] as const
+export const REMINDER_ROLES = ["direction", "compta", "secretariat"] as const
 
 // ─── Pédagogie ─────────────────────────────────────────────────────────────
 /** Écritures pédagogiques : le professeur est l'acteur principal. */
-export const TEACHING_ROLES = ["professeur", "direction", "super_admin"] as const
+export const TEACHING_ROLES = ["professeur", "direction"] as const
 /** Gestion de l’emploi du temps : configuration technique déléguée à l’informatique, pilotable aussi par la direction. */
-export const TIMETABLE_ADMIN_ROLES = ["direction", "informatique", "super_admin"] as const
+export const TIMETABLE_ADMIN_ROLES = ["direction", "informatique"] as const
 /** Décisions académiques : passage, redoublement, exclusion → acte de direction. */
-export const DECISION_ROLES = ["direction", "super_admin"] as const
+export const DECISION_ROLES = ["direction"] as const
 /** Lectures du référentiel : la vie scolaire (surveillance) suit les élèves. */
 export const REF_ROLES = [...TEACHING_ROLES, "surveillance"] as const
 
 // ─── Admissions ────────────────────────────────────────────────────────────
-export const ADMISSIONS_ROLES = ["direction", "secretariat", "super_admin"] as const
+export const ADMISSIONS_ROLES = ["direction", "secretariat"] as const
 
 // ─── Modules complémentaires & structure académique ───────────────────────
 /** Transport, cantine, internat : administration = direction/secretariat. */
-export const SERVICE_ADMIN_ROLES = ["direction", "secretariat", "super_admin"] as const
+export const SERVICE_ADMIN_ROLES = ["direction", "secretariat"] as const
 /** Années, niveaux, classes, matières, affectations. */
-export const STRUCTURE_ADMIN_ROLES = ["direction", "secretariat", "informatique", "super_admin"] as const
+export const STRUCTURE_ADMIN_ROLES = ["direction", "secretariat", "informatique"] as const
 /** Rollover d'année : opération sensible réservée à la direction. */
-export const ROLLOVER_ROLES = ["direction", "super_admin"] as const
+export const ROLLOVER_ROLES = ["direction"] as const
 
 // ─── Trouvetou (API admin) ─────────────────────────────────────────────────
-export const TROUVETOU_ADMIN_ROLES = ["direction", "super_admin"] as const
-export const TROUVETOU_FINALIZE_ROLES = ["direction", "secretariat", "super_admin"] as const
+export const TROUVETOU_ADMIN_ROLES = ["direction"] as const
+export const TROUVETOU_FINALIZE_ROLES = ["direction", "secretariat"] as const
