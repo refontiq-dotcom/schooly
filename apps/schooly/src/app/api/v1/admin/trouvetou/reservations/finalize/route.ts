@@ -43,12 +43,26 @@ export async function POST(request: Request) {
     }
 
     // Appeller finalize_reservation
+    const { data: details } = await admin
+      .from("trouvetou_reservations")
+      .select("student_birthdate")
+      .eq("id", reservation_id)
+      .single()
+
+    if (!details?.student_birthdate) {
+      return NextResponse.json({ error: "Date de naissance de l'élève manquante. Ouvre la qualification pour la compléter." }, { status: 422 })
+    }
+
     const { data: success, error } = await admin.rpc("finalize_reservation", {
       p_reservation_id: reservation_id,
     })
 
-    if (error || !success) {
-      return NextResponse.json({ error: "Echec de la finalisation" }, { status: 500 })
+    if (error) {
+      console.error("[Trouvetou Finalize]", error)
+      return NextResponse.json({ error: "La finalisation a échoué. Vérifie l'année académique en cours et les informations du dossier." }, { status: 422 })
+    }
+    if (!success) {
+      return NextResponse.json({ error: "Le dossier ne peut pas encore être finalisé. Vérifie les informations obligatoires." }, { status: 422 })
     }
 
     return NextResponse.json({ success: true })
