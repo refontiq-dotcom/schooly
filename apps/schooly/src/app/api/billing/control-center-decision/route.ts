@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { initBilling, validateSubscriptionPayment, rejectSubscriptionPayment } from "@/lib/billing";
 
 const sharedSecret = process.env.METRICS_PUSH_SECRET;
@@ -18,10 +17,11 @@ export async function POST(req: Request) {
     }
 
     initBilling(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SECRET_KEY!);
+    const safeValidatorId = typeof validatorId === "string" ? validatorId : "";
 
     const result = action === "validate"
-      ? await validateSubscriptionPayment(requestId, validatorId ?? null)
-      : await rejectSubscriptionPayment(requestId, validatorId ?? null);
+      ? await validateSubscriptionPayment(requestId, safeValidatorId)
+      : await rejectSubscriptionPayment(requestId, safeValidatorId);
 
     return NextResponse.json({ success: true, action, result });
   } catch (error) {
