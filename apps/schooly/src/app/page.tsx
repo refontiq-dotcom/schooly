@@ -7,6 +7,8 @@ import { School, Users } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import {
   schoolLoginAction,
+  schoolActivationVerifyAction,
+  completeStaffActivationAction,
   parentOtpSendAction,
   parentOtpVerifyAction,
 } from "./login/unified-actions"
@@ -23,6 +25,14 @@ export default function Home() {
   const [schoolState, schoolFormAction, schoolPending] = useActionState(schoolLoginAction, {
     error: null,
   })
+  const [activationVerifyState, activationVerifyFormAction, activationVerifyPending] = useActionState(
+    schoolActivationVerifyAction,
+    { error: null }
+  )
+  const [completeActivationState, completeActivationFormAction, completeActivationPending] = useActionState(
+    completeStaffActivationAction,
+    { error: null }
+  )
   const [parentSendState, parentSendFormAction, parentSendPending] = useActionState(
     parentOtpSendAction,
     { error: null }
@@ -32,12 +42,17 @@ export default function Home() {
     { error: null }
   )
 
+  const schoolMode =
+    schoolState.mode ??
+    activationVerifyState.mode ??
+    completeActivationState.mode ??
+    "password"
+
   return (
     <div className="relative min-h-screen flex flex-col items-center justify-center p-4">
       <GeminiBackdrop />
 
       <div className="relative z-10 w-full max-w-md space-y-6">
-        {/* ————— En-tête : logo + titre dégradé animé ————— */}
         <div className="text-center space-y-3">
           <FadeIn>
             <div className="flex justify-center">
@@ -58,7 +73,6 @@ export default function Home() {
           </FadeIn>
         </div>
 
-        {/* ————— Onglets : pilule glissante (layoutId) ————— */}
         <FadeIn delay={0.22}>
           <div className="flex rounded-2xl gemini-glass p-1.5">
             {(
@@ -88,20 +102,40 @@ export default function Home() {
           </div>
         </FadeIn>
 
-        {/* ————— Formulaire actif : transition croisée ————— */}
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
-            key={tab === "school" ? "school" : parentStep}
+            key={tab === "school" ? `school-${schoolMode}` : parentStep}
             initial={{ opacity: 0, y: 10, scale: 0.99 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -8, scale: 0.99 }}
             transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
           >
             {tab === "school" && (
-              <SchoolLoginForm state={schoolState} action={schoolFormAction} pending={schoolPending} />
+              <SchoolLoginForm
+                state={schoolState}
+                action={schoolFormAction}
+                pending={schoolPending}
+                activationVerifyAction={activationVerifyFormAction}
+                activationVerifyState={activationVerifyState}
+                activationVerifyPending={activationVerifyPending}
+                completeActivationAction={completeActivationFormAction}
+                completeActivationState={completeActivationState}
+                completeActivationPending={completeActivationPending}
+              />
             )}
             {tab === "parent" && (
-              <ParentLoginForm step={parentStep} setStep={setParentStep} contact={parentContact} setContact={setParentContact} sendState={parentSendState} sendAction={parentSendFormAction} sendPending={parentSendPending} verifyState={parentVerifyState} verifyAction={parentVerifyFormAction} verifyPending={parentVerifyPending} />
+              <ParentLoginForm
+                step={parentStep}
+                setStep={setParentStep}
+                contact={parentContact}
+                setContact={setParentContact}
+                sendState={parentSendState}
+                sendAction={parentSendFormAction}
+                sendPending={parentSendPending}
+                verifyState={parentVerifyState}
+                verifyAction={parentVerifyFormAction}
+                verifyPending={parentVerifyPending}
+              />
             )}
           </motion.div>
         </AnimatePresence>
@@ -117,4 +151,3 @@ export default function Home() {
     </div>
   )
 }
-
