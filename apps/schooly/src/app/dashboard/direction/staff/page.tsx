@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
+import type { ElementType } from "react"
 import { Power, Users, ShieldCheck, ArrowRight, KeyRound, UserCog, GraduationCap, WalletCards, ClipboardList, Eye, BookOpen } from "lucide-react"
 
 const ROLE_LABELS: Record<string, string> = {
@@ -77,14 +78,14 @@ export default async function StaffPage() {
           <CardDescription>Le Directeur n'a pas à configurer chaque permission une par une : Schooly applique le socle d'accès adapté à chaque fonction.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {[
+          {([
             ["professeur", "Professeur / Enseignant", "Cours, appel, notes", BookOpen],
             ["compta", "Comptabilité", "Finance, relances, rapports", WalletCards],
             ["secretariat", "Secrétariat", "Inscriptions, structure, services", ClipboardList],
             ["caisse", "Caisse", "Encaissements et clôture", WalletCards],
             ["surveillance", "Surveillance", "Vie scolaire et accès", Eye],
             ["direction", "Direction", "Pilotage global de l'établissement", UserCog],
-          ].map(([code, label, summary, Icon]) => {
+          ] as Array<[string, string, string, ElementType]>).map(([code, label, summary, Icon]) => {
             const count = staff.filter((s) => s.role_code === code && s.is_active).length
             return (
               <div key={String(code)} className="rounded-xl border p-4">
