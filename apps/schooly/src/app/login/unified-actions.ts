@@ -54,6 +54,7 @@ async function getActiveStaffRole(
     .eq("is_active", true)
     .neq("role_code", "parent")
     .neq("role_code", "eleve")
+    .neq("role_code", "super_admin")
     .order("created_at", { ascending: true })
     .limit(1)
 
