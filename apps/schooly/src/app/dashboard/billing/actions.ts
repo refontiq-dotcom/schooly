@@ -11,7 +11,7 @@ type ActionResult<T = void> = {
 }
 
 const ADMIN_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const ADMIN_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!
+const ADMIN_KEY = process.env.SUPABASE_SECRET_KEY!
 const getAdmin = () => createAdminClient(ADMIN_URL, ADMIN_KEY)
 
 // ─── Contexte utilisateur ─────────────────────────────────────────────────
