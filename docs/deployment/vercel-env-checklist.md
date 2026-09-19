@@ -6,8 +6,8 @@ Dans Vercel → Project → Settings → Environment Variables, configurer les v
 
 ```
 NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=<supabase-publishable-key>
-SUPABASE_SERVICE_ROLE_KEY=<supabase-secret-key>
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<supabase-publishable-key>
+SUPABASE_SECRET_KEY=<supabase-secret-key>
 TELEGRAM_BOT_TOKEN=<telegram-bot-token>
 TELEGRAM_CHAT_ID=<telegram-chat-id>
 TELEGRAM_ADMIN_URL=https://<schooly-admin-domain>/billing
