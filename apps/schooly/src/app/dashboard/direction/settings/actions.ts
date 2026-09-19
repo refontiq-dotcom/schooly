@@ -34,7 +34,7 @@ async function getContext(): Promise<Context> {
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SECRET_KEY!
   )
 
   const { data: role } = await admin
@@ -56,7 +56,7 @@ export async function getSchoolSettings(): Promise<SchoolSettings> {
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SECRET_KEY!
   )
 
   const [{ data: school }, { data: profile }] = await Promise.all([
@@ -103,7 +103,7 @@ export async function updateSchoolSettings(formData: FormData): Promise<ActionRe
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SECRET_KEY!
   )
 
   const { error } = await admin
@@ -138,7 +138,7 @@ export async function updateDirectorProfile(formData: FormData): Promise<ActionR
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SECRET_KEY!
   )
 
   const { error } = await admin
