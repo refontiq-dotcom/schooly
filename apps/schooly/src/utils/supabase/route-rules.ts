@@ -113,3 +113,20 @@ export function roleHome(roleCode: string | null | undefined): string | null {
   if (!roleCode) return null
   return ROLE_HOME[roleCode] ?? null
 }
+
+export const ROLE_ALLOWED_PATHS: Readonly<Record<string, readonly string[]>> = {
+  super_admin: ["/dashboard/super-admin", "/dashboard/billing"],
+  direction: ["/dashboard/direction", "/dashboard/academic-structure", "/dashboard/services", "/dashboard/billing", "/dashboard/admin", "/dashboard/pedagogie", "/dashboard/caisse"],
+  secretariat: ["/dashboard/direction/admissions", "/dashboard/academic-structure", "/dashboard/services"],
+  compta: ["/dashboard/direction/finance", "/dashboard/direction/reports", "/dashboard/billing"],
+  caisse: ["/dashboard/caisse"],
+  professeur: ["/dashboard/pedagogie"],
+  surveillance: ["/dashboard/pedagogie/vie-scolaire"],
+}
+
+export function isRoleAllowedPath(roleCode: string | null | undefined, pathname: string): boolean {
+  if (!roleCode) return false
+  const prefixes = ROLE_ALLOWED_PATHS[roleCode]
+  if (!prefixes) return false
+  return prefixes.some((prefix) => pathname === prefix || pathname.startsWith(prefix + "/"))
+}
