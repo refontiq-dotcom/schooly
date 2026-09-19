@@ -5,8 +5,8 @@
 ### 1. Variables d'environnement (production)
 ```
 NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon-jwt>
-SUPABASE_SERVICE_ROLE_KEY=<service-role-key>
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<anon-jwt>
+SUPABASE_SECRET_KEY=<service-role-key>
 
 # Billing
 TELEGRAM_BOT_TOKEN=<bot-token>
