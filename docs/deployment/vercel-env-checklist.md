@@ -21,9 +21,9 @@ CONTROL_CENTER_URL=https://<control-center-domain>
 ## Règles
 
 - `NEXT_PUBLIC_SUPABASE_URL` peut être documentée.
-- La clé Supabase côté client doit utiliser une clé **publishable** dès que la migration est effectuée.
-- `SUPABASE_SERVICE_ROLE_KEY` est une clé legacy sensible : elle ne doit jamais être commitée, affichée dans les logs ou exposée au navigateur.
-- Préférer à terme `SUPABASE_SECRET_KEY` pour le backend, conformément aux nouvelles clés Supabase.
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` est la clé client publique à utiliser dans le navigateur et le SSR utilisateur.
+- `SUPABASE_SECRET_KEY` est la clé backend privilégiée : jamais dans le navigateur, jamais dans Git et jamais dans les logs.
+- Les anciennes clés `anon` / `service_role` restent désactivées uniquement après validation complète de tous les clients, jobs et intégrations.
 - Tous les tokens, secrets webhook, clés API et secrets de push doivent rester hors du dépôt.
 - Les valeurs de production doivent être saisies directement dans Vercel/Supabase.
 
