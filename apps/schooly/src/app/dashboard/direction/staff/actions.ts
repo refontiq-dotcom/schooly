@@ -13,7 +13,7 @@ type Result = { error?: string; data?: unknown }
 async function context() {
   const supabase = await createClient()
   const guard = await requireSchoolRole(supabase, { allowedRoles: ["direction", "super_admin"] })
-  if (!guard.ok) return { ok: false as const, error: "Accès réservé à la direction ou au secrétariat." }
+  if (!guard.ok) return { ok: false as const, error: "Accès réservé à la direction." }
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
