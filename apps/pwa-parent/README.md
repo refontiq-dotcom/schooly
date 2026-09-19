@@ -108,7 +108,7 @@ Copier `.env.local.example` en `.env.local` et configurer :
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:55321
-NEXT_PUBLIC_SUPABASE_ANON_KEY=votre_anon_key
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=votre_anon_key
 ```
 
 ## PWA / Mode hors-ligne
