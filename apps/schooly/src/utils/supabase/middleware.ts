@@ -7,6 +7,7 @@ import {
   isStudentPortalPath,
   legacyRedirectFor,
   roleHome,
+  isRoleAllowedPath,
 } from "./route-rules"
 
 export async function updateSession(request: NextRequest) {
@@ -88,7 +89,38 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
+  const roleCode = await resolveRoleCode(supabase, user.id)
+  if (path.startsWith("/dashboard") && roleCode && !isRoleAllowedPath(roleCode, path)) {
+    const url = request.nextUrl.clone()
+    url.pathname = roleHome(roleCode) ?? "/login"
+    return NextResponse.redirect(url)
+  }
+
   return supabaseResponse
+}
+
+async function resolveRoleCode(
+  supabase: ClaimsClient,
+  userId: string
+): Promise<string | null> {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+  const claimRole = session?.user?.app_metadata?.role
+  if (claimRole) return claimRole
+
+  const adminClient = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  )
+  const { data } = await adminClient
+    .from("user_school_roles")
+    .select("role_code")
+    .eq("user_id", userId)
+    .eq("is_active", true)
+    .order("created_at", { ascending: true })
+    .limit(1)
+  return data?.[0]?.role_code ?? null
 }
 
 /**
