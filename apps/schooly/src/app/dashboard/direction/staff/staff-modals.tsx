@@ -15,6 +15,7 @@ const ROLE_OPTIONS = [
   { value: "professeur", label: "Professeur / Enseignant" },
   { value: "compta", label: "Comptabilité" },
   { value: "secretariat", label: "Secrétariat" },
+  { value: "informatique", label: "Informatique / Administration Schooly" },
   { value: "caisse", label: "Caisse" },
   { value: "surveillance", label: "Surveillance" },
 ]
