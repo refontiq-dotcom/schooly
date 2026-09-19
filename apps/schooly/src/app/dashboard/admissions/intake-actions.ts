@@ -157,7 +157,7 @@ export async function previewAdmissionAssignment(schoolId: string, academicYearI
 
   const { data: rows, error: rowError } = await admin
     .from("admission_import_rows")
-    .select("id,first_name,last_name,date_of_birth,gender,grade_level_id,grade_name,required_options,matricule")
+    .select("id,first_name,last_name,date_of_birth,gender,grade_level_id,grade_name,required_options,matricule,academic_score")
     .eq("batch_id", importBatchId).eq("grade_level_id", gradeLevelId).eq("status", "ready")
   if (rowError) return { error: rowError.message }
 
