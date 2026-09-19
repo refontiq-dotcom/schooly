@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
 import { createClient } from "@/utils/supabase/server"
+import { requireSchoolRole } from "@/utils/supabase/require-role"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Wrench, GraduationCap, FileText, Settings, ArrowRight } from "lucide-react"
@@ -9,6 +10,8 @@ export default async function InformatiqueDashboard() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect("/login")
+  const guard = await requireSchoolRole(supabase, { allowedRoles: ["informatique"] })
+  if (!guard.ok) redirect("/login")
 
   return (
     <div className="space-y-6 p-5 sm:p-8">
