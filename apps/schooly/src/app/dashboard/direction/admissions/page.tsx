@@ -34,6 +34,7 @@ type PreEnrollment = {
   status: string
   expires_at: string
   grade_level_id?: string | null
+  suggested_class_id?: string | null
   guardian_phone?: string
   guardian_name?: string | null
   birth_certificate_number?: string | null
@@ -305,6 +306,7 @@ export default function AdmissionsPage() {
                             lastName: pre.last_name,
                             dateOfBirth: pre.date_of_birth,
                             gradeLevelId: pre.grade_level_id ?? undefined,
+                            classId: pre.suggested_class_id ?? undefined,
                             guardianPhone: pre.guardian_phone,
                             guardianName: pre.guardian_name ?? undefined,
                             birthCertificateNumber: pre.birth_certificate_number ?? undefined,
