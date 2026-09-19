@@ -13,7 +13,7 @@
 *   sans facturation, sinon unknown.
  *
  * Config via .env.local (racine schooly) :
- *   NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, METRICS_PUSH_SECRET
+ *   NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SECRET_KEY, METRICS_PUSH_SECRET
  *   CONTROL_CENTER_URL (defaut http://localhost:3000 — adapte en prod)
  *
  * Usage : `npm run billing:metrics`
@@ -43,7 +43,7 @@ function loadDotEnvLocal() {
 loadDotEnvLocal();
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const serviceRoleKey = process.env.SUPABASE_SECRET_KEY;
 const pushSecret = process.env.METRICS_PUSH_SECRET;
 const ccBase = (process.env.CONTROL_CENTER_URL || "http://localhost:3000").replace(/\/$/, "");
 
