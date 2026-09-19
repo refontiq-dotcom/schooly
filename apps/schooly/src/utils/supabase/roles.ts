@@ -13,7 +13,6 @@
 
 /** Rôles du personnel (membres d'une école dans `user_school_roles`). */
 export const ALL_STAFF_ROLES = [
-  "super_admin",
   "direction",
   "compta",
   "secretariat",
@@ -26,7 +25,7 @@ export type StaffRole = (typeof ALL_STAFF_ROLES)[number]
 
 // ─── Finance / facturation ─────────────────────────────────────────────────
 /** Actes financiers décisionnels : barèmes, moratoires, profil financier. */
-export const FINANCE_DECISION_ROLES = ["direction", "compta", "super_admin"] as const
+export const FINANCE_DECISION_ROLES = ["direction", "compta"] as const
 /** Alias sémantiques (mêmes rôles, intentions distinctes par module). */
 export const PRICING_ROLES = FINANCE_DECISION_ROLES
 export const MORATORIUM_ROLES = FINANCE_DECISION_ROLES
