@@ -196,7 +196,7 @@ grant select on public.attendance_records to authenticated;
 grant select on public.payments to authenticated;
 grant select on public.receipts to authenticated;
 grant select on public.moratoriums to authenticated;
-grant select on public.enrollment_decisions to authenticated;
+grant select on public.academic_decisions to authenticated;
 grant select on public.academic_decisions to authenticated;
 grant select on public.student_qr_codes to authenticated;
 grant select on public.door_entries to authenticated;
@@ -286,8 +286,8 @@ drop policy if exists moratoriums_parent_read on public.moratoriums;
 create policy moratoriums_parent_read on public.moratoriums for select
   using (public.parent_can_read_enrollment(enrollment_id));
 
-drop policy if exists enrollment_decisions_parent_read on public.enrollment_decisions;
-create policy enrollment_decisions_parent_read on public.enrollment_decisions for select
+drop policy if exists academic_decisions_parent_read on public.academic_decisions;
+create policy academic_decisions_parent_read on public.academic_decisions for select
   using (public.parent_can_read_enrollment(enrollment_id));
 
 drop policy if exists academic_decisions_parent_read on public.academic_decisions;
@@ -349,3 +349,19 @@ create policy receipts_parent_read on public.receipts for select
 --   select count(*) from public.enrollments;   -- ses inscriptions seulement
 --   select count(*) from public.grade_entries; -- ses notes seulement
 -- ============================================================================
+
+-- SECURITY: these helpers are SECURITY DEFINER and must never be callable by anon/PUBLIC.
+revoke execute on function public.current_guardian_id() from public, anon;
+revoke execute on function public.parent_owns_enrollment(uuid) from public, anon;
+revoke execute on function public.parent_can_read_enrollment(uuid) from public, anon;
+revoke execute on function public.parent_can_write_enrollment(uuid) from public, anon;
+revoke execute on function public.parent_owns_student(uuid) from public, anon;
+revoke execute on function public.parent_owns_payment(uuid) from public, anon;
+revoke execute on function public.parent_owns_academic_year(uuid) from public, anon;
+grant execute on function public.current_guardian_id() to authenticated;
+grant execute on function public.parent_owns_enrollment(uuid) to authenticated;
+grant execute on function public.parent_can_read_enrollment(uuid) to authenticated;
+grant execute on function public.parent_can_write_enrollment(uuid) to authenticated;
+grant execute on function public.parent_owns_student(uuid) to authenticated;
+grant execute on function public.parent_owns_payment(uuid) to authenticated;
+grant execute on function public.parent_owns_academic_year(uuid) to authenticated;
