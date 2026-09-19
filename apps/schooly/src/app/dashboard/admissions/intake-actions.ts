@@ -5,8 +5,8 @@ import { createClient } from "@/utils/supabase/server"
 import { createAdminClient } from "@/utils/supabase/admin"
 import { denial, requireSchoolRole } from "@/utils/supabase/require-role"
 
-const IMPORT_ROLES = ["direction", "secretariat", "super_admin"] as const
-const ASSIGNMENT_ROLES = ["direction", "super_admin"] as const
+const IMPORT_ROLES = ["direction", "secretariat"] as const
+const ASSIGNMENT_ROLES = ["direction"] as const
 
 type Row = Record<string, unknown>
 
