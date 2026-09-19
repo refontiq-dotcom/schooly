@@ -31,6 +31,7 @@ export function Sidebar({ role, schoolName, userName }: SidebarProps) {
   const roleLabels: Record<string, string> = {
     super_admin: "Super Admin",
     direction: "Direction",
+    secretariat: "Secrétariat",
     compta: "Comptabilité",
     caisse: "Caisse",
     professeur: "Enseignant",
