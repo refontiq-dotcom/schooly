@@ -5,14 +5,46 @@ import { FINANCE_CONTEXT_ROLES } from "@/utils/supabase/roles"
 import { createClient as createAdminClient } from "@supabase/supabase-js"
 import { revalidatePath } from "next/cache"
 
-type ActionResult<T = void> = {
-  error?: string
-  data?: T
-}
+type ActionResult<T = void> = { error?: string; data?: T }
 
 const ADMIN_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const ADMIN_KEY = process.env.SUPABASE_SECRET_KEY!
 const getAdmin = () => createAdminClient(ADMIN_URL, ADMIN_KEY)
+
+async function mirrorPaymentRequestToControlCenter(input: {
+  requestId: string
+  schoolId: string
+  amount: number
+  userId: string
+  senderPhone: string
+  notes: string | null
+}) {
+  const base = (process.env.CONTROL_CENTER_URL || "").replace(/\/$/, "")
+  const secret = process.env.METRICS_PUSH_SECRET
+  if (!base || !secret) return
+
+  try {
+    const res = await fetch(`${base}/api/billing`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${secret}` },
+      body: JSON.stringify({
+        produit: "schooly",
+        produit_ref: input.requestId,
+        plan: "school_event_based",
+        amount: input.amount,
+        requested_by: input.userId,
+        sender_phone: input.senderPhone,
+        notes: input.notes,
+      }),
+      signal: AbortSignal.timeout(10_000),
+    })
+    if (!res.ok) {
+      console.error("[Control Center billing] push refusé:", res.status, await res.text())
+    }
+  } catch (error) {
+    console.error("[Control Center billing] push impossible:", error)
+  }
+}
 
 // ─── Contexte utilisateur ─────────────────────────────────────────────────
 
@@ -21,22 +53,14 @@ export async function getBillingContext() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error("NOT_AUTHENTICATED")
 
-  const { data: role } = await supabase
-    .from("user_school_roles")
-    .select("school_id, role_code")
-    .eq("user_id", user.id)
-    .eq("is_active", true)
-    .in("role_code", [...FINANCE_CONTEXT_ROLES])
-    .limit(1)
-    .maybeSingle()
+  const { data: role } = await supabase.from("user_school_roles")
+    .select("school_id, role_code").eq("user_id", user.id).eq("is_active", true)
+    .in("role_code", [...FINANCE_CONTEXT_ROLES]).limit(1).maybeSingle()
 
   if (!role) throw new Error("UNAUTHORIZED")
 
-  const { data: school } = await getAdmin()
-    .from("schools")
-    .select("id, name, city")
-    .eq("id", role.school_id)
-    .single()
+  const { data: school } = await getAdmin().from("schools")
+    .select("id, name, city").eq("id", role.school_id).single()
 
   return {
     userId: user.id,
@@ -50,12 +74,8 @@ export async function getBillingContext() {
 
 export async function getSchoolyConfig() {
   const admin = getAdmin()
-  const { data } = await admin
-    .from("billing_configs")
-    .select("event_amount, event_types")
-    .eq("product_id", "schooly")
-    .eq("is_active", true)
-    .single()
+  const { data } = await admin.from("billing_configs").select("event_amount, event_types")
+    .eq("product_id", "schooly").eq("is_active", true).single()
 
   return {
     eventAmount: (data?.event_amount as number) || 1000,
@@ -64,55 +84,39 @@ export async function getSchoolyConfig() {
 }
 
 // ─── Résumé facturation établissement ────────────────────────────────────
-// (durcissement P1-2 : le schoolId provient du contexte, jamais du client)
 
 export async function getSchoolBillingSummary() {
   const { schoolId } = await getBillingContext()
   const admin = getAdmin()
   const config = await getSchoolyConfig()
 
-  const { count: activeEnrollments } = await admin
-    .from("enrollments")
-    .select("id", { count: "exact", head: true })
-    .eq("school_id", schoolId)
-    .in("status", ["confirmed", "active"])
-    .is("deleted_at", null)
+  const { count: activeEnrollments } = await admin.from("enrollments")
+    .select("id", { count: "exact", head: true }).eq("school_id", schoolId)
+    .in("status", ["confirmed", "active"]).is("deleted_at", null)
 
-  const { data: requests } = await admin
-    .from("subscription_payment_requests")
-    .select("id, amount, status, created_at")
-    .eq("product_id", "schooly")
-    .eq("tenant_id", schoolId)
-    .order("created_at", { ascending: false })
+  const { data: requests } = await admin.from("subscription_payment_requests")
+    .select("id, amount, status, created_at").eq("product_id", "schooly")
+    .eq("tenant_id", schoolId).order("created_at", { ascending: false })
 
   const totalEvents = activeEnrollments ?? 0
   const pending = (requests ?? []).filter((r) => r.status === "pending")
   const validated = (requests ?? []).filter((r) => r.status === "validated")
   const pendingSum = pending.reduce((s, r) => s + (r.amount || 0), 0)
   const validatedSum = validated.reduce((s, r) => s + (r.amount || 0), 0)
-
-  const billedUnits = Math.round(pendingSum / config.eventAmount) +
-    Math.round(validatedSum / config.eventAmount)
+  const billedUnits = Math.round(pendingSum / config.eventAmount) + Math.round(validatedSum / config.eventAmount)
   const remainingEvents = Math.max(0, totalEvents - billedUnits)
-  const expectedAmount = remainingEvents * config.eventAmount
 
   return {
-    eventAmount: config.eventAmount,
-    totalEvents,
-    remainingEvents,
-    expectedAmount,
-    pendingRequests: pending,
-    pendingSum,
-    validatedSum,
+    eventAmount: config.eventAmount, totalEvents, remainingEvents,
+    expectedAmount: remainingEvents * config.eventAmount,
+    pendingRequests: pending, pendingSum, validatedSum,
     totalRequests: (requests ?? []).length,
   }
 }
 
 // ─── Créer une demande de versement ───────────────────────────────────────
 
-export async function createSubscriptionPaymentRequest(
-  formData: FormData,
-): Promise<ActionResult<{ schoolId: string; amount: number }>> {
+export async function createSubscriptionPaymentRequest(formData: FormData): Promise<ActionResult<{ schoolId: string; amount: number }>> {
   const { userId, schoolId } = await getBillingContext().catch(() => {
     throw new Error("NOT_AUTHENTICATED")
   })
@@ -128,55 +132,40 @@ export async function createSubscriptionPaymentRequest(
   }
 
   const admin = getAdmin()
-  const { error } = await admin.from("subscription_payment_requests").insert({
-    product_id: "schooly",
-    tenant_id: schoolId,
-    tier_id: "school_event_based",
-    amount,
-    status: "pending",
-    requested_by: userId,
-    sender_phone: senderPhone,
-    payment_provider: "wave",
-    notes,
-  })
+  const { data: request, error } = await admin.from("subscription_payment_requests").insert({
+    product_id: "schooly", tenant_id: schoolId, tier_id: "school_event_based",
+    amount, status: "pending", requested_by: userId, sender_phone: senderPhone,
+    payment_provider: "wave", notes,
+  }).select("id").single()
 
-  if (error) {
-    if (error.code === "23505") {
-      return { error: "Une demande est déjà en attente pour cet établissement." }
-    }
+  if (error || !request) {
+    if (error?.code === "23505") return { error: "Une demande est déjà en attente pour cet établissement." }
     return { error: "Erreur lors de la création de la demande." }
   }
+
+  await mirrorPaymentRequestToControlCenter({
+    requestId: request.id, schoolId, amount, userId, senderPhone, notes,
+  })
 
   revalidatePath("/dashboard/billing")
   return { data: { schoolId, amount } }
 }
 
-// ─── Demandes en attente (établissement ou super admin) ───────────────────
+// ─── Demandes de l'établissement ─────────────────────────────────────────
 
 export async function getMyPaymentRequests(): Promise<ActionResult<Array<{
-  id: string
-  amount: number
-  status: string
-  sender_phone: string
-  created_at: string
-  tenant_name?: string
+  id: string; amount: number; status: string; sender_phone: string; created_at: string; tenant_name?: string
 }>>> {
   const ctx = await getBillingContext().catch(() => null)
   if (!ctx) return { error: "Non authentifié.", data: [] }
 
-  const admin = getAdmin()
-  let query = admin
-    .from("subscription_payment_requests")
+  let query = getAdmin().from("subscription_payment_requests")
     .select("id, amount, status, sender_phone, created_at, tenant_id")
-    .eq("product_id", "schooly")
-    .order("created_at", { ascending: false })
+    .eq("product_id", "schooly").order("created_at", { ascending: false })
 
-  if (ctx.schoolId) {
-    query = query.eq("tenant_id", ctx.schoolId)
-  }
+  if (ctx.schoolId) query = query.eq("tenant_id", ctx.schoolId)
 
   const { data, error } = await query
   if (error) return { error: error.message, data: [] }
-
   return { data: data ?? [] }
 }
