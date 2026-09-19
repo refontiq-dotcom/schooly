@@ -6,7 +6,7 @@ import IntakeClient from "./client"
 export default async function AdmissionsIntakePage() {
   const supabase = await createClient()
   const guard = await requireSchoolRole(supabase, {
-    allowedRoles: ["direction", "secretariat", "super_admin"],
+    allowedRoles: ["direction", "secretariat"],
   })
   if (!guard.ok) redirect("/dashboard/direction/admissions")
 
