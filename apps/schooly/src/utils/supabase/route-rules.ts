@@ -124,8 +124,14 @@ export const ROLE_ALLOWED_PATHS: Readonly<Record<string, readonly string[]>> = {
   surveillance: ["/dashboard/pedagogie/vie-scolaire"],
 }
 
+export const ROLE_DENIED_PATHS: Readonly<Record<string, readonly string[]>> = {
+  professeur: ["/dashboard/pedagogie/vie-scolaire"],
+}
+
 export function isRoleAllowedPath(roleCode: string | null | undefined, pathname: string): boolean {
   if (!roleCode) return false
+  const denied = ROLE_DENIED_PATHS[roleCode] ?? []
+  if (denied.some((prefix) => pathname === prefix || pathname.startsWith(prefix + "/"))) return false
   const prefixes = ROLE_ALLOWED_PATHS[roleCode]
   if (!prefixes) return false
   return prefixes.some((prefix) => pathname === prefix || pathname.startsWith(prefix + "/"))
