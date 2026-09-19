@@ -20,8 +20,8 @@ Ne jamais copier une valeur secrète dans ce document. Les valeurs ci-dessous so
 | Variable | Valeur exemple | Nature |
 |----------|----------------|--------|
 | `NEXT_PUBLIC_SUPABASE_URL` | `https://<project-ref>.supabase.co` | publique |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `<supabase-publishable-key>` | clé client legacy / à migrer |
-| `SUPABASE_SERVICE_ROLE_KEY` | `<supabase-secret-key>` | secrète, serveur uniquement |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | `<supabase-publishable-key>` | clé client, navigateur autorisé |
+| `SUPABASE_SECRET_KEY` | `<supabase-secret-key>` | secrète, serveur uniquement |
 | `TELEGRAM_BOT_TOKEN` | `<telegram-bot-token>` | secrète |
 | `TELEGRAM_CHAT_ID` | `<telegram-chat-id>` | identifiant |
 | `TELEGRAM_ADMIN_URL` | `https://<schooly-admin-domain>/billing` | configuration |
