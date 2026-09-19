@@ -15,8 +15,8 @@ const envPath = resolve(here, "..", "..", ".env.local");
 
 const WANT = [
   "NEXT_PUBLIC_SUPABASE_URL",
-  "NEXT_PUBLIC_SUPABASE_ANON_KEY",
-  "SUPABASE_SERVICE_ROLE_KEY",
+  "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+  "SUPABASE_SECRET_KEY",
   "TELEGRAM_BOT_TOKEN",
   "TELEGRAM_CHAT_ID",
   "TELEGRAM_ADMIN_URL",
@@ -51,7 +51,7 @@ for (const key of WANT) {
 }
 
 console.log("\n=== Vérifications ===");
-const anon = env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+const anon = env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || "";
 console.log("  Clé anon JWT valide :", anon.startsWith("eyJhbGciOiJIUzI1NiIs") ? "✅" : "❌");
 console.log("  URL Supabase présente :", env.NEXT_PUBLIC_SUPABASE_URL?.includes(".supabase.co") ? "✅" : "❌");
-console.log("  Service role key présente :", env.SUPABASE_SERVICE_ROLE_KEY ? "✅" : "❌");
+console.log("  Service role key présente :", env.SUPABASE_SECRET_KEY ? "✅" : "❌");
