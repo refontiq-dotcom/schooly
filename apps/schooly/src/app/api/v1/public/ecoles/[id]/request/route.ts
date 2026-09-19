@@ -8,74 +8,95 @@ const supabase = createClient(
 
 function checkAuth(request: Request) {
   const authHeader = request.headers.get("authorization")
-  if (!authHeader || !authHeader.startsWith("Bearer ")) return false
-  const token = authHeader.split(" ")[1]
+  if (!authHeader?.startsWith("Bearer ")) return false
+  const token = authHeader.slice(7)
   return token === process.env.TROUVETOU_API_KEY_PEPPER || token === process.env.TROUVETOU_API_KEY
+}
+
+function validDate(value: unknown) {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
+  const date = new Date(`${value}T00:00:00Z`)
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value
+}
+
+function clean(value: unknown, max = 180) {
+  return typeof value === "string" ? value.trim().slice(0, max) : ""
 }
 
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  if (!checkAuth(request)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  }
+  if (!checkAuth(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const { id: schoolId } = await params
 
   try {
     const body = await request.json()
-    const {
-      level_id,
-      student_full_name,
-      parent_full_name,
-      parent_phone,
-      student_birthdate,
-      parent_email
-    } = body
+    const levelId = clean(body.level_id, 80)
+    const studentFullName = clean(body.student_full_name)
+    const parentFullName = clean(body.parent_full_name)
+    const parentPhone = clean(body.parent_phone, 40)
+    const studentBirthdate = clean(body.student_birthdate, 10)
+    const parentEmail = clean(body.parent_email, 160)
 
-    if (!level_id || !student_full_name || !parent_full_name || !parent_phone) {
-      return NextResponse.json({ error: "Champs obligatoires manquants" }, { status: 400 })
+    if (!levelId || !studentFullName || !parentFullName || !parentPhone || !studentBirthdate) {
+      return NextResponse.json({ error: "Nom de l'élève, date de naissance, niveau, parent et téléphone sont obligatoires." }, { status: 400 })
+    }
+    if (!validDate(studentBirthdate)) {
+      return NextResponse.json({ error: "Date de naissance invalide." }, { status: 400 })
+    }
+    if (parentEmail && !/^\S+@\S+\.\S+$/.test(parentEmail)) {
+      return NextResponse.json({ error: "Adresse email invalide." }, { status: 400 })
     }
 
-    // Vérifier que l'école est publiée
     const { data: school } = await supabase
       .from("schools")
-      .select("published_to_trouvetou")
+      .select("id, published_to_trouvetou")
       .eq("id", schoolId)
-      .single()
+      .is("deleted_at", null)
+      .maybeSingle()
 
-    if (!school || !school.published_to_trouvetou) {
+    if (!school?.published_to_trouvetou) {
       return NextResponse.json({ error: "École non trouvée ou non publiée" }, { status: 404 })
     }
 
-    // Créer la réservation 'pending_payment'
+    const { data: level } = await supabase
+      .from("grade_levels")
+      .select("id, name")
+      .eq("id", levelId)
+      .eq("school_id", schoolId)
+      .is("deleted_at", null)
+      .maybeSingle()
+
+    if (!level) return NextResponse.json({ error: "Niveau scolaire invalide pour cet établissement." }, { status: 400 })
+
     const { data: reservation, error } = await supabase
       .from("trouvetou_reservations")
       .insert({
         school_id: schoolId,
-        grade_level_id: level_id,
-        student_full_name,
-        student_birthdate: student_birthdate || null,
-        parent_full_name,
-        parent_phone,
-        parent_email: parent_email || null,
+        grade_level_id: levelId,
+        student_full_name: studentFullName,
+        student_birthdate: studentBirthdate,
+        parent_full_name: parentFullName,
+        parent_phone: parentPhone,
+        parent_email: parentEmail || null,
         status: "pending_payment"
       })
-      .select("id")
+      .select("id, status, created_at")
       .single()
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
     return NextResponse.json({
       success: true,
       reservation_id: reservation.id,
-      status: "pending_payment"
+      status: reservation.status,
+      created_at: reservation.created_at,
+      next_step: "payment",
+      level: { id: level.id, label: level.name }
     }, { status: 201 })
-
-  } catch (err) {
+  } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 })
   }
 }
