@@ -1,5 +1,5 @@
 -- 20260919020000 — Admissions : import Ministère + affectation intelligente
--- A appliquer manuellement après les migrations Admissions existantes.
+-- Version durcie : RLS + grants minimaux + fonction de commit protégée.
 
 create table if not exists public.admission_import_batches (
   id uuid primary key default gen_random_uuid(),
@@ -86,34 +86,47 @@ alter table public.admission_import_rows enable row level security;
 alter table public.admission_assignment_batches enable row level security;
 alter table public.admission_assignment_rows enable row level security;
 
+revoke all on table public.admission_import_batches from anon, authenticated;
+revoke all on table public.admission_import_rows from anon, authenticated;
+revoke all on table public.admission_assignment_batches from anon, authenticated;
+revoke all on table public.admission_assignment_rows from anon, authenticated;
+grant select, insert, update, delete on table public.admission_import_batches to authenticated;
+grant select, insert, update, delete on table public.admission_import_rows to authenticated;
+grant select, insert, update, delete on table public.admission_assignment_batches to authenticated;
+grant select, insert, update, delete on table public.admission_assignment_rows to authenticated;
+
 drop policy if exists admission_import_batches_member on public.admission_import_batches;
 create policy admission_import_batches_member on public.admission_import_batches
-  for all using (is_super_admin() or is_school_member(school_id))
-  with check (is_super_admin() or is_school_member(school_id));
+  for all to authenticated
+  using ((select is_super_admin()) or (select is_school_member(school_id)))
+  with check ((select is_super_admin()) or (select is_school_member(school_id)));
 
 drop policy if exists admission_import_rows_member on public.admission_import_rows;
 create policy admission_import_rows_member on public.admission_import_rows
-  for all using (exists (
+  for all to authenticated
+  using (exists (
     select 1 from public.admission_import_batches b
-    where b.id = batch_id and (is_super_admin() or is_school_member(b.school_id))
+    where b.id = batch_id and ((select is_super_admin()) or (select is_school_member(b.school_id)))
   )) with check (exists (
     select 1 from public.admission_import_batches b
-    where b.id = batch_id and (is_super_admin() or is_school_member(b.school_id))
+    where b.id = batch_id and ((select is_super_admin()) or (select is_school_member(b.school_id)))
   ));
 
 drop policy if exists admission_assignment_batches_member on public.admission_assignment_batches;
 create policy admission_assignment_batches_member on public.admission_assignment_batches
-  for all using (is_super_admin() or is_school_member(school_id))
-  with check (is_super_admin() or is_school_member(school_id));
+  for all to authenticated
+  using ((select is_super_admin()) or (select is_school_member(school_id)))
+  with check ((select is_super_admin()) or (select is_school_member(school_id)));
 
 drop policy if exists admission_assignment_rows_member on public.admission_assignment_rows;
 create policy admission_assignment_rows_member on public.admission_assignment_rows
-  for all using (exists (
+  for all to authenticated
+  using (exists (
     select 1 from public.admission_assignment_batches b
-    where b.id = assignment_batch_id and (is_super_admin() or is_school_member(b.school_id))
+    where b.id = assignment_batch_id and ((select is_super_admin()) or (select is_school_member(b.school_id)))
   )) with check (exists (
     select 1 from public.admission_assignment_batches b
-    where b.id = assignment_batch_id and (is_super_admin() or is_school_member(b.school_id))
+    where b.id = assignment_batch_id and ((select is_super_admin()) or (select is_school_member(b.school_id)))
   ));
 
 comment on table public.admission_import_batches is 'Imports officiels de listes d élèves affectés.';
@@ -124,14 +137,13 @@ create or replace function public.commit_admission_assignment(p_assignment_batch
 returns jsonb
 language plpgsql
 security definer
-set search_path = public
+set search_path = ''
 as $$
 declare
-  v_batch record;
+  v_batch public.admission_assignment_batches%rowtype;
   v_row record;
   v_count integer := 0;
   v_created integer := 0;
-  v_updated integer := 0;
 begin
   select * into v_batch
   from public.admission_assignment_batches
@@ -140,14 +152,18 @@ begin
 
   if not found then raise exception 'Affectation introuvable.'; end if;
   if v_batch.status <> 'preview' then raise exception 'Cette affectation a déjà été validée ou n est plus modifiable.'; end if;
-  if not (is_super_admin() or is_school_member(v_batch.school_id)) then
+  if not ((select public.is_super_admin()) or (select public.is_school_member(v_batch.school_id))) then
     raise exception 'Accès refusé.';
   end if;
+
+  select count(*) into v_count
+  from public.admission_assignment_rows
+  where assignment_batch_id = p_assignment_batch_id and hard_valid = true;
 
   for v_row in
     select ar.*, ir.first_name, ir.last_name, ir.date_of_birth, ir.gender,
            ir.matricule, ir.grade_level_id, ir.orientation_number,
-           c.capacity
+           c.capacity, c.school_id as class_school_id, c.grade_level_id as class_grade_level_id
     from public.admission_assignment_rows ar
     join public.admission_import_rows ir on ir.id = ar.import_row_id
     left join public.classes c on c.id = ar.class_id
@@ -158,11 +174,22 @@ begin
     if v_row.class_id is null then
       raise exception 'Impossible de valider : % % n''a pas de classe.', v_row.first_name, v_row.last_name;
     end if;
+    if v_row.class_school_id <> v_batch.school_id or v_row.class_grade_level_id <> v_batch.grade_level_id then
+      raise exception 'La classe sélectionnée n''appartient pas au niveau ou à l''établissement attendu.';
+    end if;
     if v_row.capacity is null or v_row.capacity <= 0 then
       raise exception 'La classe choisie pour % % n a pas de capacité.', v_row.first_name, v_row.last_name;
     end if;
-    if (select count(*) from public.enrollments e where e.school_id=v_batch.school_id and e.academic_year_id=v_batch.academic_year_id and e.class_id=v_row.class_id and e.status in ('active','confirmed') and e.deleted_at is null)
-       + (select count(*) from public.admission_assignment_rows x where x.assignment_batch_id=p_assignment_batch_id and x.class_id=v_row.class_id and x.hard_valid=true) > v_row.capacity then
+    if (select count(*) from public.enrollments e
+        where e.school_id=v_batch.school_id
+          and e.academic_year_id=v_batch.academic_year_id
+          and e.class_id=v_row.class_id
+          and e.status in ('active','confirmed')
+          and e.deleted_at is null)
+       + (select count(*) from public.admission_assignment_rows x
+          where x.assignment_batch_id=p_assignment_batch_id
+            and x.class_id=v_row.class_id
+            and x.hard_valid=true) > v_row.capacity then
       raise exception 'La capacité de la classe est dépassée pour % %.', v_row.first_name, v_row.last_name;
     end if;
 
@@ -183,9 +210,9 @@ begin
       now() + interval '72 hours',
       v_row.import_row_id,
       v_row.class_id,
+      'ministere',
       now(),
-      now(),
-      'ministere'
+      now()
     );
 
     v_created := v_created + 1;
@@ -195,18 +222,17 @@ begin
      set status = 'committed', updated_at = now()
    where id = p_assignment_batch_id;
 
-  select count(*) into v_count
-  from public.admission_assignment_rows
-  where assignment_batch_id = p_assignment_batch_id and hard_valid = true;
-
   return jsonb_build_object(
     'created', v_created,
-    'updated', v_updated,
+    'updated', 0,
     'assigned_rows', v_count,
     'status', 'committed'
   );
 end;
 $$;
+
+revoke execute on function public.commit_admission_assignment(uuid) from public, anon;
+grant execute on function public.commit_admission_assignment(uuid) to authenticated;
 
 comment on function public.commit_admission_assignment(uuid) is
   'Valide une prévisualisation d affectation et crée les dossiers pré-inscription correspondants.';
