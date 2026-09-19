@@ -111,7 +111,7 @@ export async function getAcademicYears(): Promise<ActionResult<{ id: string; lab
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SECRET_KEY!
   )
 
   const { data, error } = await admin
@@ -143,7 +143,7 @@ export async function createAcademicYear(formData: FormData): Promise<ActionResu
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SECRET_KEY!
   )
 
   // Index unique partiel `(school_id, label) where deleted_at is null`
@@ -195,7 +195,7 @@ export async function getGradeLevels() {
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SECRET_KEY!
   )
 
   const { data, error } = await admin
@@ -224,7 +224,7 @@ export async function createGradeLevel(formData: FormData): Promise<ActionResult
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SECRET_KEY!
   )
 
   // Un seul niveau par rang dans une école : `level` est l'échelle d'ordre
@@ -274,7 +274,7 @@ export async function getClasses() {
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SECRET_KEY!
   )
 
   const { data, error } = await admin
@@ -312,7 +312,7 @@ export async function createClass(formData: FormData): Promise<ActionResult> {
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SECRET_KEY!
   )
 
   if (!(await existsInSchool(admin, "grade_levels", gradeLevelId, roleData.school_id))) {
@@ -353,7 +353,7 @@ export async function getSubjects() {
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SECRET_KEY!
   )
 
   const { data, error } = await admin
@@ -385,7 +385,7 @@ export async function createSubject(formData: FormData): Promise<ActionResult> {
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SECRET_KEY!
   )
 
   const { data: duplicateSubject } = await admin
@@ -417,7 +417,7 @@ export async function getClassSubjectAssignments() {
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SECRET_KEY!
   )
 
   // Tri volontairement sur une colonne LOCALÉ (created_at) : trier sur une
@@ -460,7 +460,7 @@ export async function createClassSubjectAssignment(formData: FormData): Promise<
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SECRET_KEY!
   )
 
   // Appartenance à l'école : les trois identifiants viennent du client.
@@ -516,7 +516,7 @@ export async function getTeachersForSchool(): Promise<ActionResult<{ id: string;
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SECRET_KEY!
   )
 
   const { data: roles, error: rolesError } = await admin
@@ -567,7 +567,7 @@ async function writeContext() {
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SECRET_KEY!
   )
   return { ok: true as const, admin, schoolId: guard.context.schoolId }
 }
