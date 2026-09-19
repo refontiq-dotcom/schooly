@@ -1,7 +1,7 @@
 "use server"
 
 import { createClient } from "@/utils/supabase/server"
-import { DECISION_ROLES, REF_ROLES, TEACHING_ROLES } from "@/utils/supabase/roles"
+import { DECISION_ROLES, REF_ROLES, TEACHING_ROLES, TIMETABLE_ADMIN_ROLES } from "@/utils/supabase/roles"
 import { createClient as createAdminClient } from "@supabase/supabase-js"
 import { revalidatePath } from "next/cache"
 import {
@@ -112,7 +112,7 @@ export async function createCourseSession(formData: FormData): Promise<ActionRes
   const supabase = await createClient()
 
   // Seul un enseignant (ou la direction) planifie un cours.
-  const guard = await teachingGuard(supabase, TEACHING_ROLES)
+  const guard = await teachingGuard(supabase, TIMETABLE_ADMIN_ROLES)
   if (!guard.ok) return { error: denial(guard.reason, null).error }
   const { schoolId } = guard.context
 
@@ -128,7 +128,39 @@ export async function createCourseSession(formData: FormData): Promise<ActionRes
     return { error: "Classe, matière, enseignant, année et horaires sont requis." }
   }
 
-  const { error } = await adminClient().from("course_sessions").insert({
+  const admin = adminClient()
+  const [classCheck, subjectCheck, teacherCheck, yearCheck] = await Promise.all([
+    admin.from("classes").select("id").eq("id", classId).eq("school_id", schoolId).is("deleted_at", null).maybeSingle(),
+    admin.from("subjects").select("id").eq("id", subjectId).eq("school_id", schoolId).is("deleted_at", null).maybeSingle(),
+    admin.from("user_school_roles").select("user_id").eq("user_id", teacherId).eq("school_id", schoolId).eq("role_code", "professeur").eq("is_active", true).maybeSingle(),
+    admin.from("academic_years").select("id").eq("id", academicYearId).eq("school_id", schoolId).is("deleted_at", null).maybeSingle(),
+  ])
+  if (!classCheck.data || !subjectCheck.data || !teacherCheck.data || !yearCheck.data) {
+    return { error: "La classe, la matière, le professeur ou l’année ne correspond pas à cet établissement." }
+  }
+
+  const { data: assignment } = await admin
+    .from("class_subject_assignments")
+    .select("id")
+    .eq("school_id", schoolId).eq("class_id", classId).eq("subject_id", subjectId).eq("teacher_id", teacherId)
+    .is("deleted_at", null).maybeSingle()
+  if (!assignment) return { error: "Ce professeur n’est pas affecté à cette matière dans cette classe." }
+
+  const start = new Date(startsAt)
+  const end = new Date(endsAt)
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) {
+    return { error: "Les horaires du cours sont invalides." }
+  }
+
+  const { data: conflicts } = await admin.from("course_sessions")
+    .select("id,teacher_id,class_id,starts_at,ends_at")
+    .eq("school_id", schoolId).eq("academic_year_id", academicYearId).is("deleted_at", null)
+    .lt("starts_at", endsAt).gt("ends_at", startsAt)
+  if ((conflicts ?? []).some((s: any) => s.teacher_id === teacherId || s.class_id === classId)) {
+    return { error: "Conflit détecté : ce professeur ou cette classe a déjà un cours sur ce créneau." }
+  }
+
+  const { error } = await admin.from("course_sessions").insert({
     school_id: schoolId,
     class_id: classId,
     subject_id: subjectId,
@@ -142,6 +174,7 @@ export async function createCourseSession(formData: FormData): Promise<ActionRes
 
   if (error) return { error: error.message }
   revalidatePath("/dashboard/pedagogie")
+  revalidatePath("/dashboard/informatique/emploi-du-temps")
   return { success: true }
 }
 
@@ -170,7 +203,7 @@ export async function getAttendanceForSession(
   const supabase = await createClient()
 
   // Lecture d'une feuille d'appel : acteurs pédagogiques.
-  const guard = await requireSchoolRole(supabase, { allowedRoles: [...REF_ROLES] })
+  const guard = await requireSchoolRole(supabase, { allowedRoles: [...REF_ROLES, "informatique"] })
   if (!guard.ok) return denial(guard.reason, [])
 
   const { data, error } = await adminClient()
