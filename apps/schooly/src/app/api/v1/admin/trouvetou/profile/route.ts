@@ -25,16 +25,25 @@ export async function POST(request: Request) {
     if (!role) return NextResponse.json({ error: "Non autorise" }, { status: 403 })
 
     const body = await request.json()
+    const cleanArray = (value: unknown) => Array.isArray(value) ? value.filter((item) => typeof item === "string" && item.trim()) : []
 
     const { error } = await admin
       .from("schools")
       .update({
-        description_publique: body.description_publique || null,
-        latitude: body.latitude || null,
-        longitude: body.longitude || null,
-        itineraire: body.itineraire || null,
-        video_url: body.video_url || null,
-        photos_360: body.photos_360 || [],
+        description_publique: String(body.description_publique || "").trim() || null,
+        latitude: Number.isFinite(Number(body.latitude)) ? Number(body.latitude) : null,
+        longitude: Number.isFinite(Number(body.longitude)) ? Number(body.longitude) : null,
+        itineraire: String(body.itineraire || "").trim() || null,
+        video_url: String(body.video_url || "").trim() || null,
+        photos_360: cleanArray(body.photos_360),
+        cover_photo_url: String(body.cover_photo_url || "").trim() || null,
+        gallery_photos: cleanArray(body.gallery_photos),
+        public_address: String(body.public_address || "").trim() || null,
+        public_phone: String(body.public_phone || "").trim() || null,
+        public_email: String(body.public_email || "").trim() || null,
+        public_website_url: String(body.public_website_url || "").trim() || null,
+        public_highlights: cleanArray(body.public_highlights),
+        admission_notes: String(body.admission_notes || "").trim() || null,
         updated_at: new Date().toISOString(),
       })
       .eq("id", role.school_id)
