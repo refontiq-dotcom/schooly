@@ -75,9 +75,13 @@ export async function registerSchoolAction(
       return { error: "Erreur lors de l'attribution du rôle de direction." }
     }
 
-    // Le compte et l'école sont créés avec succès en base.
-    // L'utilisateur devra se connecter manuellement la première fois, 
-    // car le SDK Admin n'établit pas de session de cookies.
+    // Le compte et l'école sont créés avec succès.
+    // Si le navigateur avait déjà une session Schooly (par exemple un Super Admin),
+    // elle doit être fermée avant le retour vers /login. Sinon le proxy considère
+    // encore l'ancien utilisateur connecté et renvoie immédiatement /login vers
+    // son ancien tableau de bord.
+    const sessionClient = await createClient()
+    await sessionClient.auth.signOut()
 
   } catch (err) {
     console.error("[register] Unexpected error:", err)
