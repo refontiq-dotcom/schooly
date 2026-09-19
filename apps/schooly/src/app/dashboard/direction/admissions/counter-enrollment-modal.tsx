@@ -208,7 +208,7 @@ export function CounterEnrollmentModal({
                 name="firstName"
                 required
                 defaultValue={prefill?.firstName ?? ""}
-                disabled={loading || isFromPreEnrollment}
+                disabled={loading}
                 className="min-h-11"
               />
             </div>
