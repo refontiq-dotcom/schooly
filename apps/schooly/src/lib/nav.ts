@@ -9,6 +9,7 @@ import {
   Clock,
   ShieldCheck,
   Settings,
+  Wrench,
   LogOut,
   ChevronLeft,
   School,
@@ -55,6 +56,12 @@ export const NAV_BY_ROLE: Record<string, NavItem[]> = {
     { label: "Finance", href: "/dashboard/direction/finance", icon: CreditCard },
     { label: "Relances", href: "/dashboard/direction/finance/reminders", icon: Bell },
     { label: "Rapports", href: "/dashboard/direction/reports", icon: BookOpen },
+  ],
+  informatique: [
+    { label: "Tableau de bord", href: "/dashboard/informatique", icon: LayoutDashboard },
+    { label: "Configuration", href: "/dashboard/academic-structure", icon: Wrench },
+    { label: "Paramètres établissement", href: "/dashboard/direction/settings", icon: Settings },
+    { label: "Bulletins & rapports", href: "/dashboard/direction/reports", icon: BookOpen },
   ],
   caisse: [
     { label: "Encaissement", href: "/dashboard/caisse", icon: CreditCard },
