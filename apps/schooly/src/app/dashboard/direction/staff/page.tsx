@@ -1,4 +1,4 @@
-import { getStaff } from "./actions"
+import { getStaff, setStaffRoleActive } from "./actions"
 import { AddStaffModal } from "./staff-modals"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -127,6 +127,9 @@ export default async function StaffPage() {
                   <div className="mt-2 flex flex-wrap items-center gap-2">
                     <Badge variant="secondary">{ROLE_LABELS[item.role_code] ?? item.role_code}</Badge>
                     <Badge variant={item.is_active ? "default" : "outline"}>{item.is_active ? "Actif" : "Suspendu"}</Badge>
+                    <Badge variant={user?.is_activated ? "secondary" : "outline"}>
+                      {user?.is_activated ? "Compte activé" : "Activation en attente"}
+                    </Badge>
                     {item.role_code === "professeur" && (
                       <Link
                         href="/dashboard/academic-structure?tab=matrix"
