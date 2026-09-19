@@ -142,7 +142,7 @@ export default async function StaffPage() {
                     )}
                   </div>
                 </div>
-                <form action={setStaffRoleActive}>
+                <form action={async (formData) => { await setStaffRoleActive(formData) }}>
                   <input type="hidden" name="roleId" value={item.id} />
                   <input type="hidden" name="isActive" value={String(!item.is_active)} />
                   <Button type="submit" variant="outline" size="sm">

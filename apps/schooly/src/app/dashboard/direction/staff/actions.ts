@@ -18,7 +18,7 @@ async function context() {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
-  return { ok: true as const, admin, schoolId: guard.context.schoolId, role: guard.context.role }
+  return { ok: true as const, admin, schoolId: guard.context.schoolId, role: guard.context.roleCode }
 }
 
 async function sendActivationCode(contact: { email?: string; phone?: string }) {

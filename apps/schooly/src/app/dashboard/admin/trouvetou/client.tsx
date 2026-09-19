@@ -360,8 +360,8 @@ export function TrouvetouAdminClient({
           <DialogHeader><DialogTitle>Médias de l'établissement</DialogTitle><DialogDescription>Ajoute directement les photos depuis ton téléphone ou ton ordinateur. Les images sont stockées dans Supabase Storage.</DialogDescription></DialogHeader>
           <div className="space-y-6 py-4">
             <MediaSection title="Photo principale" description="La photo de couverture de l'établissement." files={coverPhoto ? [coverPhoto] : []} multiple={false} onUpload={e=>handleMediaUpload(e,"cover")} onRemove={()=>setCoverPhoto("")} />
-            <MediaSection title="Galerie photos" description="Photos des salles, cour, activités, équipements..." files={gallery} multiple onUpload={e=>handleMediaUpload(e,"gallery")} onRemove={i=>removeItem(setGallery,i)} />
-            <MediaSection title="Photos 360°" description="Pour une visite immersive quand les fichiers 360° sont disponibles." files={photos360} multiple onUpload={e=>handleMediaUpload(e,"360")} onRemove={i=>removeItem(setPhotos360,i)} />
+            <MediaSection title="Galerie photos" description="Photos des salles, cour, activités, équipements..." files={gallery} multiple onUpload={e=>handleMediaUpload(e,"gallery")} onRemove={i=>{ if(i!==undefined) removeItem(setGallery,i) }} />
+            <MediaSection title="Photos 360°" description="Pour une visite immersive quand les fichiers 360° sont disponibles." files={photos360} multiple onUpload={e=>handleMediaUpload(e,"360")} onRemove={i=>{ if(i!==undefined) removeItem(setPhotos360,i) }} />
           </div>
           <DialogFooter><Button onClick={saveProfile} disabled={loading}>{loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Enregistrer les médias</Button></DialogFooter>
           <DialogClose onClick={()=>setModal(null)} />

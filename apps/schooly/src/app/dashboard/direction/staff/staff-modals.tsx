@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { ActionForm } from "@/components/action-form"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -25,10 +25,9 @@ export function AddStaffModal() {
   const [role, setRole] = useState("professeur")
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button>Ajouter un membre</Button>
-      </DialogTrigger>
+    <>
+      <Button onClick={() => setOpen(true)}>Ajouter un membre</Button>
+      <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Ajouter un membre du personnel</DialogTitle>
@@ -65,7 +64,7 @@ export function AddStaffModal() {
             <div>
               <Label>Fonction</Label>
               <Select name="roleCode" value={role} onValueChange={setRole}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Choisir une fonction" /></SelectTrigger>
                 <SelectContent>
                   {ROLE_OPTIONS.map((item) => (
                     <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
@@ -87,6 +86,7 @@ export function AddStaffModal() {
           </DialogFooter>
         </ActionForm>
       </DialogContent>
-    </Dialog>
+      </Dialog>
+    </>
   )
 }

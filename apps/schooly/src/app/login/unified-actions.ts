@@ -20,7 +20,7 @@ function isEmail(contact: string) {
   return contact.includes("@")
 }
 
-async function findStaffUser(contact: string, admin: ReturnType<typeof createAdminClient>) {
+async function findStaffUser(contact: string, admin: any) {
   const query = admin
     .from("users")
     .select("id, email, phone, full_name, is_activated")
@@ -44,7 +44,7 @@ async function sendStaffOtp(contact: string) {
 }
 
 async function getActiveStaffRole(
-  admin: ReturnType<typeof createAdminClient>,
+  admin: any,
   userId: string
 ) {
   const { data } = await admin

@@ -18,7 +18,7 @@ export default async function ReportsPage() {
   if (!guard.ok) redirect("/login")
   const admin = createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
   const schoolId = guard.context.schoolId
-  const isIT = guard.context.role === "informatique"
+  const isIT = guard.context.roleCode === "informatique"
   const dashboard = await getDirectionDashboard(admin, schoolId)
   const guidance = [
     ...(!dashboard.activeYear ? [{ id: "year", title: "Le bilan est limité : aucune année active", description: "Activez une année académique pour obtenir des indicateurs comparables et exploitables.", severity: "critical" as const, actionLabel: "Préparer la structure", href: "/dashboard/academic-structure" }] : []),

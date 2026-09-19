@@ -24,7 +24,7 @@ type Year = { id: string; label: string; is_current?: boolean }
 type Level = { id: string; name: string; level?: number; cycle?: string | null }
 type Batch = {
   id: string; filename: string; status: string; total_rows: number; valid_rows: number; error_rows: number;
-  created_at: string; academic_years?: { label: string } | null
+  created_at: string; academic_years?: { label: string }[] | null
 }
 type PreviewRow = {
   id: string
@@ -65,7 +65,7 @@ export default function IntakeClient({
     setLoading(true)
     const result = await importAdmissionsList(formData)
     setLoading(false)
-    if (result.error) return toast.error(result.error)
+    if (result.error) { toast.error(result.error); return }
     toast.success(`Import terminé : ${result.data?.valid ?? 0} ligne(s) exploitable(s).`)
     setImportOpen(false)
     await refresh()
@@ -166,7 +166,7 @@ export default function IntakeClient({
                 <div className="rounded-xl border p-3"><FileSpreadsheet className="h-5 w-5" /></div>
                 <div>
                   <p className="font-semibold">{batch.filename}</p>
-                  <p className="text-sm text-muted-foreground">{batch.academic_years?.label ?? "Année inconnue"} · {new Date(batch.created_at).toLocaleString("fr-FR")}</p>
+                  <p className="text-sm text-muted-foreground">{batch.academic_years?.[0]?.label ?? "Année inconnue"} · {new Date(batch.created_at).toLocaleString("fr-FR")}</p>
                   <div className="mt-2 flex flex-wrap gap-2">
                     <Badge variant="secondary">{batch.valid_rows} valides</Badge>
                     {batch.error_rows > 0 && <Badge variant="destructive">{batch.error_rows} erreurs</Badge>}

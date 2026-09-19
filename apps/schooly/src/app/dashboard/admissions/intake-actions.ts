@@ -68,7 +68,10 @@ async function guardSchool(schoolId?: string, roles: readonly string[] = IMPORT_
   }
 }
 
-export async function importAdmissionsList(formData: FormData) {
+export async function importAdmissionsList(formData: FormData): Promise<{
+  error?: string
+  data?: { batchId: string; filename: string; total: number; valid: number; errors: number }
+}> {
   const schoolId = clean(formData.get("schoolId"))
   const academicYearId = clean(formData.get("academicYearId"))
   const file = formData.get("file")
@@ -184,7 +187,13 @@ export async function importAdmissionsList(formData: FormData) {
   }
 }
 
-export async function getAdmissionImportBatches(schoolId: string) {
+export async function getAdmissionImportBatches(schoolId: string): Promise<{
+  error?: string
+  data?: Array<{
+    id: string; filename: string; status: string; total_rows: number; valid_rows: number; error_rows: number
+    created_at: string; academic_years?: { label: string }[] | null
+  }>
+}> {
   const auth = await guardSchool(schoolId)
   if ("error" in auth) return auth
   const { data, error } = await auth.admin
@@ -202,7 +211,24 @@ export async function previewAdmissionAssignment(
   academicYearId: string,
   importBatchId: string,
   gradeLevelId: string,
-) {
+): Promise<{
+  error?: string
+  data?: {
+    assignmentBatchId: string
+    assigned: number
+    unassigned: number
+    rows: Array<{
+      id: string
+      import_row_id: string
+      position: number
+      class_id: string | null
+      hard_valid: boolean
+      constraint_reason: string | null
+      student?: { id: string; first_name: string; last_name: string; gender?: string | null; grade_name?: string | null }
+      class?: { id: string; name: string; capacity?: number | null } | null
+    }>
+  }
+}> {
   const auth = await guardSchool(schoolId, ASSIGNMENT_ROLES)
   if ("error" in auth) return auth
   const { admin, guard } = auth
@@ -403,7 +429,7 @@ export async function saveAdmissionAssignmentPreview(
   schoolId: string,
   assignmentBatchId: string,
   rows: Array<{ id: string; classId: string | null; position: number }>,
-) {
+): Promise<{ error?: string; data?: { updated: number } }> {
   const auth = await guardSchool(schoolId, ASSIGNMENT_ROLES)
   if ("error" in auth) return auth
   const { admin } = auth
@@ -433,7 +459,10 @@ export async function saveAdmissionAssignmentPreview(
   return { data: { updated: rows.length } }
 }
 
-export async function commitAdmissionAssignment(schoolId: string, assignmentBatchId: string) {
+export async function commitAdmissionAssignment(schoolId: string, assignmentBatchId: string): Promise<{
+  error?: string
+  data?: { created: number; updated: number; assigned_rows: number; status: string }
+}> {
   const auth = await guardSchool(schoolId, ASSIGNMENT_ROLES)
   if ("error" in auth) return auth
 

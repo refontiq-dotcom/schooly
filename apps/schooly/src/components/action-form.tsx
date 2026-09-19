@@ -8,10 +8,14 @@ export function ActionForm({
   action,
   children,
   className,
+  onSuccess,
+  onError,
 }: {
   action: (formData: FormData) => Promise<{ error?: string; data?: any } | void>
   children: React.ReactNode
   className?: string
+  onSuccess?: (data?: any) => void
+  onError?: (error: string) => void
 }) {
   const [state, setState] = useState<FormState>({})
 
@@ -19,8 +23,10 @@ export function ActionForm({
     const result = (await action(formData)) || {}
     if (result.error) {
       setState({ error: result.error })
+      onError?.(result.error)
     } else {
       setState({})
+      onSuccess?.(result.data)
     }
   }
 
