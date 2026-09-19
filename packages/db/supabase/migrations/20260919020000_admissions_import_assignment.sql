@@ -29,6 +29,7 @@ create table if not exists public.admission_import_rows (
   grade_level_id uuid references public.grade_levels(id),
   grade_name text,
   orientation_number text,
+  academic_score numeric,
   required_options jsonb not null default '[]'::jsonb,
   raw_data jsonb not null default '{}'::jsonb,
   status text not null default 'ready',
