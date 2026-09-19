@@ -1,6 +1,7 @@
 "use server"
 
-import { createClient } from "@supabase/supabase-js"
+import { createClient } from "@/utils/supabase/server"
+import { createClient as createAdminClient } from "@supabase/supabase-js"
 import { redirect } from "next/navigation"
 
 type RegisterResult = {
@@ -22,8 +23,8 @@ export async function registerSchoolAction(
 
   // Utilisation de la Service Role Key pour contourner RLS et insérer l'école et l'utilisateur
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-  const supabaseServiceKey = process.env.SUPABASE_SECRET_KEY!
-  const adminAuthClient = createClient(supabaseUrl, supabaseServiceKey)
+  const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY!
+  const adminAuthClient = createAdminClient(supabaseUrl, supabaseSecretKey)
 
   try {
     // 1. Créer le compte utilisateur
