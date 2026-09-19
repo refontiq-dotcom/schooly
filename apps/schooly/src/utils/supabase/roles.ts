@@ -58,7 +58,7 @@ export const ADMISSIONS_ROLES = ["direction", "secretariat", "super_admin"] as c
 /** Transport, cantine, internat : administration = direction/secretariat. */
 export const SERVICE_ADMIN_ROLES = ["direction", "secretariat", "super_admin"] as const
 /** Années, niveaux, classes, matières, affectations. */
-export const STRUCTURE_ADMIN_ROLES = ["direction", "secretariat", "super_admin"] as const
+export const STRUCTURE_ADMIN_ROLES = ["direction", "secretariat", "informatique", "super_admin"] as const
 /** Rollover d'année : opération sensible réservée à la direction. */
 export const ROLLOVER_ROLES = ["direction", "super_admin"] as const
 
