@@ -16,7 +16,7 @@ async function context() {
   if (!guard.ok) return { ok: false as const, error: "Accès réservé à la direction." }
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SECRET_KEY!
   )
   return { ok: true as const, admin, schoolId: guard.context.schoolId, role: guard.context.roleCode }
 }
