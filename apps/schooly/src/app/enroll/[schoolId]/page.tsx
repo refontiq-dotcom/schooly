@@ -11,7 +11,7 @@ export default async function EnrollPage({ params }: Props) {
   const { schoolId } = await params
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SECRET_KEY!
   )
 
   const { data: school } = await admin
