@@ -95,6 +95,7 @@ export async function importAdmissionsList(formData: FormData) {
       grade_level_id: grade?.id ?? null,
       grade_name: gradeName || null,
       orientation_number: clean(valueBy(row, ["numero_orientation", "n° orientation", "orientation", "notification"])),
+      academic_score: Number(valueBy(row, ["moyenne", "score", "note", "academic_score"]) ?? 0) || null,
       required_options: splitOptions(valueBy(row, ["options", "option", "options_obligatoires"])),
       raw_data: raw,
       status: !firstName || !lastName ? "error" : !grade ? "error" : "ready",
@@ -175,7 +176,7 @@ export async function previewAdmissionAssignment(schoolId: string, academicYearI
   for (const e of occupied ?? []) counts.set(e.class_id, (counts.get(e.class_id) ?? 0) + 1)
 
   const ordered = [...rows].sort((a, b) => {
-    const score = (x: any) => Number(x.raw_data?.score ?? x.raw_data?.moyenne ?? 0)
+    const score = (x: any) => Number(x.academic_score ?? 0)
     return score(b) - score(a) || String(a.last_name).localeCompare(String(b.last_name), "fr")
   })
 
@@ -188,103 +189,63 @@ export async function previewAdmissionAssignment(schoolId: string, academicYearI
     girls: 0,
   }))
 
+  // Serpentin déterministe : A → B → C → C → B → A.
+  // Les contraintes dures filtrent les classes avant chaque pas ; les scores
+  // souples ne servent qu'à départager les classes encore éligibles.
+  let direction = 1
+  let cursor = 0
+
   for (const [index, student] of ordered.entries()) {
-    const candidates = classState.filter((c) => c.remaining > 0 && (Array.isArray(c.required_options) ? c.required_options : []).every((required: string) => (Array.isArray(student.required_options) ? student.required_options : []).map((x: string) => x.toLowerCase()).includes(required.toLowerCase())))
-    if (!candidates.length) {
-      assignment.push({ import_row_id: student.id, class_id: null, position: index + 1, hard_valid: false, soft_score: 0, constraint_reason: "Capacité atteinte." })
+    const eligible = classState.filter((c) =>
+      c.remaining > 0 &&
+      (Array.isArray(c.required_options) ? c.required_options : [])
+        .every((required: string) =>
+          (Array.isArray(student.required_options) ? student.required_options : [])
+            .map((x: string) => x.toLowerCase()).includes(required.toLowerCase())
+        )
+    )
+
+    if (!eligible.length) {
+      assignment.push({
+        import_row_id: student.id, class_id: null, position: index + 1,
+        hard_valid: false, soft_score: 0, constraint_reason: "Aucune classe ne respecte capacité/options.",
+      })
       continue
     }
-    const chosen = [...candidates].sort((a, b) => {
-      const aGender = student.gender === "F" ? a.girls : a.boys
-      const bGender = student.gender === "F" ? b.girls : b.boys
-      return (aGender - bGender) || (b.remaining - a.remaining) || a.name.localeCompare(b.name, "fr")
-    })[0]
+
+    let chosen = null as any
+    for (let step = 0; step < classState.length; step++) {
+      const idx = (cursor + step * direction + classState.length) % classState.length
+      const candidate = classState[idx]
+      if (eligible.some((x) => x.id === candidate.id)) {
+        chosen = candidate
+        cursor = idx + direction
+        if (cursor >= classState.length || cursor < 0) {
+          direction *= -1
+          cursor = Math.max(0, Math.min(classState.length - 1, idx))
+        }
+        break
+      }
+    }
+
+    if (!chosen) {
+      assignment.push({
+        import_row_id: student.id, class_id: null, position: index + 1,
+        hard_valid: false, soft_score: 0, constraint_reason: "Aucune classe disponible.",
+      })
+      continue
+    }
+
     chosen.remaining -= 1
     if (student.gender === "F") chosen.girls += 1
     else if (student.gender === "M") chosen.boys += 1
+
+    // Petit score souple de suivi : plus l'équilibre F/M est proche, plus il est élevé.
+    const total = chosen.girls + chosen.boys
+    const balance = total ? 1 - Math.abs(chosen.girls - chosen.boys) / total : 1
     assignment.push({
-      import_row_id: student.id,
-      class_id: chosen.id,
-      position: index + 1,
-      hard_valid: true,
-      soft_score: 1,
-      constraint_reason: null,
+      import_row_id: student.id, class_id: chosen.id, position: index + 1,
+      hard_valid: true, soft_score: balance, constraint_reason: null,
     })
   }
 
-  const { data: batch, error: batchError } = await admin
-    .from("admission_assignment_batches")
-    .insert({
-      school_id: schoolId,
-      academic_year_id: academicYearId,
-      grade_level_id: gradeLevelId,
-      source_batch_id: importBatchId,
-      algorithm: "serpentin",
-      status: "preview",
-      created_by: guard.context.userId,
-    }).select("id").single()
-  if (batchError || !batch) return { error: batchError?.message ?? "Prévisualisation impossible." }
-
-  const { error: assignmentError } = await admin.from("admission_assignment_rows").insert(
-    assignment.map((a) => ({ ...a, assignment_batch_id: batch.id }))
-  )
-  if (assignmentError) {
-    await admin.from("admission_assignment_batches").delete().eq("id", batch.id)
-    return { error: assignmentError.message }
-  }
-
-  const classById = new Map(classes.map((c) => [c.id, c]))
-  return {
-    data: {
-      batchId: batch.id,
-      gradeLevelId,
-      total: assignment.length,
-      assigned: assignment.filter((a) => a.hard_valid).length,
-      unassigned: assignment.filter((a) => !a.hard_valid).length,
-      rows: assignment.map((a) => ({
-        ...a,
-        student: rows.find((r) => r.id === a.import_row_id),
-        class: a.class_id ? classById.get(a.class_id) : null,
-      })),
-    },
-  }
-}
-
-
-export async function saveAdmissionAssignmentPreview(
-  schoolId: string,
-  batchId: string,
-  rows: Array<{ id: string; classId: string | null; position: number }>
-) {
-  const auth = await guardSchool(schoolId, ASSIGNMENT_ROLES)
-  if ("error" in auth) return auth
-  const { admin } = auth
-  for (const row of rows) {
-    const { error } = await admin
-      .from("admission_assignment_rows")
-      .update({ class_id: row.classId, position: row.position })
-      .eq("id", row.id)
-      .eq("assignment_batch_id", batchId)
-    if (error) return { error: error.message }
-  }
-  return { data: { saved: rows.length } }
-}
-
-export async function getAssignmentPreview(schoolId: string, batchId: string) {
-  const auth = await guardSchool(schoolId, ASSIGNMENT_ROLES)
-  if ("error" in auth) return auth
-  const { data, error } = await auth.admin
-    .from("admission_assignment_rows")
-    .select("id,position,class_id,hard_valid,soft_score,constraint_reason,admission_import_rows(first_name,last_name,gender,grade_name)")
-    .eq("assignment_batch_id", batchId).order("position")
-  if (error) return { error: error.message }
-  return { data: data ?? [] }
-}
-
-export async function commitAdmissionAssignment(schoolId: string, batchId: string) {
-  const auth = await guardSchool(schoolId, ASSIGNMENT_ROLES)
-  if ("error" in auth) return auth
-  const { data, error } = await auth.admin.rpc("commit_admission_assignment", { p_assignment_batch_id: batchId })
-  if (error) return { error: error.message }
-  return { data }
-}
