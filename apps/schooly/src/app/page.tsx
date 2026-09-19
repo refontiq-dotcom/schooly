@@ -43,9 +43,9 @@ export default function Home() {
   )
 
   const schoolMode =
-    schoolState.mode ??
-    activationVerifyState.mode ??
     completeActivationState.mode ??
+    activationVerifyState.mode ??
+    schoolState.mode ??
     "password"
 
   return (
