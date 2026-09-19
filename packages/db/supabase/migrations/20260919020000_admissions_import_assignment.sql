@@ -42,6 +42,9 @@ create index if not exists idx_admission_import_batches_school
 create index if not exists idx_admission_import_rows_batch
   on public.admission_import_rows(batch_id, row_number);
 
+alter table public.classes
+  add column if not exists required_options jsonb not null default '[]'::jsonb;
+
 alter table public.pre_enrollments
   add column if not exists import_row_id uuid references public.admission_import_rows(id) on delete set null,
   add column if not exists suggested_class_id uuid references public.classes(id) on delete set null;
