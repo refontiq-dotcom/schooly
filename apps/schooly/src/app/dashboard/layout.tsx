@@ -15,11 +15,8 @@ export default async function DashboardLayout({
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) {
-    redirect("/login")
-  }
+  if (!user) redirect("/login")
 
-  // Récupérer le rôle et l'école depuis la base (sans dépendre du hook JWT)
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -34,37 +31,31 @@ export default async function DashboardLayout({
     .limit(1)
     .maybeSingle()
 
-  if (!roleData?.role_code || !roleData.school_id) {
-    redirect("/login")
-  }
+  if (!roleData?.role_code || !roleData.school_id) redirect("/login")
 
   const role = roleData.role_code
   const schoolId = roleData.school_id
 
-    // Récupérer le nom de l'école + état d'onboarding
   let schoolName = "Schooly"
   let schoolCity: string | null = null
   let schoolType: string | null = null
   let isSetupComplete = true
-  if (schoolId) {
-    const { data: school } = await admin
-      .from("schools")
-      .select("name, city, school_type, is_setup_complete")
-      .eq("id", schoolId)
-      .single()
-    if (school) {
-      schoolName = school.name
-      schoolCity = school.city ?? null
-      schoolType = school.school_type ?? null
-      isSetupComplete = school.is_setup_complete ?? true
-    }
+
+  const { data: school } = await admin
+    .from("schools")
+    .select("name, city, school_type, is_setup_complete")
+    .eq("id", schoolId)
+    .single()
+
+  if (school) {
+    schoolName = school.name
+    schoolCity = school.city ?? null
+    schoolType = school.school_type ?? null
+    isSetupComplete = school.is_setup_complete ?? true
   }
 
-  // Le fondateur d'une école non configurée doit passer par le wizard d'onboarding
-  // (déclenché à la première connexion après l'inscription via /register-school).
   const showOnboarding = role === "direction" && !!schoolId && !isSetupComplete
 
-  // Récupérer le nom complet de l'utilisateur
   const { data: profile } = await admin
     .from("users")
     .select("full_name")
@@ -72,37 +63,37 @@ export default async function DashboardLayout({
     .single()
 
   return (
-    <div className="relative flex h-screen overflow-hidden">
-      {/* Décor Gemini : les blobs dérivent DERRIÈRE la sidebar et le contenu. */}
+    <div className="relative flex h-screen overflow-hidden bg-transparent p-2 sm:p-3">
       <GeminiBackdrop />
-      <div className="relative z-10 flex flex-1 overflow-hidden">
-      <Sidebar
-        role={role}
-        schoolName={schoolName}
-        userName={profile?.full_name ?? user.email ?? "Utilisateur"}
-      />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Bannière supérieure avec recherche globale + sélecteur d'année académique */}
-        <header className="flex h-[72px] shrink-0 items-center gap-3 border-b border-border/70 bg-background/72 px-5 backdrop-blur-xl sm:gap-4 sm:px-8">
-          <GlobalSearch />
-          <AcademicYearSelector schoolId={schoolId} />
-          <div className="hidden rounded-full border border-border bg-card/70 px-3 py-1.5 text-xs font-medium text-muted-foreground sm:block">
-            {schoolName}
-          </div>
-        </header>
-                <main className="flex-1 overflow-y-auto scroll-smooth">
-          {children}
-        </main>
 
-        {/* Wizard d'onboarding (obligatoire tant que l'école n'est pas configurée) */}
-        {showOnboarding && (
-          <OnboardingWizard
-            schoolName={schoolName}
-            schoolCity={schoolCity}
-            schoolType={schoolType}
-          />
-        )}
-      </div>
+      <div className="relative z-10 flex min-h-0 min-w-0 flex-1 gap-2 sm:gap-3">
+        <Sidebar
+          role={role}
+          schoolName={schoolName}
+          userName={profile?.full_name ?? user.email ?? "Utilisateur"}
+        />
+
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border/60 bg-background/72 shadow-[0_18px_50px_oklch(0.2_0.05_252_/_0.08)] backdrop-blur-xl">
+          <header className="flex h-[72px] shrink-0 items-center gap-3 border-b border-border/70 bg-background/60 px-4 backdrop-blur-xl sm:gap-4 sm:px-7">
+            <GlobalSearch />
+            <AcademicYearSelector schoolId={schoolId} />
+            <div className="hidden rounded-full border border-border bg-card/70 px-3 py-1.5 text-xs font-medium text-muted-foreground sm:block">
+              {schoolName}
+            </div>
+          </header>
+
+          <main className="min-h-0 flex-1 overflow-y-auto scroll-smooth px-1 py-1 sm:px-2 sm:py-2">
+            {children}
+          </main>
+
+          {showOnboarding && (
+            <OnboardingWizard
+              schoolName={schoolName}
+              schoolCity={schoolCity}
+              schoolType={schoolType}
+            />
+          )}
+        </div>
       </div>
     </div>
   )
