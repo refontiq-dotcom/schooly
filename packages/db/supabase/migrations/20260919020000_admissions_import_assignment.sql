@@ -205,7 +205,7 @@ begin
       coalesce(v_row.date_of_birth, current_date),
       v_row.grade_level_id,
       '0000000000',
-      upper(substr(encode(gen_random_bytes(8), 'hex'), 1, 6)),
+      upper(substr(replace(public.gen_random_uuid()::text, '-', ''), 1, 6)),
       'pending',
       now() + interval '72 hours',
       v_row.import_row_id,
