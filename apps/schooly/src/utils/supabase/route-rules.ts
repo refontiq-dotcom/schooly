@@ -94,8 +94,8 @@ export function legacyRedirectFor(pathname: string): string | null {
 export const ROLE_HOME: Readonly<Record<string, string>> = {
   super_admin: "/dashboard/super-admin",
   direction: "/dashboard/direction",
-  compta: "/dashboard/direction",
-  secretariat: "/dashboard/direction",
+  compta: "/dashboard/direction/finance",
+  secretariat: "/dashboard/direction/admissions",
   caisse: "/dashboard/caisse",
   professeur: "/dashboard/pedagogie",
   surveillance: "/dashboard/pedagogie",
