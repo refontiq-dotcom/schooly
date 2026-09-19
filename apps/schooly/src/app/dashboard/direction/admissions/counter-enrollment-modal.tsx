@@ -38,6 +38,7 @@ export type CounterPrefill = {
   lastName?: string
   dateOfBirth?: string
   gradeLevelId?: string
+  classId?: string
   guardianPhone?: string
   guardianName?: string
   birthCertificateNumber?: string
@@ -81,7 +82,7 @@ export function CounterEnrollmentModal({
     if (!open) return
     setSuccess(null)
     setGradeLevelId(prefill?.gradeLevelId ?? "")
-    setClassId("")
+    setClassId(prefill?.classId ?? "")
     setCollectPayment(true)
     const mapped = prefill?.paymentMethod
     setPaymentMethod(
