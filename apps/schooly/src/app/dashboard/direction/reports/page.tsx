@@ -16,7 +16,7 @@ export default async function ReportsPage() {
   if (!user) redirect("/login")
   const guard = await requireSchoolRole(supabase, { allowedRoles: ["direction", "informatique", "compta", "super_admin"] })
   if (!guard.ok) redirect("/login")
-  const admin = createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+  const admin = createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SECRET_KEY!)
   const schoolId = guard.context.schoolId
   const isIT = guard.context.roleCode === "informatique"
   const dashboard = await getDirectionDashboard(admin, schoolId)
