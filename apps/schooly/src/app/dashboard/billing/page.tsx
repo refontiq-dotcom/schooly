@@ -3,10 +3,8 @@ import {
   getBillingContext,
   getSchoolBillingSummary,
   getMyPaymentRequests,
-  getAllPendingRequests,
 } from "./actions"
 import { PaymentSubmissionFormClient } from "@/components/billing/PaymentSubmissionFormClient"
-import { AdminValidationPanelClient } from "@/components/billing/AdminValidationPanelClient"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { formatFCFA } from "@/lib/formatters"
@@ -15,25 +13,7 @@ export default async function BillingPage() {
   const ctx = await getBillingContext().catch(() => null)
   if (!ctx) redirect("/login")
 
-  const { schoolId, isSuperAdmin, school, roleCode } = ctx
-
-  // Super Admin : voit toutes les demandes
-  if (isSuperAdmin) {
-    const all = await getAllPendingRequests()
-    return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Facturation</h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Validation des versements établissements — Schooly
-          </p>
-        </div>
-        <AdminValidationPanelClient requests={all.data || []} />
-      </div>
-    )
-  }
-
-  // Établissement : voit son résumé + formulaire de versement
+  const { schoolId, school } = ctx
   if (!schoolId) redirect("/login")
 
   const billing = await getSchoolBillingSummary()
@@ -49,7 +29,6 @@ export default async function BillingPage() {
         </p>
       </div>
 
-      {/* Résumé facturation */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="pb-2">
@@ -86,7 +65,6 @@ export default async function BillingPage() {
         </Card>
       </div>
 
-      {/* Formulaire de versement */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div>
           <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">
@@ -119,7 +97,6 @@ export default async function BillingPage() {
           )}
         </div>
 
-        {/* Historique des demandes */}
         <div>
           <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">
             Mes demandes
