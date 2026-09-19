@@ -315,7 +315,7 @@ export function CounterEnrollmentModal({
                 type="tel"
                 required
                 defaultValue={prefill?.guardianPhone ?? ""}
-                disabled={loading || isFromPreEnrollment}
+                disabled={loading}
                 className="min-h-11"
               />
             </div>
