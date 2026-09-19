@@ -42,7 +42,7 @@ async function getContext(): Promise<Context> {
     .select("school_id, role_code")
     .eq("user_id", user.id)
     .eq("is_active", true)
-    .in("role_code", ["direction", "super_admin"])
+    .in("role_code", ["direction", "informatique", "super_admin"])
     .limit(1)
     .maybeSingle()
 
@@ -130,7 +130,7 @@ export async function updateDirectorProfile(formData: FormData): Promise<ActionR
     return { error: err instanceof Error && err.message === "NOT_AUTHENTICATED" ? "Non autorisé" : "Accès refusé" }
   }
 
-  const fullName = (formData.get("fullName") as string | null)?.trim()
+  if (context.roleCode !== "direction" && context.roleCode !== "super_admin") return { error: "Seule la direction peut modifier le profil du directeur." }\n\n  const fullName = (formData.get("fullName") as string | null)?.trim()
 
   if (!fullName) return { error: "Le nom complet est requis." }
 
