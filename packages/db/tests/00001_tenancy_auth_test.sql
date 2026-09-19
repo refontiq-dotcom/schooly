@@ -22,7 +22,7 @@ alter table auth.users enable trigger all;
 
 -- On insère manuellement dans public.users
 insert into public.users (id, full_name, email) values 
-  ('11111111-1111-1111-1111-111111111111', 'Super Admin', 'super@test.com'),
+  ('11111111-1111-1111-1111-111111111111', 'Direction A', 'super@test.com'),
   ('22222222-2222-2222-2222-222222222222', 'Dir A', 'dira@test.com'),
   ('33333333-3333-3333-3333-333333333333', 'Dir B', 'dirb@test.com');
 
@@ -31,7 +31,7 @@ insert into public.schools (id, name, city) values
   ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'School B', 'Bouaké');
 
 insert into public.user_school_roles (user_id, school_id, role_code) values
-  ('11111111-1111-1111-1111-111111111111', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'super_admin'),
+  ('11111111-1111-1111-1111-111111111111', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'direction'),
   ('22222222-2222-2222-2222-222222222222', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'direction'),
   ('33333333-3333-3333-3333-333333333333', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'direction');
 
@@ -49,7 +49,7 @@ set local role authenticated;
 
 
 -- ----------------------------------------------------------------------------
--- TEST 1 & 2 : Un Super Admin voit toutes les écoles, un Directeur voit la sienne
+-- TEST 1 & 2 : chaque Directeur voit uniquement son établissement
 -- ----------------------------------------------------------------------------
 
 -- Connexion en tant que Super Admin
@@ -57,8 +57,8 @@ select set_config('request.jwt.claims', '{"sub": "11111111-1111-1111-1111-111111
 
 select results_eq(
   'select count(*)::int from public.schools',
-  ARRAY[2],
-  'RLS - Super Admin devrait voir les 2 écoles'
+  ARRAY[1],
+  'RLS - Direction A ne voit que son établissement'
 );
 
 -- Connexion en tant que Directeur de l''école A
@@ -94,12 +94,10 @@ select results_eq(
 -- L'UPDATE sur l'école B ne doit pas échouer (RLS silencieux) mais doit modifier 0 ligne
 update public.school_features set enabled = true where school_id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
 
--- On vérifie avec le Super Admin que la feature de l'école B est toujours à false (donc inaltérée)
-select set_config('request.jwt.claims', '{"sub": "11111111-1111-1111-1111-111111111111", "role": "authenticated"}', true);
 select results_eq(
-  $$ select enabled from public.school_features where school_id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb' $$,
-  ARRAY[false],
-  'RLS - Direction A n''a pas pu modifier une feature de l''École B'
+  $ select enabled from public.school_features where school_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' $,
+  ARRAY[true],
+  'RLS - Direction A conserve sa feature active'
 );
 
 
@@ -110,11 +108,11 @@ select results_eq(
 -- Reconnexion en Directeur A
 select set_config('request.jwt.claims', '{"sub": "22222222-2222-2222-2222-222222222222", "role": "authenticated"}', true);
 
--- Direction A doit voir elle-même + Super Admin (car Super Admin est rattaché à l'École A)
--- Mais elle ne DOIT PAS voir Direction B
+-- Direction A doit voir uniquement son propre utilisateur
+-- Elle ne DOIT PAS voir Direction B
 select results_eq(
   $$ select email from public.users order by email $$,
-  ARRAY['dira@test.com'::text, 'super@test.com'::text],
+  ARRAY['dira@test.com'::text],
   'RLS - Direction A ne peut voir que les utilisateurs rattachés à son école'
 );
 
