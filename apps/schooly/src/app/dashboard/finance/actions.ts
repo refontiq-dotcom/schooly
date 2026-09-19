@@ -28,7 +28,7 @@ export async function getFeeSchedules(schoolId: string) {
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SECRET_KEY!
   )
 
   const { data, error } = await admin
@@ -66,7 +66,7 @@ export async function createFeeSchedule(formData: FormData): Promise<ActionResul
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SECRET_KEY!
   )
 
   const { error } = await admin.from("fee_schedules").insert({
@@ -97,7 +97,7 @@ export async function getPayments(schoolId: string) {
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SECRET_KEY!
   )
 
   const { data, error } = await admin
@@ -143,7 +143,7 @@ export async function createPayment(formData: FormData): Promise<ActionResult<{ 
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SECRET_KEY!
   )
 
   const { data: enrollment } = await admin
@@ -241,7 +241,7 @@ export async function getOpenCashSession(schoolId: string) {
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SECRET_KEY!
   )
 
   const { data } = await admin
@@ -262,7 +262,7 @@ export async function getCashSessions(schoolId: string) {
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SECRET_KEY!
   )
 
   const { data, error } = await admin
@@ -291,7 +291,7 @@ export async function openCashSession(formData: FormData): Promise<ActionResult>
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SECRET_KEY!
   )
 
   const { data: existing } = await admin
@@ -328,7 +328,7 @@ export async function closeCashSession(formData: FormData): Promise<ActionResult
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SECRET_KEY!
   )
 
   const { data: session } = await admin
@@ -381,7 +381,7 @@ export async function closeCashSession(formData: FormData): Promise<ActionResult
 export async function verifyReceipt(verificationCode: string) {
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SECRET_KEY!
   )
 
   const { data: receipt } = await admin
@@ -424,7 +424,7 @@ export async function getAccountingExports(requestedSchoolId: string) {
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SECRET_KEY!
   )
 
   const { data, error } = await admin
@@ -479,7 +479,7 @@ export async function generateAccountingExport(formData: FormData): Promise<Acti
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SECRET_KEY!
   )
 
   const { data: payments } = await admin
@@ -573,7 +573,7 @@ export async function getFinanceConfig(schoolId: string) {
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SECRET_KEY!
   )
 
   const [schedulesRes, profilesRes, levelsRes, yearsRes] = await Promise.all([
@@ -642,7 +642,7 @@ export async function duplicateFeeSchedule(
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SECRET_KEY!
   )
 
   const { data: sourceRows, error: sourceError } = await admin
@@ -708,7 +708,7 @@ export async function deleteFeeSchedule(formData: FormData): Promise<ActionResul
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SECRET_KEY!
   )
 
   const { data: row } = await admin
@@ -768,7 +768,7 @@ export async function getStudentBalances(schoolId: string, academicYearId?: stri
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SECRET_KEY!
   )
 
   let query = admin
@@ -795,7 +795,7 @@ export async function getFinanceOverview(schoolId: string) {
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SECRET_KEY!
   )
 
   const { data: balances, error } = await admin
@@ -881,7 +881,7 @@ export async function cancelPayment(formData: FormData): Promise<ActionResult> {
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SECRET_KEY!
   )
 
   const { data: payment } = await admin
@@ -936,7 +936,7 @@ export async function generateMissingFeeItems(
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SECRET_KEY!
   )
 
   const { data: rows, error } = await admin
@@ -980,7 +980,7 @@ export async function getEnrollmentDiscounts(schoolId: string, enrollmentId: str
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SECRET_KEY!
   )
 
   const { data, error } = await admin
@@ -1015,7 +1015,7 @@ export async function createManualDiscount(
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SECRET_KEY!
   )
 
   const { data: enr } = await admin
@@ -1075,7 +1075,7 @@ export async function deleteDiscount(formData: FormData): Promise<ActionResult> 
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SECRET_KEY!
   )
 
   const { data: row } = await admin
@@ -1139,7 +1139,7 @@ export async function applySiblingDiscounts(
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SECRET_KEY!
   )
 
   const { data: rows, error } = await admin
@@ -1267,7 +1267,7 @@ export async function generateDueReminders(
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SECRET_KEY!
   )
 
   const todayISO = new Date().toISOString().slice(0, 10)
