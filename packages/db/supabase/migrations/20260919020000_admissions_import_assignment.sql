@@ -139,6 +139,7 @@ begin
   for update;
 
   if not found then raise exception 'Affectation introuvable.'; end if;
+  if v_batch.status <> 'preview' then raise exception 'Cette affectation a déjà été validée ou n est plus modifiable.'; end if;
   if not (is_super_admin() or is_school_member(v_batch.school_id)) then
     raise exception 'Accès refusé.';
   end if;
@@ -156,6 +157,13 @@ begin
   loop
     if v_row.class_id is null then
       raise exception 'Impossible de valider : % % n''a pas de classe.', v_row.first_name, v_row.last_name;
+    end if;
+    if v_row.capacity is null or v_row.capacity <= 0 then
+      raise exception 'La classe choisie pour % % n a pas de capacité.', v_row.first_name, v_row.last_name;
+    end if;
+    if (select count(*) from public.enrollments e where e.school_id=v_batch.school_id and e.academic_year_id=v_batch.academic_year_id and e.class_id=v_row.class_id and e.status in ('active','confirmed') and e.deleted_at is null)
+       + (select count(*) from public.admission_assignment_rows x where x.assignment_batch_id=p_assignment_batch_id and x.class_id=v_row.class_id and x.hard_valid=true) > v_row.capacity then
+      raise exception 'La capacité de la classe est dépassée pour % %.', v_row.first_name, v_row.last_name;
     end if;
 
     insert into public.pre_enrollments(
