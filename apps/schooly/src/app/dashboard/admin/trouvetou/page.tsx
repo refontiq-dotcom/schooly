@@ -18,7 +18,7 @@ export default async function TrouvetouAdminPage() {
     .select("role_code, school_id")
     .eq("user_id", user.id)
     .eq("is_active", true)
-    .in("role_code", ["direction", "secretariat", "super_admin"])
+    .in("role_code", ["direction", "secretariat"])
     .limit(1)
     .maybeSingle()
 
