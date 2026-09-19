@@ -12,7 +12,7 @@ type Result = { error?: string; data?: unknown }
 
 async function context() {
   const supabase = await createClient()
-  const guard = await requireSchoolRole(supabase, { allowedRoles: [...STRUCTURE_ADMIN_ROLES] })
+  const guard = await requireSchoolRole(supabase, { allowedRoles: ["direction", "super_admin"] })
   if (!guard.ok) return { ok: false as const, error: "Accès réservé à la direction ou au secrétariat." }
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -50,9 +50,14 @@ export async function createStaffMember(formData: FormData): Promise<Result> {
   if (!STAFF_ROLES.includes(roleCode as (typeof STAFF_ROLES)[number])) return { error: "Rôle invalide." }
   if (password.length < 8) return { error: "Le mot de passe initial doit contenir au moins 8 caractères." }
 
-  const { data: existing } = await ctx.admin.auth.admin.listUsers({ page: 1, perPage: 1000 })
-  const authExisting = existing?.users?.find((u) => u.email?.toLowerCase() === email)
-  let userId = authExisting?.id
+  const { data: existingUser } = await ctx.admin
+    .from("users")
+    .select("id, full_name")
+    .eq("email", email)
+    .is("deleted_at", null)
+    .maybeSingle()
+
+  let userId = existingUser?.id
 
   if (userId) {
     const { data: existingRole } = await ctx.admin
