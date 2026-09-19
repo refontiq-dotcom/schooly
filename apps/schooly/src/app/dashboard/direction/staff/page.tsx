@@ -3,7 +3,8 @@ import { AddStaffModal } from "./staff-modals"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Power, Users, ShieldCheck } from "lucide-react"
+import Link from "next/link"
+import { Power, Users, ShieldCheck, ArrowRight, KeyRound, UserCog, GraduationCap, WalletCards, ClipboardList, Eye, BookOpen } from "lucide-react"
 
 const ROLE_LABELS: Record<string, string> = {
   professeur: "Professeur / Enseignant",
@@ -42,6 +43,22 @@ export default async function StaffPage() {
         <Card><CardContent className="pt-6 text-sm text-destructive">{result.error}</CardContent></Card>
       )}
 
+      <Card className="border-primary/20 bg-primary/[0.03]">
+        <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="font-medium">Centre de pilotage du personnel</p>
+            <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+              Ici, le Directeur définit qui travaille dans l'établissement. Le rôle choisi détermine automatiquement
+              l'espace de travail et les accès. Les affectations pédagogiques se règlent ensuite dans la structure académique.
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-2 rounded-lg border bg-background px-3 py-2 text-sm">
+            <KeyRound className="h-4 w-4 text-primary" />
+            <span>Accès pilotés par Schooly</span>
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="grid gap-4 sm:grid-cols-3">
         <Card>
           <CardHeader className="pb-2"><CardDescription>Membres actifs</CardDescription><CardTitle>{staff.filter((s) => s.is_active).length}</CardTitle></CardHeader>
@@ -53,6 +70,37 @@ export default async function StaffPage() {
           <CardHeader className="pb-2"><CardDescription>Accès Schooly</CardDescription><CardTitle><ShieldCheck className="inline h-5 w-5 mr-1" /> Séparés par rôle</CardTitle></CardHeader>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Rôles et accès</CardTitle>
+          <CardDescription>Le Directeur n'a pas à configurer chaque permission une par une : Schooly applique le socle d'accès adapté à chaque fonction.</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {[
+            ["professeur", "Professeur / Enseignant", "Cours, appel, notes", BookOpen],
+            ["compta", "Comptabilité", "Finance, relances, rapports", WalletCards],
+            ["secretariat", "Secrétariat", "Inscriptions, structure, services", ClipboardList],
+            ["caisse", "Caisse", "Encaissements et clôture", WalletCards],
+            ["surveillance", "Surveillance", "Vie scolaire et accès", Eye],
+            ["direction", "Direction", "Pilotage global de l'établissement", UserCog],
+          ].map(([code, label, summary, Icon]) => {
+            const count = staff.filter((s) => s.role_code === code && s.is_active).length
+            return (
+              <div key={String(code)} className="rounded-xl border p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <Icon className="h-4 w-4 shrink-0 text-primary" />
+                    <p className="font-medium">{String(label)}</p>
+                  </div>
+                  <Badge variant="secondary">{count}</Badge>
+                </div>
+                <p className="mt-2 text-sm text-muted-foreground">{String(summary)}</p>
+              </div>
+            )
+          })}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
@@ -73,9 +121,19 @@ export default async function StaffPage() {
                 <div className="min-w-0">
                   <p className="font-medium truncate">{user?.full_name ?? "Utilisateur"}</p>
                   <p className="text-sm text-muted-foreground truncate">{user?.email ?? "Email non renseigné"}</p>
-                  <div className="mt-2 flex items-center gap-2">
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
                     <Badge variant="secondary">{ROLE_LABELS[item.role_code] ?? item.role_code}</Badge>
                     <Badge variant={item.is_active ? "default" : "outline"}>{item.is_active ? "Actif" : "Suspendu"}</Badge>
+                    {item.role_code === "professeur" && (
+                      <Link
+                        href="/dashboard/academic-structure?tab=matrix"
+                        className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium hover:bg-muted"
+                      >
+                        <GraduationCap className="h-3.5 w-3.5" />
+                        Affectations
+                        <ArrowRight className="h-3 w-3" />
+                      </Link>
+                    )}
                   </div>
                 </div>
                 <form action={setStaffRoleActive}>
