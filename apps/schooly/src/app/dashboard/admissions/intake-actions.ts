@@ -64,10 +64,7 @@ async function guardSchool(schoolId?: string, roles: readonly string[] = IMPORT_
   if (!guard.ok) return { error: denial(guard.reason, null).error }
   return {
     guard,
-    admin: createAdminClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    ),
+    admin: createAdminClient(),
   }
 }
 
