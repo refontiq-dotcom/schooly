@@ -21,10 +21,10 @@ INSERT INTO billing_configs (
   'XOF',
   1000,
   '["enrollment_confirmed"]'::jsonb,
-  'M_ci_RImDyQYI8ccj',
-  'votre_wave_webhook_secret',
-  '8882268453:AAGNSyYytK2Wyo57sKAlw2Vps1HNBg11ZvE',
-  '8958821599',
+  '<configure-in-secure-environment>',
+  NULL,
+  NULL,
+  NULL,
   'https://admin.schooly.ci/billing',
   true
 )
