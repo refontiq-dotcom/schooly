@@ -55,17 +55,17 @@ ON CONFLICT (user_id, school_id, role_code) DO NOTHING;
 -- Année précédente (clôturée) — inscriptions à promouvoir
 INSERT INTO public.academic_years (id, school_id, label, start_date, end_date, status) VALUES
   ('a1b2c3d4-0000-4372-a567-0e02b2c3d479', 'f47ac10b-58cc-4372-a567-0e02b2c3d479', '2024-2025', '2024-09-16', '2025-07-04', 'cloturee')
-ON CONFLICT (school_id, label) DO UPDATE SET status = excluded.status;
+ON CONFLICT (school_id, label) WHERE deleted_at IS NULL DO UPDATE SET status = excluded.status;
 
 -- Année en cours — destination de la bascule
 INSERT INTO public.academic_years (id, school_id, label, start_date, end_date, status) VALUES
   ('a1b2c3d4-1111-4372-a567-0e02b2c3d479', 'f47ac10b-58cc-4372-a567-0e02b2c3d479', '2025-2026', '2025-09-15', '2026-07-03', 'en_cours')
-ON CONFLICT (school_id, label) DO UPDATE SET status = excluded.status;
+ON CONFLICT (school_id, label) WHERE deleted_at IS NULL DO UPDATE SET status = excluded.status;
 
 -- Année suivante (planifiée) — pour les futures bascules
 INSERT INTO public.academic_years (id, school_id, label, start_date, end_date, status) VALUES
   ('a1b2c3d4-2222-4372-a567-0e02b2c3d479', 'f47ac10b-58cc-4372-a567-0e02b2c3d479', '2026-2027', '2026-09-14', '2027-07-02', 'planifiee')
-ON CONFLICT (school_id, label) DO UPDATE SET status = excluded.status;
+ON CONFLICT (school_id, label) WHERE deleted_at IS NULL DO UPDATE SET status = excluded.status;
 
 -- Niveaux (pérennes, pas d'année académique)
 -- ⚠️ `level` = ordre de PROGRESSION croissant (6ème avant 5ème) — la bascule
@@ -73,13 +73,13 @@ ON CONFLICT (school_id, label) DO UPDATE SET status = excluded.status;
 INSERT INTO public.grade_levels (id, school_id, name, level, cycle) VALUES
   ('b1111111-0000-4372-a567-0e02b2c3d479', 'f47ac10b-58cc-4372-a567-0e02b2c3d479', '6ème', 1, 'collège'),
   ('b2222222-0000-4372-a567-0e02b2c3d479', 'f47ac10b-58cc-4372-a567-0e02b2c3d479', '5ème', 2, 'collège')
-ON CONFLICT (school_id, name) DO UPDATE SET level = excluded.level;
+ON CONFLICT (school_id, name) WHERE deleted_at IS NULL DO UPDATE SET level = excluded.level;
 
 -- Classes
 INSERT INTO public.classes (id, school_id, grade_level_id, name, capacity) VALUES
   ('c1111111-0000-4372-a567-0e02b2c3d479', 'f47ac10b-58cc-4372-a567-0e02b2c3d479', 'b1111111-0000-4372-a567-0e02b2c3d479', '6ème A', 40),
   ('c2222222-0000-4372-a567-0e02b2c3d479', 'f47ac10b-58cc-4372-a567-0e02b2c3d479', 'b2222222-0000-4372-a567-0e02b2c3d479', '5ème A', 40)
-ON CONFLICT (school_id, name) DO NOTHING;
+ON CONFLICT (school_id, name) WHERE deleted_at IS NULL DO NOTHING;
 
 -- Élèves de test (6)
 INSERT INTO public.students (id, school_id, first_name, last_name, date_of_birth, gender, status) VALUES
