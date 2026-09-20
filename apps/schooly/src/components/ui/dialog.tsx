@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 
 interface DialogProps {
@@ -18,17 +19,30 @@ const DialogDescIdContext = React.createContext<string | undefined>(undefined);
 export const Dialog = ({ open, onOpenChange, children, className, label }: DialogProps) => {
   const titleId = React.useId();
   const descId = React.useId();
+  const [mounted, setMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
   React.useEffect(() => {
     if (!open) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onOpenChange(false);
     };
     document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", onKey);
+    };
   }, [open, onOpenChange]);
-  if (!open) return null;
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+
+  if (!open || !mounted) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div
         className="fixed inset-0 animate-in fade-in duration-200 bg-[#0e2d52]/55 backdrop-blur-[2px]"
         onClick={() => onOpenChange(false)}
@@ -41,7 +55,7 @@ export const Dialog = ({ open, onOpenChange, children, className, label }: Dialo
         aria-describedby={descId}
         aria-label={label}
         className={cn(
-          "relative w-full max-w-lg max-h-[90vh] animate-in fade-in zoom-in-95 slide-in-from-bottom-2 duration-200 overflow-y-auto rounded-2xl border border-white/70 bg-card p-6 shadow-[0_24px_70px_oklch(0.2_0.05_252_/_0.25)]",
+          "relative z-[101] w-full max-w-lg max-h-[90vh] animate-in fade-in zoom-in-95 slide-in-from-bottom-2 duration-200 overflow-y-auto rounded-2xl border border-white/70 bg-card p-6 shadow-[0_24px_70px_oklch(0.2_0.05_252_/_0.25)]",
           className
         )}
       >
@@ -51,7 +65,8 @@ export const Dialog = ({ open, onOpenChange, children, className, label }: Dialo
           </DialogDescIdContext.Provider>
         </DialogTitleIdContext.Provider>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

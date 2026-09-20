@@ -17,6 +17,7 @@ import {
   Scan,
   AlertTriangle,
   Bus,
+  UserCog,
 } from "lucide-react"
 
 export type NavItem = {
@@ -35,6 +36,7 @@ export const NAV_BY_ROLE: Record<string, NavItem[]> = {
   direction: [
     { label: "Tableau de bord", href: "/dashboard/direction", icon: LayoutDashboard },
     { label: "Inscriptions", href: "/dashboard/direction/admissions", icon: Users },
+    { label: "Personnel & rôles", href: "/dashboard/direction/staff", icon: UserCog },
     { label: "Structure académique", href: "/dashboard/academic-structure", icon: GraduationCap },
     { label: "Finance", href: "/dashboard/direction/finance", icon: CreditCard },
     { label: "Moratoires", href: "/dashboard/direction/finance/moratoriums", icon: Clock },
