@@ -222,7 +222,7 @@ export default function AdmissionsPage() {
       ]} contextKey="admissions" />
 
       <Tabs value={tab} onValueChange={setTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList>
           <TabsTrigger value="pre-enrollments" className="gap-2">
             <Clock className="h-4 w-4" /> Pré-inscriptions {pendingPreEnrollments.length > 0 && `(${pendingPreEnrollments.length})`}
           </TabsTrigger>
