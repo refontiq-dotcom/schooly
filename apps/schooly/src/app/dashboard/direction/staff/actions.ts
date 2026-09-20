@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache"
 import { requireSchoolRole } from "@/utils/supabase/require-role"
 import { ALL_STAFF_ROLES } from "@/utils/supabase/roles"
 
-const STAFF_ROLES = ALL_STAFF_ROLES.filter((r) => r !== "super_admin")
+const STAFF_ROLES = ALL_STAFF_ROLES
 
 type Result = { error?: string; data?: unknown }
 

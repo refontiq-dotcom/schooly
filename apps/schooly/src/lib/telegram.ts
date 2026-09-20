@@ -19,7 +19,7 @@ async function mirrorToControlCenter(message: string, level: TelegramAlertLevel,
   if (!base || !secret) return
 
   try {
-    await fetch(${base}/api/telegram-alerts/ingest, {
+    await fetch(`${base}/api/telegram-alerts/ingest`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
