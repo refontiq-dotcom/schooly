@@ -11,11 +11,30 @@ interface AlertDialogProps {
 }
 
 export const AlertDialog = ({ open, onOpenChange, children }: AlertDialogProps) => {
+  React.useEffect(() => {
+    if (!open) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onOpenChange(false);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [open, onOpenChange]);
+
   if (!open) return null;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="fixed inset-0 animate-in fade-in duration-200 bg-[#0e2d52]/55 backdrop-blur-[2px]" onClick={() => onOpenChange(false)} />
-      <div className="relative w-full max-w-lg animate-in fade-in zoom-in-95 slide-in-from-bottom-2 duration-200 rounded-2xl border border-white/70 bg-card p-6 shadow-[0_24px_70px_oklch(0.2_0.05_252_/_0.25)]">
+    <div className="fixed inset-0 z-50 flex min-h-0 items-center justify-center p-3 sm:p-4">
+      <div
+        className="fixed inset-0 z-0 animate-in fade-in duration-200 bg-[#0e2d52]/55 backdrop-blur-[2px]"
+        onClick={() => onOpenChange(false)}
+        aria-hidden="true"
+      />
+      <div className="relative z-10 flex w-full max-w-lg min-h-0 max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-2rem)] flex-col overflow-y-auto overscroll-contain rounded-2xl border border-white/70 bg-card p-5 sm:p-6 shadow-[0_24px_70px_oklch(0.2_0.05_252_/_0.25)] animate-in fade-in zoom-in-95 slide-in-from-bottom-2 duration-200">
         {children}
       </div>
     </div>
