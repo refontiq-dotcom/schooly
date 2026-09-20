@@ -18,6 +18,8 @@ const ROLE_LABELS: Record<string, string> = {
   direction: "Direction",
 }
 
+export const dynamic = "force-dynamic"
+
 export default async function StaffPage() {
   const result = await getStaff()
   const staff = Array.isArray(result.data) ? result.data as any[] : []
