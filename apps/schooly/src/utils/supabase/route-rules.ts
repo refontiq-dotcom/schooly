@@ -124,8 +124,22 @@ export const ROLE_ALLOWED_PATHS: Readonly<Record<string, readonly string[]>> = {
   surveillance: ["/dashboard/pedagogie/vie-scolaire"],
 }
 
+/**
+ * Sous-espaces explicitement refusés à un rôle, même si un préfixe autorisé les
+ * couvre. Le refus l'emporte sur l'autorisation (`isRoleAllowedPath`).
+ *
+ * Pourquoi une table séparée plutôt qu'un retrait des préfixes : `/dashboard/pedagogie`
+ * doit rester ouvert au professeur (saisie des notes, appels), seules les surfaces
+ * d'actes officiels sont réservées.
+ */
 export const ROLE_DENIED_PATHS: Readonly<Record<string, readonly string[]>> = {
-  professeur: ["/dashboard/pedagogie/vie-scolaire"],
+  professeur: [
+    "/dashboard/pedagogie/vie-scolaire",
+    // `report-cards` fige la décision annuelle et publie aux familles : c'est un
+    // acte de direction. La garde de la page n'est qu'un confort visuel — le
+    // middleware doit refuser l'URL elle-même (défense en profondeur).
+    "/dashboard/pedagogie/grades/report-cards",
+  ],
 }
 
 export function isRoleAllowedPath(roleCode: string | null | undefined, pathname: string): boolean {

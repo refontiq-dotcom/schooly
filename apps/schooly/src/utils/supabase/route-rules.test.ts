@@ -5,6 +5,7 @@ import {
   ROLE_HOME,
   isEntryPath,
   isPublicPath,
+  isRoleAllowedPath,
   isStudentPortalPath,
   legacyRedirectFor,
   matchesPrefix,
@@ -114,10 +115,30 @@ describe("roleHome — table de routage par rôle (finding M4)", () => {
     expect(roleHome(undefined)).toBeNull()
   })
 
-  it("route les rôles staff manquants du proxy vers l'espace direction", () => {
-    expect(roleHome("compta")).toBe("/dashboard/direction")
-    expect(roleHome("secretariat")).toBe("/dashboard/direction")
+  it("route chaque rôle staff vers sa surface métier, pas vers un parent interdit", () => {
+    // `compta` et `secretariat` n'ont pas accès à `/dashboard/direction` dans
+    // ROLE_ALLOWED_PATHS : les renvoyer à la racine direction produirait un
+    // refus d'accès (voire une boucle) juste après connexion.
+    expect(roleHome("compta")).toBe("/dashboard/direction/finance")
+    expect(roleHome("secretariat")).toBe("/dashboard/direction/admissions")
     expect(roleHome("surveillance")).toBe("/dashboard/pedagogie")
+  })
+
+  it("envoie chaque rôle vers une surface qui lui est réellement autorisée", () => {
+    // Incohérences connues, hors périmètre de ce lot :
+    // - `eleve` : portail hors /dashboard, règles distinctes ;
+    // - `surveillance` : la seule surface autorisée est
+    //   `/dashboard/pedagogie/vie-scolaire`, un module pas encore implémenté
+    //   (ni route, ni page). Son accueil `/dashboard/pedagogie` n'est donc pas
+    //   autorisé par le middleware : le surveillant est renvoyé au login après
+    //   connexion. À réparer quand le module « vie scolaire » sera livré — le
+    //   corriger ici reviendrait à ouvrir tout `/dashboard/pedagogie` (notes,
+    //   appels, bulletins) au surveillant, ce qui élargirait ses droits.
+    const known = new Set(["eleve", "surveillance"])
+    for (const [role, home] of Object.entries(ROLE_HOME)) {
+      if (known.has(role)) continue
+      expect(isRoleAllowedPath(role, home)).toBe(true)
+    }
   })
 
   it("n'envoie jamais un rôle vers /login (boucle de connexion)", () => {
@@ -135,6 +156,40 @@ describe("roleHome — table de routage par rôle (finding M4)", () => {
   it("le portail élève reste HORS de /dashboard (layout staff exige une session)", () => {
     expect(ROLE_HOME.eleve).toBe("/eleve")
     expect(ROLE_HOME.eleve.startsWith("/dashboard")).toBe(false)
+  })
+})
+
+describe("isRoleAllowedPath — cloisonnement inter-rôles du middleware", () => {
+  it("autorise un professeur à saisir des notes", () => {
+    expect(isRoleAllowedPath("professeur", "/dashboard/pedagogie/grades")).toBe(true)
+    expect(isRoleAllowedPath("professeur", "/dashboard/pedagogie/grades/notes")).toBe(true)
+  })
+
+  it("refuse au professeur les actes officiels de fin d'année", () => {
+    // `report-cards` fige la décision annuelle et publie aux familles :
+    // responsabilité de la direction, comme vie-scolaire l'est au surveillant.
+    expect(isRoleAllowedPath("professeur", "/dashboard/pedagogie/grades/report-cards")).toBe(false)
+  })
+
+  it("refuse toujours le sous-espace de la surveillance", () => {
+    expect(isRoleAllowedPath("professeur", "/dashboard/pedagogie/vie-scolaire")).toBe(false)
+  })
+
+  it("autorise la direction sur les deux écrans d'évaluation", () => {
+    expect(isRoleAllowedPath("direction", "/dashboard/pedagogie/grades/notes")).toBe(true)
+    expect(isRoleAllowedPath("direction", "/dashboard/pedagogie/grades/report-cards")).toBe(true)
+  })
+
+  it("refuse un rôle inconnu, absent ou une cible hors périmètre", () => {
+    expect(isRoleAllowedPath("role_inexistant", "/dashboard/pedagogie")).toBe(false)
+    expect(isRoleAllowedPath(null, "/dashboard/pedagogie")).toBe(false)
+    expect(isRoleAllowedPath(undefined, "/dashboard/pedagogie")).toBe(false)
+    expect(isRoleAllowedPath("professeur", "/dashboard/direction/finance")).toBe(false)
+  })
+
+  it("ne confond pas un préfixe autorisé avec son homonyme", () => {
+    // `/dashboard/pedagogieX` n'est pas `/dashboard/pedagogie`.
+    expect(isRoleAllowedPath("professeur", "/dashboard/pedagogieX")).toBe(false)
   })
 })
 

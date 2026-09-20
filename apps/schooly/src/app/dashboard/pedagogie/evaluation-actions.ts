@@ -7,7 +7,7 @@ import { validateRules, computePeriodAverage } from "@/lib/evaluation/calculatio
 import { computeExpectedSubject, type EnteredGrade } from "@/lib/evaluation/completeness"
 import { toRules, type EvaluationRule, type EvaluationPeriod, type EvaluationAssessment } from "./evaluation-types"
 import { computeAnnualPreview, type AnnualPeriod } from "@/lib/evaluation/annual"
-import { revalidatePath } from "next/cache"
+import { revalidateGrades } from "./grades/_lib/revalidate"
 
 const text = (form: FormData, key: string) => String(form.get(key) ?? "").trim()
 const number = (form: FormData, key: string) => text(form, key) === "" ? NaN : Number(text(form, key))
@@ -41,7 +41,7 @@ export async function createEvaluationRule(form: FormData) {
     return { error: error instanceof Error ? error.message : "Paramètres invalides." }
   }
   const { error } = await db.from("evaluation_rules").insert(row)
-  revalidatePath("/dashboard/pedagogie/grades")
+  revalidateGrades()
   return error ? { error: error.message } : {}
 }
 
@@ -56,7 +56,7 @@ export async function createEvaluationPeriod(form: FormData) {
     position: number(form, "position"), is_passage: text(form, "passage") === "on",
     starts_at: `${start}T00:00:00Z`, ends_at: `${end}T00:00:00Z`,
   })
-  revalidatePath("/dashboard/pedagogie/grades")
+  revalidateGrades()
   return error ? { error: error.message } : {}
 }
 
@@ -66,7 +66,7 @@ export async function closeEvaluationPeriod(form: FormData) {
   if (!guard.ok) return { error: denial(guard.reason, null).error }
   const { data, error } = await db.from("evaluation_periods").update({ locked_at: new Date().toISOString() })
     .eq("id", text(form, "periodId")).eq("school_id", guard.context.schoolId).is("locked_at", null).select("id")
-  revalidatePath("/dashboard/pedagogie/grades")
+  revalidateGrades()
   return error ? { error: error.message } : data?.length ? {} : { error: "Période introuvable ou déjà clôturée." }
 }
 
@@ -92,7 +92,7 @@ export async function createEvaluationAssessment(form: FormData) {
     grade_type: text(form, "gradeType"), label: text(form, "label"), max_value: maxValue, weight,
   })
   if (error) return { error: error.message }
-  revalidatePath("/dashboard/pedagogie/grades")
+  revalidateGrades()
   return {}
 }
 
@@ -246,7 +246,7 @@ export async function validateAnnualDecision(form: FormData) {
     p_fingerprint: fingerprint, p_observations: text(form, "observations") || null,
   })
   if (error) return { error: error.message }
-  revalidatePath("/dashboard/pedagogie/grades")
+  revalidateGrades()
   return {}
 }
 
@@ -264,7 +264,7 @@ export async function generateReportCards(form: FormData) {
     p_class_id: text(form, "classId"), p_academic_year_id: text(form, "yearId"),
   })
   if (error) return { error: error.message }
-  revalidatePath("/dashboard/pedagogie/grades")
+  revalidateGrades()
   return {}
 }
 
@@ -281,6 +281,6 @@ export async function publishReportCards(form: FormData) {
     p_class_id: text(form, "classId"), p_academic_year_id: text(form, "yearId"),
   })
   if (error) return { error: error.message }
-  revalidatePath("/dashboard/pedagogie/grades")
+  revalidateGrades()
   return {}
 }

@@ -3,7 +3,7 @@
 import { createClient } from "@/utils/supabase/server"
 import { requireSchoolRole, denial } from "@/utils/supabase/require-role"
 import { TEACHING_ROLES } from "@/utils/supabase/roles"
-import { revalidatePath } from "next/cache"
+import { revalidateGrades } from "./grades/_lib/revalidate"
 
 export type GradeCorrection = {
   id: string; revision: number; old_value: number | null; new_value: number | null
@@ -26,7 +26,9 @@ export async function correctGradeEntry(form: FormData): Promise<{ error?: strin
     p_value: value, p_status: status, p_comment: text("comment"), p_reason: reason,
   })
   if (error) return { error: error.message }
-  revalidatePath("/dashboard/pedagogie/grades")
+  // Une correction touche le module entier : la saisie, l'aperçu annuel et le
+  // hub doivent tous être invalidés, pas seulement l'ancienne URL unique.
+  revalidateGrades()
   return {}
 }
 

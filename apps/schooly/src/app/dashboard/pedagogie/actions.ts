@@ -4,6 +4,7 @@ import { createClient } from "@/utils/supabase/server"
 import { DECISION_ROLES, REF_ROLES, TEACHING_ROLES, TIMETABLE_ADMIN_ROLES } from "@/utils/supabase/roles"
 import { createClient as createAdminClient } from "@supabase/supabase-js"
 import { revalidatePath } from "next/cache"
+import { revalidateGrades } from "./grades/_lib/revalidate"
 import {
   denial,
   requireSchoolRole,
@@ -460,7 +461,7 @@ export async function createGradeEntry(formData: FormData): Promise<ActionResult
   })
 
   if (error) return { error: error.message }
-  revalidatePath("/dashboard/pedagogie/grades")
+  revalidateGrades()
   return { success: true }
 }
 
