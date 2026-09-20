@@ -135,6 +135,14 @@ const payload = {
       : activeSchools > 0
         ? "warning"
         : "unknown",
+  details: {
+    ecoles: schoolCount || 0,
+    inscriptions_actives: billableBase,
+    etablissements_actifs: activeSchools,
+    clients_factures: billedTenants.size,
+    lignes_ledger: rows.length,
+    revenus_collectes: mrr,
+  },
 };
 
 console.log(
