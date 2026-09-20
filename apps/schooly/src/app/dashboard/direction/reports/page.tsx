@@ -27,7 +27,7 @@ export default async function ReportsPage() {
   ]
   return <div className="space-y-6">
     <div><h1 className="text-2xl font-bold tracking-tight">Rapports</h1><p className="text-sm text-muted-foreground">Une vue synthétique des indicateurs de l’établissement et des décisions à prendre.</p></div>
-    <IntelligentGuidance items={guidance} title="Schooly analyse vos indicateurs" />
+    <IntelligentGuidance items={guidance} title="Schooly analyse vos indicateurs" contextKey="reports" />
     <div className="grid gap-4 md:grid-cols-3">
       <Card><CardHeader><CardTitle className="flex items-center gap-2 text-base"><Users className="h-4 w-4" />Effectifs</CardTitle><CardDescription>Année active : {dashboard.activeYear?.label ?? "aucune"}</CardDescription></CardHeader><CardContent><p className="text-3xl font-bold">{dashboard.students.active}</p><p className="text-xs text-muted-foreground">élève(s) actif(s)</p></CardContent></Card>
       {!isIT && <Card><CardHeader><CardTitle className="flex items-center gap-2 text-base"><CreditCard className="h-4 w-4" />Finance</CardTitle><CardDescription>Taux de recouvrement</CardDescription></CardHeader><CardContent><p className="text-3xl font-bold">{dashboard.finance.recoveryRate.toFixed(1)} %</p><p className="text-xs text-muted-foreground">{formatFCFA(dashboard.finance.outstanding)} restant à recouvrer</p></CardContent></Card>}

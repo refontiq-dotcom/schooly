@@ -15,6 +15,7 @@ import { DuplicateFeeScheduleModal } from "./duplicate-fee-schedule-modal"
 import { SiblingDiscountModal } from "./sibling-discount-modal"
 import { AlertTriangle, CalendarClock, Landmark, PieChart, Wallet } from "lucide-react"
 import { IntelligentGuidance } from "@/components/intelligent-guidance"
+import { termProgress, progressiveThreshold } from "@/lib/guidance"
 
 export default async function FinancePage() {
   const supabase = await createClient()
@@ -37,13 +38,27 @@ export default async function FinancePage() {
   if (!roleData?.school_id) redirect("/login")
   const schoolId = roleData.school_id as string
 
-  const [overviewRes, configRes] = await Promise.all([
+  const [overviewRes, configRes, activeYearRes] = await Promise.all([
     getFinanceOverview(schoolId),
     getFinanceConfig(schoolId),
+    admin
+      .from("academic_years")
+      .select("start_date, end_date")
+      .eq("school_id", schoolId)
+      .eq("status", "en_cours")
+      .maybeSingle(),
   ])
 
   const overview = overviewRes.data
   const config = configRes.data
+  const activeYear = activeYearRes.data as { start_date: string; end_date: string } | null
+
+  // Le taux de recouvrement attendu monte progressivement dans l'année : 30%
+  // en début d'année n'a pas la même gravité qu'en fin d'année scolaire.
+  const progress = activeYear ? termProgress(activeYear.start_date, activeYear.end_date) : 0
+  const expectedRate = progressiveThreshold(30, 85, progress)
+  const collectionRate = overview?.collectionRate ?? null
+  const isBehindOnCollection = collectionRate !== null && collectionRate < expectedRate
 
   return (
     <div className="p-6 space-y-6">
@@ -57,9 +72,10 @@ export default async function FinancePage() {
       <IntelligentGuidance items={[
         ...((overview?.unpaidCount ?? 0) > 0 ? [{ id: "unpaid", title: `${overview?.unpaidCount ?? 0} élève(s) ont encore un solde`, description: "Schooly détecte des impayés et peut vous guider vers les relances avant une éventuelle demande de moratoire.", severity: "action" as const, actionLabel: "Gérer les relances", href: "/dashboard/direction/finance/reminders" }] : []),
         ...((overview?.upcomingDue?.length ?? 0) > 0 ? [{ id: "due", title: "Des échéances arrivent dans les 7 prochains jours", description: "Préparez les relances préventives avant la date d’échéance.", severity: "warning" as const, actionLabel: "Voir les relances", href: "/dashboard/direction/finance/reminders" }] : []),
+        ...(isBehindOnCollection ? [{ id: "collection-behind", title: `Recouvrement à ${collectionRate}%, en retard sur le rythme attendu (~${Math.round(expectedRate)}% à ce stade de l’année)`, description: "Compte tenu de la progression de l’année scolaire, ce taux est plus bas que ce qu’on attendrait normalement — une campagne de relance ciblée peut aider à rattraper le rythme.", severity: (expectedRate - (collectionRate ?? 0) > 20 ? ("action" as const) : ("warning" as const)), actionLabel: "Gérer les relances", href: "/dashboard/direction/finance/reminders" }] : []),
         ...(config && config.schedules.length === 0 ? [{ id: "tariff", title: "La grille tarifaire n’est pas encore configurée", description: "Sans tarif, Schooly ne peut pas calculer correctement le dû et le solde des inscriptions.", severity: "critical" as const, actionLabel: "Configurer les tarifs", href: "/dashboard/direction/finance" }] : []),
         ...(!overview?.openCashSession ? [{ id: "cash", title: "La caisse est fermée", description: "Si des encaissements doivent être réalisés aujourd’hui, ouvrez une session avant de commencer.", severity: "info" as const, actionLabel: "Ouvrir la caisse", href: "/dashboard/caisse" }] : []),
-      ]} />
+      ]} contextKey="finance" />
 
       {/* KPI réels — plus de cartes factices */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">

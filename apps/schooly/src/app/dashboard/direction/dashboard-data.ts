@@ -123,7 +123,7 @@ export type ClassRow = {
 
 export type DirectionDashboard = {
   hasData: boolean
-  activeYear: { id: string; label: string } | null
+  activeYear: { id: string; label: string; startDate: string; endDate: string } | null
   previousYear: { id: string; label: string } | null
   students: {
     active: number
@@ -670,7 +670,7 @@ export async function getDirectionDashboard(
   return {
     hasData: years.length > 0 || allEnrollments.length > 0,
     activeYear: activeYear
-      ? { id: activeYear.id, label: activeYear.label }
+      ? { id: activeYear.id, label: activeYear.label, startDate: activeYear.start_date, endDate: activeYear.end_date }
       : null,
     previousYear: previousYear
       ? { id: previousYear.id, label: previousYear.label }

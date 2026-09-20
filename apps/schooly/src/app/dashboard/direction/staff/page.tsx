@@ -1,5 +1,6 @@
 import { getStaff, setStaffRoleActiveFormAction } from "./actions"
 import { AddStaffModal } from "./staff-modals"
+import { IntelligentGuidance } from "@/components/intelligent-guidance"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -27,6 +28,22 @@ export default async function StaffPage() {
     return acc
   }, {})
 
+  const activeNonDirection = staff.filter((s) => s.is_active && s.role_code !== "direction")
+  const staleActivations = staff.filter((s) => {
+    if (s.users?.is_activated) return false
+    const daysSinceInvite = (Date.now() - new Date(s.created_at).getTime()) / 86_400_000
+    return daysSinceInvite >= 3
+  })
+  const hasSecretariat = staff.some((s) => s.is_active && s.role_code === "secretariat")
+  const hasCompta = staff.some((s) => s.is_active && (s.role_code === "compta" || s.role_code === "caisse"))
+
+  const guidance = [
+    ...(activeNonDirection.length === 0 ? [{ id: "solo-direction", title: "Seule la direction a un accès actif", description: "Aucun membre du personnel n'est encore rattaché. Ajoutez au moins un secrétariat ou une comptabilité pour déléguer les tâches courantes.", severity: "action" as const }] : []),
+    ...(staleActivations.length > 0 ? [{ id: "stale-activation", title: `${staleActivations.length} compte(s) en attente d'activation depuis plus de 3 jours`, description: "Ces membres ne peuvent pas encore se connecter. Vérifiez avec eux qu'ils ont bien reçu leur code d'activation.", severity: "warning" as const, weight: staleActivations.length }] : []),
+    ...(activeNonDirection.length > 0 && !hasSecretariat ? [{ id: "no-secretariat", title: "Aucun secrétariat actif", description: "Le secrétariat gère habituellement les inscriptions et le suivi administratif courant.", severity: "info" as const }] : []),
+    ...(activeNonDirection.length > 0 && !hasCompta ? [{ id: "no-compta", title: "Aucune comptabilité ni caisse active", description: "Sans ce rôle, la direction doit gérer seule tous les encaissements et le suivi financier.", severity: "info" as const }] : []),
+  ]
+
   return (
     <div className="space-y-6 p-5 sm:p-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -43,6 +60,8 @@ export default async function StaffPage() {
       {result.error && (
         <Card><CardContent className="pt-6 text-sm text-destructive">{result.error}</CardContent></Card>
       )}
+
+      {guidance.length > 0 && <IntelligentGuidance items={guidance} contextKey="personnel" />}
 
       <Card className="border-primary/20 bg-primary/[0.03]">
         <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">

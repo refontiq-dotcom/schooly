@@ -219,7 +219,7 @@ export default function AdmissionsPage() {
         ...(gradeLevels.length === 0 ? [{ id: "levels", title: "La structure académique doit être préparée avant les nouvelles inscriptions", description: "Créez au moins un niveau et une classe pour pouvoir orienter correctement les élèves.", severity: "critical" as const, actionLabel: "Ouvrir la structure", onAction: () => { window.location.href = "/dashboard/academic-structure" } }] : []),
         ...(classes.length === 0 && gradeLevels.length > 0 ? [{ id: "classes", title: "Aucune classe disponible pour l’affectation", description: "Les niveaux existent, mais aucune classe n’est encore prête à accueillir un élève.", severity: "critical" as const, actionLabel: "Créer une classe", onAction: () => { window.location.href = "/dashboard/academic-structure" } }] : []),
         { id: "counter", title: "Besoin d’inscrire immédiatement un élève ?", description: "Schooly peut ouvrir directement le parcours d’inscription au guichet.", severity: "info" as const, actionLabel: "Inscrire au guichet", onAction: () => openCounter() },
-      ]} />
+      ]} contextKey="admissions" />
 
       <Tabs value={tab} onValueChange={setTab} className="space-y-6">
         <TabsList className="grid w-full grid-cols-4">

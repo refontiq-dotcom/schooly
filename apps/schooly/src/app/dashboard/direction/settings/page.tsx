@@ -41,6 +41,7 @@ export default async function SettingsPage() {
             actionLabel: "Compléter les informations",
             href: "#etablissement",
           }]}
+          contextKey="settings"
         />
       )}
 
