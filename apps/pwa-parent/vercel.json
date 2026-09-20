@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/control-center-metrics",
+      "schedule": "0 * * * *"
+    }
+  ]
+}
