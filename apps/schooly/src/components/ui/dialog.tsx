@@ -8,7 +8,6 @@ interface DialogProps {
   onOpenChange: (open: boolean) => void;
   children: React.ReactNode;
   className?: string;
-  /** Nom accessible de secours si aucun DialogTitle visible n'est rendu. */
   label?: string;
 }
 
@@ -18,22 +17,33 @@ const DialogDescIdContext = React.createContext<string | undefined>(undefined);
 export const Dialog = ({ open, onOpenChange, children, className, label }: DialogProps) => {
   const titleId = React.useId();
   const descId = React.useId();
+
   React.useEffect(() => {
     if (!open) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onOpenChange(false);
     };
+
     document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = previousOverflow;
+    };
   }, [open, onOpenChange]);
+
   if (!open) return null;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex min-h-0 items-center justify-center p-3 sm:p-4">
       <div
         className="fixed inset-0 animate-in fade-in duration-200 bg-[#0e2d52]/55 backdrop-blur-[2px]"
         onClick={() => onOpenChange(false)}
         aria-hidden="true"
       />
+
       <div
         role="dialog"
         aria-modal="true"
@@ -41,7 +51,7 @@ export const Dialog = ({ open, onOpenChange, children, className, label }: Dialo
         aria-describedby={descId}
         aria-label={label}
         className={cn(
-          "relative w-full max-w-lg max-h-[90vh] animate-in fade-in zoom-in-95 slide-in-from-bottom-2 duration-200 overflow-y-auto rounded-2xl border border-white/70 bg-card p-6 shadow-[0_24px_70px_oklch(0.2_0.05_252_/_0.25)]",
+          "relative z-10 flex w-full max-w-lg min-h-0 max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-2rem)] flex-col overflow-y-auto overscroll-contain rounded-2xl border border-white/70 bg-card p-5 sm:p-6 shadow-[0_24px_70px_oklch(0.2_0.05_252_/_0.25)] animate-in fade-in zoom-in-95 slide-in-from-bottom-2 duration-200",
           className
         )}
       >
@@ -90,7 +100,7 @@ export const DialogClose = ({ onClick, children, label = "Fermer" }: { onClick: 
     type="button"
     onClick={onClick}
     aria-label={label}
-    className="absolute right-4 top-4 rounded-md p-1 text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+    className="absolute right-4 top-4 z-20 rounded-md p-1 text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
   >
     {children || <span aria-hidden="true">✕</span>}
   </button>
