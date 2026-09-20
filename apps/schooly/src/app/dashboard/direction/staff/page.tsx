@@ -1,4 +1,4 @@
-import { getStaff, setStaffRoleActive } from "./actions"
+import { getStaff, setStaffRoleActiveFormAction } from "./actions"
 import { AddStaffModal } from "./staff-modals"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -141,7 +141,7 @@ export default async function StaffPage() {
                     )}
                   </div>
                 </div>
-                <form action={async (formData) => { await setStaffRoleActive(formData) }}>
+                <form action={setStaffRoleActiveFormAction}>
                   <input type="hidden" name="roleId" value={item.id} />
                   <input type="hidden" name="isActive" value={String(!item.is_active)} />
                   <Button type="submit" variant="outline" size="sm">
