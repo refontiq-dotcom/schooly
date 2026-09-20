@@ -51,19 +51,19 @@
 :root {
   /* Palette Schooly : bleu nuit du logo, corail chaleureux et bleu ciel. */
   --background: oklch(0.975 0.008 245);
-  --foreground: oklch(0.18 0.04 252);
+  --foreground: oklch(0.12 0 0);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.18 0.04 252);
+  --card-foreground: oklch(0.12 0 0);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.16 0.03 250);
+  --popover-foreground: oklch(0.12 0 0);
   --primary: oklch(0.53 0.17 35);
   --primary-foreground: oklch(0.99 0 0);
   --secondary: oklch(0.94 0.015 245);
-  --secondary-foreground: oklch(0.20 0.04 252);
+  --secondary-foreground: oklch(0.12 0 0);
   --muted: oklch(0.945 0.012 245);
-  --muted-foreground: oklch(0.36 0.03 252);
+  --muted-foreground: oklch(0.22 0 0);
   --accent: oklch(0.925 0.035 243);
-  --accent-foreground: oklch(0.20 0.04 252);
+  --accent-foreground: oklch(0.12 0 0);
   --destructive: oklch(0.5 0.2 25); /* Rouge Corail (Erreur/Impayé) — assombri pour contraste AA sur fond clair */
   --destructive-foreground: oklch(0.98 0 0);
   --border: oklch(0.87 0.02 245);
