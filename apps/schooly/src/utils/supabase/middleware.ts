@@ -1,5 +1,4 @@
 import { createServerClient } from "@supabase/ssr"
-import { createClient } from "@supabase/supabase-js"
 import { NextResponse, type NextRequest } from "next/server"
 import {
   isEntryPath,
@@ -108,34 +107,44 @@ async function resolveRoleCode(
   } = await supabase.auth.getSession()
   const claimRole = session?.user?.app_metadata?.role
   if (claimRole) return claimRole
+  return resolveRoleCodeFromDatabase(userId)
+}
 
-  const adminClient = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SECRET_KEY!,
-  )
-  const { data } = await adminClient
+async function resolveHomePath(
+  supabase: ClaimsClient,
+  userId: string
+): Promise<string | null> {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+  const claimRole = session?.user?.app_metadata?.role
+  if (claimRole) return roleHome(claimRole)
+
+  const role = await resolveRoleCodeFromDatabase(userId)
+  return roleHome(role ?? undefined)
+}
+
+async function resolveRoleCodeFromDatabase(userId: string): Promise<string | null> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+  if (!url || !key) return null
+
+  const { createClient } = await import("@supabase/supabase-js")
+  const client = createClient(url, key)
+  const { data } = await client
     .from("user_school_roles")
     .select("role_code")
     .eq("user_id", userId)
     .eq("is_active", true)
     .order("created_at", { ascending: true })
     .limit(1)
+
   return data?.[0]?.role_code ?? null
 }
 
 /**
- * Tableau de bord de l'utilisateur.
- *
- * 1. **Claims du JWT** (audit P2-3) : le hook `custom_access_token_hook`
- *    injecte `app_metadata.role` à chaque émission/refresh du token — la
- *    lecture est locale (décodage des cookies), zéro appel SQL par requête.
- * 2. **Repli base** : si les claims sont absents (hook pas encore enregistré
- *    côté dashboard Supabase, ou token émis avant activation), on résout en
- *    base comme avant — rollout progressif, aucun retour arrière requis.
- *
- * Le repli trie par ancienneté d'attribution (`created_at` asc) : un
- * utilisateur porteur de plusieurs rôles (ex. direction + caisse) obtient un
- * routage *déterministe*. Le hook (migration 20260916000001) reprend ce tri.
+ * Middleware uses JWT claims first and a publishable-key fallback.
+ * It must not require SUPABASE_SECRET_KEY at Edge runtime.
  */
 type ClaimsClient = {
   auth: {
