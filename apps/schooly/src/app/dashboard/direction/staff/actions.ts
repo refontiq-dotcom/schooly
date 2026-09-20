@@ -34,9 +34,6 @@ export async function getStaff(): Promise<Result> {
   const ctx = await context()
   if (!ctx.ok) return { error: ctx.error }
 
-  // Charge d'abord les affectations, puis les profils utilisateurs.
-  // Cela évite de dépendre d'une relation PostgREST imbriquée dont le cache
-  // de schéma pourrait ne pas être actualisé.
   const { data: roles, error: rolesError } = await ctx.admin
     .from("user_school_roles")
     .select("id, user_id, role_code, is_active, created_at")
@@ -191,4 +188,8 @@ export async function setStaffRoleActive(formData: FormData): Promise<Result> {
   revalidatePath("/dashboard/direction/staff")
   revalidatePath("/dashboard/academic-structure")
   return {}
+}
+
+export async function setStaffRoleActiveFormAction(formData: FormData): Promise<void> {
+  await setStaffRoleActive(formData)
 }
