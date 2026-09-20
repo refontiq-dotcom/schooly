@@ -44,6 +44,10 @@ export function matchesPrefix(pathname: string, prefixes: readonly string[]): bo
 
 /** Vrai si le chemin est joignable sans session (public ou technique). */
 export function isPublicPath(pathname: string): boolean {
+  // `/` est l'écran de connexion unifié : il DOIT rester public. Sinon le
+  // middleware renvoie `/` → `/login` pendant que `/login` redirige vers `/`
+  // (ERR_TOO_MANY_REDIRECTS constaté en production).
+  if (pathname === "/") return true
   return (
     matchesPrefix(pathname, PUBLIC_PATH_PREFIXES) ||
     matchesPrefix(pathname, TECHNICAL_PATH_PREFIXES)

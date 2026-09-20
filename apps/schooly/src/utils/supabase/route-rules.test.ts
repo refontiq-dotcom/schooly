@@ -34,12 +34,19 @@ const ROLE_CATALOG = [
 
 describe("isPublicPath — tunnels publics", () => {
   it.each([
+    "/",
     "/login",
     "/register-school",
     "/verify/ABC123",
     "/enroll/61ccee8e-f135-4223-b5ce-88a450142e22",
   ])("autorise %s sans session", (path) => {
     expect(isPublicPath(path)).toBe(true)
+  })
+
+  it("garde / public sans ouvrir tout le site (préfixe /)", () => {
+    expect(isPublicPath("/")).toBe(true)
+    expect(isPublicPath("/dashboard")).toBe(false)
+    expect(isPublicPath("/foo")).toBe(false)
   })
 
   it.each(["/api/health", "/api/debug", "/_next/static/chunk.js"])(
@@ -145,6 +152,7 @@ describe("cohérence des constantes exportées", () => {
   })
 
   it("l'écran d'entrée est aussi un chemin public", () => {
+    expect(isPublicPath("/")).toBe(true)
     for (const entry of ENTRY_PATH_PREFIXES) {
       expect(isPublicPath(entry)).toBe(true)
     }

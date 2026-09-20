@@ -82,9 +82,11 @@ export async function updateSession(request: NextRequest) {
   }
 
   // ─── 2. Protection stricte : session obligatoire ────────────────────────────
+  // Destination = `/` (login unifié), jamais `/login` : en production `/login`
+  // redirige vers `/`, ce qui formait une boucle ERR_TOO_MANY_REDIRECTS.
   if (!user) {
     const url = request.nextUrl.clone()
-    url.pathname = "/login"
+    url.pathname = "/"
     return NextResponse.redirect(url)
   }
 
