@@ -89,14 +89,14 @@ export const DialogFooter = ({ className, ...props }: React.HTMLAttributes<HTMLD
 export const DialogTitle = ({ className, id, ...props }: React.HTMLAttributes<HTMLHeadingElement>) => {
   const ctxId = React.useContext(DialogTitleIdContext);
   return (
-    <h2 id={id ?? ctxId} className={cn("text-lg font-semibold leading-none tracking-tight", className)} {...props} />
+    <h2 id={id ?? ctxId} className={cn("text-xl font-semibold leading-snug tracking-tight text-foreground", className)} {...props} />
   );
 };
 
 export const DialogDescription = ({ className, id, ...props }: React.HTMLAttributes<HTMLParagraphElement>) => {
   const ctxId = React.useContext(DialogDescIdContext);
   return (
-    <p id={id ?? ctxId} className={cn("text-sm text-muted-foreground", className)} {...props} />
+    <p id={id ?? ctxId} className={cn("text-base leading-relaxed text-muted-foreground", className)} {...props} />
   );
 };
 

@@ -124,7 +124,7 @@ export function AcademicYearSelector({ schoolId }: { schoolId?: string | null })
   if (years.length === 0) {
     if (loading) {
       return (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <div className="flex items-center gap-2 text-base text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" />
           Chargement…
         </div>
@@ -153,7 +153,7 @@ export function AcademicYearSelector({ schoolId }: { schoolId?: string | null })
         onValueChange={handleChange}
         disabled={loading || creating}
       >
-        <SelectTrigger id="academic-year" ariaLabel="Année académique affichée" className="h-10 w-[168px] text-sm sm:w-[200px]">
+        <SelectTrigger id="academic-year" ariaLabel="Année académique affichée" className="h-10 w-[168px] text-base sm:w-[200px]">
           {/* Le SelectValue maison rend la valeur brute (uuid) : on affiche le label. */}
           <span className={selectedId ? "" : "text-muted-foreground"}>
             {activeYear?.label ?? "Année académique"}

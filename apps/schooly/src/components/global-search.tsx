@@ -138,7 +138,7 @@ export function GlobalSearch() {
           aria-label="Recherche élèves, tuteurs, professeurs et inscriptions"
           autoComplete="off"
           spellCheck={false}
-          className="h-10 min-h-10 pl-9 pr-16 text-base md:text-sm"
+          className="h-10 min-h-10 pl-9 pr-16 text-base"
         />
         <div className="absolute right-1.5 top-1/2 flex -translate-y-1/2 items-center gap-1">
           {query ? (
@@ -156,7 +156,7 @@ export function GlobalSearch() {
               <X className="h-4 w-4" />
             </Button>
           ) : (
-            <kbd className="hidden rounded border bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground sm:inline">
+            <kbd className="hidden rounded border bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground sm:inline">
               Ctrl K
             </kbd>
           )}
@@ -169,14 +169,14 @@ export function GlobalSearch() {
           className="absolute left-0 right-0 z-50 mt-1.5 max-h-[min(70vh,28rem)] overflow-y-auto rounded-xl border bg-card p-1 shadow-lg"
         >
           {loading && snapshot.students.length === 0 ? (
-            <div className="flex items-center gap-2 px-3 py-6 text-sm text-muted-foreground">
+            <div className="flex items-center gap-2 px-3 py-6 text-base text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
               Chargement de l’annuaire…
             </div>
           ) : hits.length === 0 ? (
             <div className="space-y-1 px-3 py-6 text-center">
-              <p className="text-sm font-medium">Aucun résultat pour « {query.trim()} »</p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-base font-medium text-foreground">Aucun résultat pour « {query.trim()} »</p>
+              <p className="text-sm text-muted-foreground">
                 Nom, prénom, téléphone, matricule ou classe. Accents ignorés.
               </p>
             </div>
@@ -185,7 +185,7 @@ export function GlobalSearch() {
               const Icon = KIND_ICON[kind]
               return (
                 <div key={kind} className="py-1">
-                  <p className="flex items-center gap-1.5 px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  <p className="flex items-center gap-1.5 px-2 py-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     <Icon className="h-3 w-3" />
                     {SEARCH_KIND_LABELS[kind]}
                   </p>
@@ -205,9 +205,9 @@ export function GlobalSearch() {
                         onMouseEnter={() => setActive(index)}
                         onClick={() => go(hit)}
                       >
-                        <span className="text-sm font-medium">{hit.title}</span>
+                        <span className="text-base font-medium text-foreground">{hit.title}</span>
                         {hit.subtitle ? (
-                          <span className="text-xs text-muted-foreground">{hit.subtitle}</span>
+                          <span className="text-sm text-muted-foreground">{hit.subtitle}</span>
                         ) : null}
                       </button>
                     )

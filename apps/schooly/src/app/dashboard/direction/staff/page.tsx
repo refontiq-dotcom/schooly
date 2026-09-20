@@ -15,7 +15,7 @@ function RoleSelect({ member }: { member: StaffMember }) {
       <select
         name="roleCode"
         defaultValue={member.role_code}
-        className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+        className="h-10 rounded-md border border-input bg-background px-2 text-base text-foreground"
       >
         {STAFF_ROLE_CODES.map((code) => (
           <option key={code} value={code}>
@@ -39,7 +39,7 @@ export default async function StaffPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Personnel & rôles</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="mt-1 text-base leading-relaxed text-muted-foreground">
             Invitez le staff de l&apos;établissement et attribuez un rôle d&apos;accès.
           </p>
         </div>
@@ -56,9 +56,9 @@ export default async function StaffPage() {
         </CardHeader>
         <CardContent>
           {res.error ? (
-            <p role="alert" className="text-sm text-destructive">{res.error}</p>
+            <p role="alert" className="text-base text-destructive">{res.error}</p>
           ) : members.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Aucun membre pour le moment.</p>
+            <p className="text-base text-muted-foreground">Aucun membre pour le moment.</p>
           ) : (
             <div className="divide-y">
               {members.map((member) => (
@@ -67,8 +67,8 @@ export default async function StaffPage() {
                   className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between"
                 >
                   <div className="min-w-0 space-y-1">
-                    <p className="font-medium">{member.full_name}</p>
-                    <p className="truncate text-sm text-muted-foreground">
+                    <p className="text-base font-semibold text-foreground">{member.full_name}</p>
+                    <p className="truncate text-base text-muted-foreground">
                       {[member.email, member.phone].filter(Boolean).join(" · ") || "Sans contact"}
                     </p>
                   </div>

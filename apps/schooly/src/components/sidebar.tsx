@@ -49,8 +49,8 @@ export function Sidebar({ role, schoolName, userName }: SidebarProps) {
         <AnimatePresence initial={false}>
           {!collapsed && (
             <motion.div initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -8 }} transition={{ duration: reduceMotion ? 0 : .18 }} className="flex min-w-0 flex-col">
-              <span className="truncate text-base font-semibold tracking-tight text-white">{schoolName}</span>
-              <span className="mt-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[.16em] text-white/55"><Sparkles className="h-3 w-3 text-primary" /> Schooly</span>
+              <span className="truncate text-lg font-semibold tracking-tight text-white">{schoolName}</span>
+              <span className="mt-1 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[.14em] text-white/80"><Sparkles className="h-3.5 w-3.5 text-primary" /> Schooly</span>
             </motion.div>
           )}
         </AnimatePresence>
@@ -73,7 +73,7 @@ export function Sidebar({ role, schoolName, userName }: SidebarProps) {
       {/* Badge rôle */}
       {!collapsed && (
         <div className="px-4 pt-3 pb-1">
-          <Badge variant="secondary" className="w-full justify-center border border-white/10 bg-white/8 py-1 text-[10px] font-semibold uppercase tracking-wider text-white/75">
+          <Badge variant="secondary" className="w-full justify-center border border-white/15 bg-white/10 py-1.5 text-xs font-semibold uppercase tracking-wider text-white">
             {roleLabels[role] ?? role}
           </Badge>
         </div>
@@ -89,9 +89,9 @@ export function Sidebar({ role, schoolName, userName }: SidebarProps) {
               href={item.href}
               aria-current={isActive ? "page" : undefined}
               className={cn(
-                "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 ease-out",
+                "flex items-center gap-3 rounded-xl px-3 py-2.5 text-base font-medium transition-all duration-200 ease-out",
                 "hover:bg-white/10 hover:text-white hover:translate-x-0.5",
-                isActive ? "text-primary-foreground" : "text-white/65",
+                isActive ? "text-primary-foreground" : "text-white/85",
                 collapsed && "justify-center px-0",
                 "relative isolate overflow-hidden"
               )}
@@ -116,8 +116,8 @@ export function Sidebar({ role, schoolName, userName }: SidebarProps) {
       <div className="border-t border-white/10 p-3">
         {!collapsed && (
           <div className="px-2 pb-2">
-            <p className="text-xs font-medium text-white truncate">{userName}</p>
-            <p className="mt-0.5 text-[11px] text-white/50 capitalize">{roleLabels[role]}</p>
+            <p className="text-sm font-medium text-white truncate">{userName}</p>
+            <p className="mt-0.5 text-sm text-white/75 capitalize">{roleLabels[role]}</p>
           </div>
         )}
         <form action="/api/auth/signout" method="post">
@@ -125,7 +125,7 @@ export function Sidebar({ role, schoolName, userName }: SidebarProps) {
             type="submit"
             variant="ghost"
             className={cn(
-              "w-full text-white/60 hover:bg-white/10 hover:text-primary",
+              "w-full text-white/80 hover:bg-white/10 hover:text-primary",
               collapsed ? "justify-center px-0" : "justify-start gap-2"
             )}
             size="sm"

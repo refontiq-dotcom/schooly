@@ -9,10 +9,10 @@ export function SchoolLoginForm({ state, action, pending }: { state: State; acti
   return (
     <form action={action} className="gemini-glass rounded-2xl p-6 space-y-4">
       <div className="space-y-1">
-        <h2 className="text-lg font-semibold">Connexion établissement</h2>
-        <p className="text-xs text-muted-foreground">Accédez à votre tableau de bord de gestion.</p>
+        <h2 className="text-xl font-semibold text-foreground">Connexion établissement</h2>
+        <p className="text-base leading-relaxed text-muted-foreground">Accédez à votre tableau de bord de gestion.</p>
       </div>
-      {state.error && <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">{state.error}</div>}
+      {state.error && <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-base">{state.error}</div>}
       <div className="space-y-2">
         <Label htmlFor="school-email">Email professionnel</Label>
         <div className="relative">
@@ -31,8 +31,8 @@ export function SchoolLoginForm({ state, action, pending }: { state: State; acti
         {pending ? "Connexion…" : "Se connecter"} {!pending && <ArrowRight className="ml-2 h-4 w-4" />}
       </Button>
       <div className="text-center pt-2">
-        <span className="text-xs text-muted-foreground">Nouveau sur Schooly ? </span>
-        <a href="/register-school" className="text-xs text-primary hover:underline font-medium">Créer votre établissement →</a>
+        <span className="text-sm text-muted-foreground">Nouveau sur Schooly ? </span>
+        <a href="/register-school" className="text-sm text-primary hover:underline font-medium">Créer votre établissement →</a>
       </div>
     </form>
   )
@@ -47,12 +47,12 @@ export function ParentLoginForm(p: {
   return (
     <div className="gemini-glass rounded-2xl p-6 space-y-4">
       <div className="space-y-1">
-        <h2 className="text-lg font-semibold">{p.step === "send" ? "Espace Parent" : "Vérification"}</h2>
-        <p className="text-xs text-muted-foreground">{p.step === "send" ? "Connectez-vous avec votre email. Aucun mot de passe nécessaire." : "Entrez le code reçu par email."}</p>
+        <h2 className="text-xl font-semibold text-foreground">{p.step === "send" ? "Espace Parent" : "Vérification"}</h2>
+        <p className="text-base leading-relaxed text-muted-foreground">{p.step === "send" ? "Connectez-vous avec votre email. Aucun mot de passe nécessaire." : "Entrez le code reçu par email."}</p>
       </div>
       {p.step === "send" && (
         <form action={(fd) => { p.setContact(fd.get("email") as string); if (!p.sendState.error) p.setStep("verify"); p.sendAction(fd); }} className="space-y-4">
-          {p.sendState.error && <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">{p.sendState.error}</div>}
+          {p.sendState.error && <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-base">{p.sendState.error}</div>}
           <div className="space-y-2">
             <Label htmlFor="parent-email">Email</Label>
             <div className="relative">
@@ -67,7 +67,7 @@ export function ParentLoginForm(p: {
       )}
       {p.step === "verify" && (
         <form action={p.verifyAction} className="space-y-4">
-          {p.verifyState.error && <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">{p.verifyState.error}</div>}
+          {p.verifyState.error && <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-base">{p.verifyState.error}</div>}
           <input type="hidden" name="email" value={p.contact} />
           <div className="space-y-2">
             <Label htmlFor="parent-code">Code de vérification</Label>
@@ -76,7 +76,7 @@ export function ParentLoginForm(p: {
           <Button type="submit" className="w-full h-11 text-base font-semibold bg-primary hover:bg-primary/90" disabled={p.verifyPending}>
             {p.verifyPending ? "Vérification…" : "Valider le code"} {!p.verifyPending && <ArrowRight className="ml-2 h-4 w-4" />}
           </Button>
-          <button type="button" onClick={() => p.setStep("send")} className="w-full text-xs text-muted-foreground hover:text-foreground">← Changer d&apos;email</button>
+          <button type="button" onClick={() => p.setStep("send")} className="w-full text-sm text-muted-foreground hover:text-foreground">← Changer d&apos;email</button>
         </form>
       )}
     </div>

@@ -52,7 +52,7 @@ export default function Home() {
             </h1>
           </FadeIn>
           <FadeIn delay={0.16}>
-            <p className="text-muted-foreground text-sm">
+            <p className="text-muted-foreground text-base leading-relaxed">
               La plateforme de gestion scolaire pour l&apos;Afrique de l&apos;Ouest
             </p>
           </FadeIn>
@@ -70,7 +70,7 @@ export default function Home() {
               <button
                 key={id}
                 onClick={() => setTab(id)}
-                className={`relative flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                className={`relative flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-base font-medium transition-colors ${
                   tab === id ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground"
                 }`}
               >

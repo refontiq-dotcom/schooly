@@ -81,7 +81,7 @@ export default async function DashboardLayout({
         <header className="flex h-[72px] shrink-0 items-center gap-3 border-b border-border/70 bg-background/72 px-5 backdrop-blur-xl sm:gap-4 sm:px-8">
           <AcademicYearSelector schoolId={schoolId} />
           <GlobalSearch />
-          <div className="hidden shrink-0 rounded-full border border-border bg-card/70 px-3 py-1.5 text-xs font-medium text-muted-foreground lg:block">
+          <div className="hidden shrink-0 rounded-full border border-border bg-card/70 px-3 py-1.5 text-sm font-medium text-foreground lg:block">
             {schoolName}
           </div>
         </header>

@@ -65,11 +65,11 @@ export const DialogFooter = ({ className, ...props }: React.HTMLAttributes<HTMLD
 );
 
 export const DialogTitle = ({ className, ...props }: React.HTMLAttributes<HTMLHeadingElement>) => (
-  <h2 className={cn("text-lg font-semibold leading-none tracking-tight", className)} {...props} />
+  <h2 className={cn("text-xl font-semibold leading-snug tracking-tight text-foreground", className)} {...props} />
 );
 
 export const DialogDescription = ({ className, ...props }: React.HTMLAttributes<HTMLParagraphElement>) => (
-  <p className={cn("text-sm text-muted-foreground", className)} {...props} />
+  <p className={cn("text-base leading-relaxed text-muted-foreground", className)} {...props} />
 );
 
 export const DialogClose = ({ onClick, children }: { onClick: () => void; children?: React.ReactNode }) => (

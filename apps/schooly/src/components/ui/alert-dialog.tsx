@@ -69,11 +69,11 @@ export const AlertDialogFooter = ({ className, ...props }: React.HTMLAttributes<
 );
 
 export const AlertDialogTitle = ({ className, ...props }: React.HTMLAttributes<HTMLHeadingElement>) => (
-  <h2 className={cn("text-lg font-semibold", className)} {...props} />
+  <h2 className={cn("text-xl font-semibold leading-snug text-foreground", className)} {...props} />
 );
 
 export const AlertDialogDescription = ({ className, ...props }: React.HTMLAttributes<HTMLParagraphElement>) => (
-  <p className={cn("text-sm text-muted-foreground", className)} {...props} />
+  <p className={cn("text-base leading-relaxed text-muted-foreground", className)} {...props} />
 );
 
 export const AlertDialogAction = ({ className, onClick, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement>) => (

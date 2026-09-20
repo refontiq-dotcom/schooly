@@ -81,7 +81,7 @@ export function InviteStaffForm() {
                 name="roleCode"
                 defaultValue="professeur"
                 disabled={pending}
-                className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base text-foreground"
               >
                 {STAFF_ROLE_CODES.map((code) => (
                   <option key={code} value={code}>
@@ -96,18 +96,18 @@ export function InviteStaffForm() {
             </div>
           </div>
           {error ? (
-            <p role="alert" className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm font-medium text-destructive">
+            <p role="alert" className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-base font-medium text-destructive">
               {error}
             </p>
           ) : null}
           {created ? (
-            <p className="rounded-lg border bg-muted/60 p-3 text-sm">
+            <p className="rounded-lg border bg-muted/60 p-3 text-base leading-relaxed">
               Compte prêt pour <span className="font-medium">{created.email}</span>. Mot de passe à transmettre :
               <span className="ml-1 font-mono font-semibold">{created.password}</span>
             </p>
           ) : null}
           {added ? (
-            <p className="rounded-lg border bg-muted/60 p-3 text-sm">
+            <p className="rounded-lg border bg-muted/60 p-3 text-base leading-relaxed">
               <span className="font-medium">{added}</span> a été rattaché à l&apos;établissement.
             </p>
           ) : null}
