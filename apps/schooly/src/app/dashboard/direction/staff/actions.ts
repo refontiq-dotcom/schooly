@@ -34,16 +34,39 @@ export async function getStaff(): Promise<Result> {
   const ctx = await context()
   if (!ctx.ok) return { error: ctx.error }
 
-  const { data, error } = await ctx.admin
+  // Charge d'abord les affectations, puis les profils utilisateurs.
+  // Cela évite de dépendre d'une relation PostgREST imbriquée dont le cache
+  // de schéma pourrait ne pas être actualisé.
+  const { data: roles, error: rolesError } = await ctx.admin
     .from("user_school_roles")
-    .select("id, user_id, role_code, is_active, created_at, users!inner(id, full_name, email, phone, is_activated, activated_at)")
+    .select("id, user_id, role_code, is_active, created_at")
     .eq("school_id", ctx.schoolId)
     .neq("role_code", "parent")
     .neq("role_code", "eleve")
     .order("created_at", { ascending: true })
 
-  if (error) return { error: error.message }
-  return { data: data ?? [] }
+  if (rolesError) return { error: rolesError.message }
+
+  const roleRows = roles ?? []
+  const userIds = [...new Set(roleRows.map((row) => row.user_id))]
+
+  if (userIds.length === 0) return { data: [] }
+
+  const { data: users, error: usersError } = await ctx.admin
+    .from("users")
+    .select("id, full_name, email, phone, is_activated, activated_at")
+    .in("id", userIds)
+
+  if (usersError) return { error: usersError.message }
+
+  const usersById = new Map((users ?? []).map((user) => [user.id, user]))
+
+  return {
+    data: roleRows.map((role) => ({
+      ...role,
+      users: usersById.get(role.user_id) ?? null,
+    })),
+  }
 }
 
 export async function createStaffMember(formData: FormData): Promise<Result> {
