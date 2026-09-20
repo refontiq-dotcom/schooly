@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { createClient } from "@/utils/supabase/browser"
 import { Button } from "@/components/ui/button"
@@ -24,6 +24,8 @@ import {
   CounterEnrollmentModal,
   type CounterPrefill,
 } from "./counter-enrollment-modal"
+import { ListPagination } from "@/components/list-pagination"
+import { usePagination } from "@/hooks/use-pagination"
 
 type PreEnrollment = {
   id: string
@@ -182,6 +184,16 @@ export default function AdmissionsPage() {
     p => p.status === "pending" && new Date(p.expires_at) >= new Date()
   )
 
+    const {
+    pageItems: visibleStudents,
+    page: studentPage,
+    totalPages: studentTotalPages,
+    total: studentTotal,
+    canGoPrev: studentCanGoPrev,
+    canGoNext: studentCanGoNext,
+    goToPage: goToStudentPage,
+  } = usePagination(students)
+
   if (loading) {
     return <div className="p-6 text-center text-muted-foreground">Chargement...</div>
   }
@@ -332,28 +344,38 @@ export default function AdmissionsPage() {
               <CardTitle>Élèves</CardTitle>
               <CardDescription>Liste des élèves de l’établissement.</CardDescription>
             </CardHeader>
-            <CardContent>
+                        <CardContent>
               {students.length === 0 ? (
                 <div className="p-8 text-center text-sm text-muted-foreground">Aucun élève.</div>
               ) : (
-                <div className="space-y-2">
-                  {students.map((s: any) => (
-                    <div key={s.id} className="p-3 rounded-lg border text-sm">
-                      <p className="font-medium">{s.last_name} {s.first_name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        Né(e) le {s.date_of_birth}
-                        {s.enrollments?.[0]?.grade_levels?.name ? ` · ${s.enrollments[0].grade_levels.name}` : ""}
-                        {s.enrollments?.[0]?.classes?.name ? ` · ${s.enrollments[0].classes.name}` : ""}
-                      </p>
-                      {(s.previous_school || s.previous_class) && (
+                <>
+                  <div className="space-y-2">
+                    {visibleStudents.map((s: any) => (
+                      <div key={s.id} className="p-3 rounded-lg border text-sm">
+                        <p className="font-medium">{s.last_name} {s.first_name}</p>
                         <p className="text-xs text-muted-foreground">
-                          Venant de : {s.previous_school || "—"}
-                          {s.previous_class ? ` (${s.previous_class})` : ""}
+                          Né(e) le {s.date_of_birth}
+                          {s.enrollments?.[0]?.grade_levels?.name ? ` · ${s.enrollments[0].grade_levels.name}` : ""}
+                          {s.enrollments?.[0]?.classes?.name ? ` · ${s.enrollments[0].classes.name}` : ""}
                         </p>
-                      )}
-                    </div>
-                  ))}
-                </div>
+                        {(s.previous_school || s.previous_class) && (
+                          <p className="text-xs text-muted-foreground">
+                            Venant de : {s.previous_school || "—"}
+                            {s.previous_class ? ` (${s.previous_class})` : ""}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <ListPagination
+                    page={studentPage}
+                    totalPages={studentTotalPages}
+                    total={studentTotal}
+                    singularLabel="élève"
+                    pluralLabel="élèves"
+                    onPageChange={goToStudentPage}
+                  />
+                </>
               )}
             </CardContent>
           </Card>

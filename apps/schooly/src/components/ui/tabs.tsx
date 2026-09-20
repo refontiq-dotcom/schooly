@@ -35,7 +35,7 @@ function Tabs({ value, defaultValue, onValueChange, children, className }: {
 
 function TabsList({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={cn("inline-flex h-11 items-center justify-center rounded-xl border border-border/70 bg-muted/70 p-1 text-muted-foreground shadow-sm", className)}>
+    <div role="tablist" className={cn("inline-flex h-11 items-center justify-center rounded-xl border border-border/70 bg-muted/70 p-1 text-muted-foreground shadow-sm", className)}>
       {children}
     </div>
   )
@@ -53,6 +53,8 @@ function TabsTrigger({ value, children, className }: {
   return (
     <button
       type="button"
+      role="tab"
+      aria-selected={isActive}
       onClick={() => ctx.onValueChange(value)}
       className={cn(
         "relative isolate inline-flex items-center justify-center whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium ring-offset-background transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
