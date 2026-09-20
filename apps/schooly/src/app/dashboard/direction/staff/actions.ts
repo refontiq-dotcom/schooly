@@ -5,41 +5,15 @@ import { DECISION_ROLES } from "@/utils/supabase/roles"
 import { createClient as createAdminClient } from "@supabase/supabase-js"
 import { revalidatePath } from "next/cache"
 import { denial, requireSchoolRole } from "@/utils/supabase/require-role"
+import {
+  STAFF_ROLE_CODES,
+  isStaffRole,
+  type StaffMember,
+} from "./staff-roles"
 
 export type ActionResult<T = void> = {
   error?: string
   data?: T
-}
-
-export const STAFF_ROLE_CODES = [
-  "direction",
-  "secretariat",
-  "compta",
-  "caisse",
-  "professeur",
-  "surveillance",
-] as const
-
-export type StaffRoleCode = (typeof STAFF_ROLE_CODES)[number]
-
-export const STAFF_ROLE_LABELS: Record<StaffRoleCode, string> = {
-  direction: "Direction",
-  secretariat: "Secrétariat",
-  compta: "Comptabilité",
-  caisse: "Caisse",
-  professeur: "Enseignant",
-  surveillance: "Surveillance",
-}
-
-export type StaffMember = {
-  id: string
-  user_id: string
-  role_code: StaffRoleCode
-  is_active: boolean
-  created_at: string
-  full_name: string
-  email: string | null
-  phone: string | null
 }
 
 function adminClient() {
@@ -47,10 +21,6 @@ function adminClient() {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
   )
-}
-
-function isStaffRole(value: string): value is StaffRoleCode {
-  return (STAFF_ROLE_CODES as readonly string[]).includes(value)
 }
 
 function generatePassword(length = 10): string {

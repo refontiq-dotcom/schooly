@@ -13,7 +13,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { inviteStaffMember, STAFF_ROLE_CODES, STAFF_ROLE_LABELS } from "./actions"
+import { inviteStaffMember } from "./actions"
+import { STAFF_ROLE_CODES, STAFF_ROLE_LABELS } from "./staff-roles"
 
 export function InviteStaffForm() {
   const [open, setOpen] = useState(false)

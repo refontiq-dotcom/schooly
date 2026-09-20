@@ -3,14 +3,10 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ActionForm } from "@/components/action-form"
 import { InviteStaffForm } from "./invite-form"
-import {
-  getStaffMembers,
-  setStaffActive,
-  STAFF_ROLE_CODES,
-  STAFF_ROLE_LABELS,
-  updateStaffRole,
-  type StaffMember,
-} from "./actions"
+import { getStaffMembers, setStaffActive, updateStaffRole } from "./actions"
+import { STAFF_ROLE_CODES, STAFF_ROLE_LABELS, type StaffMember } from "./staff-roles"
+
+export const dynamic = "force-dynamic"
 
 function RoleSelect({ member }: { member: StaffMember }) {
   return (
