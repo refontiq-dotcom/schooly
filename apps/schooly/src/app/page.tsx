@@ -13,7 +13,7 @@ import {
   parentOtpVerifyAction,
 } from "./login/unified-actions"
 import { SchoolLoginForm, ParentLoginForm } from "./login-form-components"
-import { FadeIn, GeminiBackdrop, GradientText } from "@/components/gemini"
+import { FadeIn, GeminiBackdrop } from "@/components/gemini"
 
 type Tab = "school" | "parent"
 
@@ -56,19 +56,16 @@ export default function Home() {
         <div className="text-center space-y-3">
           <FadeIn>
             <div className="flex justify-center">
-              <div className="w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg bg-gradient-to-br from-primary to-emerald-600 shadow-primary/25">
-                <span className="text-white text-2xl font-bold">S</span>
-              </div>
+              <img
+                src="/schooly_logo_vector.svg"
+                alt="Schooly"
+                className="h-12 w-auto max-w-[260px] object-contain"
+              />
             </div>
-          </FadeIn>
-          <FadeIn delay={0.08}>
-            <h1 className="text-4xl font-bold tracking-tight">
-              <GradientText>Schooly</GradientText>
-            </h1>
           </FadeIn>
           <FadeIn delay={0.16}>
             <p className="text-muted-foreground text-sm">
-              La plateforme de gestion scolaire pour l&apos;Afrique de l&apos;Ouest
+              La plateforme de gestion scolaire pour les réalités de l&apos;Afrique
             </p>
           </FadeIn>
         </div>
