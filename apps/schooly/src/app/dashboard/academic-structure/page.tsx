@@ -399,7 +399,7 @@ export default function AcademicStructurePage() {
       )}
 
       <Tabs value={tab} onValueChange={setTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList>
           <TabsTrigger value="years"><BookOpen className="h-4 w-4 mr-2" />Années</TabsTrigger>
           <TabsTrigger value="levels"><GraduationCap className="h-4 w-4 mr-2" />Niveaux</TabsTrigger>
           <TabsTrigger value="classes"><Users className="h-4 w-4 mr-2" />Classes</TabsTrigger>
