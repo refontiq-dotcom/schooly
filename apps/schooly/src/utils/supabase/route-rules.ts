@@ -16,6 +16,7 @@
  * de dossier, ainsi que les écrans de connexion (/ et /login).
  */
 export const PUBLIC_PATH_PREFIXES = [
+  "/",
   "/login",
   "/register-school",
   "/verify",
