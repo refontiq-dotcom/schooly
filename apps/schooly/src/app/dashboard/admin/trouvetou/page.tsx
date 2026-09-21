@@ -41,7 +41,7 @@ export default async function TrouvetouAdminPage() {
 
   const { data: ads } = await admin
     .from("trouvetou_ads")
-    .select("id, title, message, image_url, target_url, start_date, end_date, is_active, created_at")
+    .select("id, title, message, image_url, target_url, contact_phone, cta_label, start_date, end_date, duration_days, daily_rate, total_amount, payment_status, is_active, created_at")
     .eq("school_id", schoolId)
     .order("created_at", { ascending: false })
     .limit(10)
