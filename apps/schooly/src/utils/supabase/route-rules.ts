@@ -21,6 +21,7 @@ export const PUBLIC_PATH_PREFIXES = [
   "/register-school",
   "/verify",
   "/enroll",
+  "/auth/callback",
 ] as const
 
 /**
