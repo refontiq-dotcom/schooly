@@ -54,6 +54,18 @@ export function isPublicPath(pathname: string): boolean {
 }
 
 /** Vrai si le chemin est un écran d'entrée (/, /login…). */
+/** Routes conservées accessibles lorsque la facturation est restreinte/suspendue. */
+export const BILLING_ACCESS_PATH_PREFIXES = [
+  "/dashboard/billing",
+  "/api/billing",
+  "/api/school/export",
+  "/legal",
+] as const
+
+export function isBillingAccessPath(pathname: string): boolean {
+  return matchesPrefix(pathname, BILLING_ACCESS_PATH_PREFIXES)
+}
+
 export function isEntryPath(pathname: string): boolean {
   return pathname === "/" || matchesPrefix(pathname, ENTRY_PATH_PREFIXES)
 }
