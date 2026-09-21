@@ -81,10 +81,22 @@ async function syncSchoolToTrouvetou(admin: SupabaseClient, schoolId: string, pu
     cache: "no-store",
   })
   const body = await response.json().catch(() => ({}))
+  // IMPORTANT : `body.ok === true` ne suffit pas à prouver qu'une fiche
+  // catalogue existe côté Trouvetou. L'ancienne version de /api/v1/sync/schooly
+  // renvoyait déjà `ok: true` après le seul RPC `schooly_sync_school`, avant
+  // même que le code de création de la fiche `listings` (+ listing_id) existe.
+  // On exige donc explicitement un `listing_id` non vide pour considérer la
+  // synchronisation comme confirmée — sinon le flag `published_to_trouvetou`
+  // peut rester "true" en base Schooly alors qu'aucune fiche n'est publiée
+  // dans le catalogue public Trouvetou (cas constaté sur ITES).
   if (!response.ok || body?.ok !== true) {
     throw new Error(body?.error || ("Trouvetou a refusé la synchronisation (" + response.status + ")"))
   }
-  return { levels: niveaux.length, result: body?.result ?? null }
+  const listingId = typeof body?.listing_id === "string" && body.listing_id ? body.listing_id : null
+  if (published && !listingId) {
+    throw new Error("Trouvetou a répondu sans confirmer la création de la fiche catalogue (listing_id manquant).")
+  }
+  return { levels: niveaux.length, result: body?.result ?? null, listingId }
 }
 
 export async function POST(request: Request) {
@@ -157,15 +169,33 @@ export async function POST(request: Request) {
 
     try {
       const sync = await syncSchoolToTrouvetou(admin, role.school_id, nextPublished)
+
+      // On ne considère la synchronisation confirmée (et on ne trace
+      // trouvetou_listing_id / trouvetou_synced_at) que si Trouvetou a
+      // effectivement renvoyé un listing_id pour une publication. Pour une
+      // dépublication (nextPublished = false), il n'y a pas de nouvelle
+      // fiche à confirmer : on efface simplement le suivi de confirmation.
+      await admin
+        .from("schools")
+        .update(
+          nextPublished
+            ? { trouvetou_listing_id: sync.listingId, trouvetou_synced_at: new Date().toISOString() }
+            : { trouvetou_listing_id: null, trouvetou_synced_at: null }
+        )
+        .eq("id", role.school_id)
+
       return NextResponse.json({
         success: true,
         published: nextPublished,
-        trouvetou: { synced: true, levels: sync.levels, result: sync.result },
+        trouvetou: { synced: true, listingId: sync.listingId, levels: sync.levels, result: sync.result },
       })
     } catch (syncError) {
+      // Rollback complet : le flag ET le suivi de confirmation reviennent à
+      // l'état précédent. On ne laisse jamais published_to_trouvetou = true
+      // sans qu'une synchronisation confirmée (listing_id) l'accompagne.
       await admin
         .from("schools")
-        .update({ published_to_trouvetou: !nextPublished })
+        .update({ published_to_trouvetou: !nextPublished, trouvetou_listing_id: null, trouvetou_synced_at: null })
         .eq("id", role.school_id)
       return NextResponse.json(
         {
