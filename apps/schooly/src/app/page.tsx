@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useActionState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { School, Users } from "lucide-react"
+import Link from "next/link"
 import { Badge } from "@/components/ui/badge"
 import {
   schoolLoginAction,
@@ -138,10 +139,12 @@ export default function Home() {
         </AnimatePresence>
 
         <FadeIn delay={0.3}>
-          <div className="text-center pt-2">
-            <Badge variant="outline" className="text-xs gemini-glass border-0">
-              © {new Date().getFullYear()} Refontiq
-            </Badge>
+          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 pt-2 text-xs text-muted-foreground">
+            <Link href="/legal">Mentions légales</Link>
+            <Link href="/legal/conditions">Conditions</Link>
+            <Link href="/legal/confidentialite">Confidentialité</Link>
+            <Link href="/legal/tarifs">Tarifs</Link>
+            <span>© {new Date().getFullYear()} Refontiq</span>
           </div>
         </FadeIn>
       </div>
