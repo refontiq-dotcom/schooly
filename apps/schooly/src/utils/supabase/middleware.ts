@@ -84,6 +84,12 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
+  if (!user) {
+    const url = request.nextUrl.clone()
+    url.pathname = "/login"
+    return NextResponse.redirect(url)
+  }
+
   const billingStatus = await resolveBillingStatus(user.id)
   if (billingStatus && (billingStatus === "restricted" || billingStatus === "suspended") && !isBillingAccessPath(path)) {
     if (path.startsWith("/api/")) {
@@ -92,12 +98,6 @@ export async function updateSession(request: NextRequest) {
     const url = request.nextUrl.clone()
     url.pathname = "/dashboard/billing"
     url.searchParams.set("access", billingStatus)
-    return NextResponse.redirect(url)
-  }
-
-  if (!user) {
-    const url = request.nextUrl.clone()
-    url.pathname = "/login"
     return NextResponse.redirect(url)
   }
 
