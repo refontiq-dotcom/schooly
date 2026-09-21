@@ -14,7 +14,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog"
 
 interface TrouvetouAdminClientProps {
@@ -38,7 +37,6 @@ export function TrouvetouAdminClient({
 }: TrouvetouAdminClientProps) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
-  const [activeTab, setActiveTab] = useState("overview")
   const [modal, setModal] = useState<Modal>(null)
   const [selectedReservation, setSelectedReservation] = useState<any>(null)
   const [qualificationLoading, setQualificationLoading] = useState(false)
@@ -82,6 +80,15 @@ export function TrouvetouAdminClient({
     const done = checks.filter(([ok]) => ok).length
     return { done, total: checks.length, percent: Math.round((done / checks.length) * 100), checks }
   }, [coverPhoto, description, address, latitude, longitude, phone, email, gallery, videoUrl, highlights, admissionNotes])
+
+  const hasPublicationPhoto = useMemo(
+    () => Boolean(
+      coverPhoto.trim() ||
+      gallery.some((url) => typeof url === "string" && url.trim()) ||
+      photos360.some((url) => typeof url === "string" && url.trim())
+    ),
+    [coverPhoto, gallery, photos360]
+  )
 
   const saveProfile = useCallback(async () => {
     setLoading(true)
@@ -150,6 +157,11 @@ export function TrouvetouAdminClient({
   }, [uploadMedia])
 
   const togglePublish = useCallback(async () => {
+    if (!published && !hasPublicationPhoto) {
+      setModal("publication")
+      toast.error("Ajoute au moins une photo avant de publier la fiche.")
+      return
+    }
     setLoading(true)
     try {
       const next = !published
@@ -169,7 +181,7 @@ export function TrouvetouAdminClient({
     } finally {
       setLoading(false)
     }
-  }, [published, router])
+  }, [published, hasPublicationPhoto, router])
 
   const createAd = useCallback(async () => {
     if (!adTitle.trim() || !adMessage.trim() || !adStartDate || !adEndDate) {
@@ -234,108 +246,163 @@ export function TrouvetouAdminClient({
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <div className="mb-2 flex items-center gap-2">
-            <Badge variant={published ? "default" : "secondary"}>{published ? "Fiche publiée" : "Fiche non publiée"}</Badge>
-            <Badge variant="outline"><Sparkles className="mr-1 h-3.5 w-3.5" /> Profil intelligent</Badge>
+            <Badge variant={published ? "default" : "secondary"}>
+              {published ? "Fiche publiée" : "Fiche non publiée"}
+            </Badge>
           </div>
           <h1 className="text-2xl font-semibold tracking-tight">{school?.name || "Trouvetou"}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Prépare la vitrine publique de ton établissement et transforme les demandes en inscriptions.</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Une seule fiche établissement, automatiquement liée à ton établissement Schooly.
+          </p>
         </div>
-        <div className="flex gap-2">
-          <Button onClick={() => setModal("publication")}><Plus className="mr-2 h-4 w-4" /> {published ? "Gérer ma fiche Trouvetou" : "Publier ma fiche Trouvetou"}</Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => setModal("profile")}>
+            <Pencil className="mr-2 h-4 w-4" /> Modifier ma fiche
+          </Button>
+          <Button onClick={() => setModal("ad")}>
+            <Plus className="mr-2 h-4 w-4" /> Ajouter une publicité
+          </Button>
         </div>
       </div>
 
+      <div className="grid gap-3 sm:grid-cols-3">
+        <KpiCard icon={<Eye className="h-5 w-5" />} label="Visites de la fiche" value="—" hint="Suivi des visites à connecter" />
+        <KpiCard icon={<Users className="h-5 w-5" />} label="Demandes reçues" value={String(reservations.length)} hint="Depuis Trouvetou" />
+        <KpiCard icon={<Megaphone className="h-5 w-5" />} label="Publicités actives" value={String(ads.filter((ad: any) => ad.is_active).length)} hint="Campagnes temporaires" />
+      </div>
+
+      {!hasPublicationPhoto && (
+        <Card className="border-amber-300/70 bg-amber-50/60 dark:bg-amber-950/20">
+          <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex gap-3">
+              <Info className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+              <div>
+                <p className="font-medium">Publication impossible pour le moment</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Ajoute au moins 1 photo de l'établissement ou renseigne le lien d'une photo pour pouvoir publier la fiche sur Trouvetou.
+                </p>
+              </div>
+            </div>
+            <Button variant="outline" onClick={() => setModal("media")} className="shrink-0">
+              <Camera className="mr-2 h-4 w-4" /> Ajouter une photo
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       <Card className="overflow-hidden">
         <CardContent className="p-0">
-          <div className="grid gap-0 lg:grid-cols-[1.2fr_.8fr]">
-            <div className="relative min-h-[220px] overflow-hidden bg-muted">
+          <div className="grid lg:grid-cols-[1.15fr_.85fr]">
+            <div className="relative min-h-[240px] overflow-hidden bg-muted">
               {coverPhoto ? (
-                <img src={coverPhoto} alt="Photo principale de l'établissement" className="h-full min-h-[220px] w-full object-cover" />
+                <img src={coverPhoto} alt="Photo principale de l'établissement" className="h-full min-h-[240px] w-full object-cover" />
               ) : (
-                <div className="flex h-full min-h-[220px] flex-col items-center justify-center text-muted-foreground">
+                <button
+                  type="button"
+                  onClick={() => setModal("media")}
+                  className="flex h-full min-h-[240px] w-full flex-col items-center justify-center text-muted-foreground hover:bg-muted/80"
+                >
                   <Camera className="mb-3 h-10 w-10" />
-                  <p className="font-medium">Ajoute une photo principale</p>
-                  <p className="mt-1 text-xs">Elle sera utilisée comme couverture sur Trouvetou.</p>
-                </div>
+                  <p className="font-medium">Ajouter une photo</p>
+                  <p className="mt-1 text-xs">La fiche ne peut pas être publiée sans photo.</p>
+                </button>
               )}
-              <Button size="sm" variant="secondary" className="absolute bottom-3 left-3 shadow-md" onClick={() => setModal("media")}>
-                <Camera className="mr-2 h-4 w-4" /> Gérer les photos
-              </Button>
             </div>
             <div className="space-y-4 p-5">
-              <div className="flex items-center justify-between">
-                <div><p className="text-sm font-medium">Qualité du profil</p><p className="text-xs text-muted-foreground">{completion.done}/{completion.total} éléments renseignés</p></div>
-                <span className="text-lg font-semibold">{completion.percent}%</span>
+              <div>
+                <Badge variant={published ? "default" : "secondary"}>
+                  {published ? "Visible sur Trouvetou" : "Non publiée"}
+                </Badge>
+                <h2 className="mt-3 text-xl font-semibold">{school?.name}</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {school?.city || address || "Ville à renseigner"}
+                </p>
               </div>
-              <div className="h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary transition-all" style={{ width: `${completion.percent}%` }} /></div>
-              <div className="grid gap-2 sm:grid-cols-2">
-                {completion.checks.map(([ok, label]) => (
-                  <div key={label} className="flex items-center gap-2 text-xs">
-                    {ok ? <CheckCircle2 className="h-4 w-4 text-emerald-600" /> : <AlertIcon />}
-                    <span className={ok ? "text-foreground" : "text-muted-foreground"}>{label}</span>
-                  </div>
-                ))}
+
+              <div className="grid gap-2 text-sm">
+                <InfoLine icon={<MapPin />} label="Adresse" value={address || "À renseigner"} />
+                <InfoLine icon={<Phone />} label="Téléphone" value={phone || "À renseigner"} />
+                <InfoLine icon={<Globe2 />} label="Site web" value={website || "À renseigner"} />
               </div>
-              <p className="rounded-xl bg-muted/60 p-3 text-xs text-muted-foreground"><Sparkles className="mr-1 inline h-3.5 w-3.5" /> Schooly utilise cette complétude pour t'indiquer ce qui manque avant une publication de qualité.</p>
+
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" onClick={() => setModal("profile")}>
+                  <Pencil className="mr-2 h-4 w-4" /> Modifier ma fiche
+                </Button>
+                {!published && (
+                  <Button onClick={() => setModal("publication")}>
+                    <Megaphone className="mr-2 h-4 w-4" /> Publier sur Trouvetou
+                  </Button>
+                )}
+                {published && (
+                  <Button variant="outline" onClick={() => setModal("publication")}>
+                    <Power className="mr-2 h-4 w-4" /> Gérer la publication
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
-          <TabsTrigger value="overview">Vue d'ensemble</TabsTrigger>
-          <TabsTrigger value="reservations"><Users className="mr-2 h-4 w-4" />Demandes ({reservations.length})</TabsTrigger>
-          <TabsTrigger value="ads"><ImageIcon className="mr-2 h-4 w-4" />Publicités ({ads.length})</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="overview" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-3">
-            <QuickCard icon={<Globe2 className="h-5 w-5" />} title="Profil public" value={school?.city || "Localisation à renseigner"} action={() => setModal("profile")} />
-            <QuickCard icon={<Camera className="h-5 w-5" />} title="Galerie" value={`${gallery.length} photo(s) • ${photos360.length} 360°`} action={() => setModal("media")} />
-            <QuickCard icon={<Users className="h-5 w-5" />} title="Demandes" value={`${reservations.length} reçue(s)`} action={() => setActiveTab("reservations")} />
-          </div>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Ce que les familles verront</CardTitle>
-              <CardDescription>Aperçu des informations publiques configurées dans Schooly.</CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-3 md:grid-cols-2">
-              <InfoLine icon={<MapPin />} label="Adresse" value={address || "À renseigner"} />
-              <InfoLine icon={<Phone />} label="Téléphone" value={phone || "À renseigner"} />
-              <InfoLine icon={<Mail />} label="Email" value={email || "À renseigner"} />
-              <InfoLine icon={<Globe2 />} label="Site web" value={website || "À renseigner"} />
-              <div className="md:col-span-2"><InfoLine icon={<Info />} label="Admission" value={admissionNotes || "À renseigner"} /></div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="reservations">
-          <Card>
-            <CardHeader><CardTitle>Demandes reçues</CardTitle><CardDescription>Les familles qui viennent de Trouvetou doivent pouvoir être traitées rapidement.</CardDescription></CardHeader>
-            <CardContent>
-              {reservations.length === 0 ? <EmptyState text="Aucune demande pour le moment." /> : (
-                <div className="divide-y divide-border/50">
-                  {reservations.map((r: any) => (
-                    <div key={r.id} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
-                      <div><p className="font-medium">{r.student_full_name}</p><p className="text-xs text-muted-foreground">Parent : {r.parent_full_name} • {r.parent_phone}</p><p className="text-xs text-muted-foreground">{new Date(r.created_at).toLocaleDateString("fr-FR")}</p></div>
-                      <div className="flex items-center gap-2"><Badge variant="outline">{reservationLabel(r.status)}</Badge><Button size="sm" variant="outline" onClick={() => { setSelectedReservation(r); setModal("reservation") }}><Eye className="mr-1 h-4 w-4" /> Détails</Button>{r.status === "reserved" && <Button size="sm" onClick={() => { setSelectedReservation(r); setModal("reservation") }} disabled={loading}>Finaliser</Button>}</div>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Demandes récentes</CardTitle>
+            <CardDescription>{reservations.length} demande(s) reçue(s) depuis Trouvetou.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {reservations.length === 0 ? (
+              <EmptyState text="Aucune demande pour le moment." />
+            ) : (
+              <div className="divide-y divide-border/50">
+                {reservations.slice(0, 5).map((r: any) => (
+                  <div key={r.id} className="flex items-center justify-between gap-3 py-3">
+                    <div className="min-w-0">
+                      <p className="truncate font-medium">{r.student_full_name}</p>
+                      <p className="text-xs text-muted-foreground">{r.parent_full_name} • {r.parent_phone}</p>
                     </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
+                    <Button size="sm" variant="outline" onClick={() => { setSelectedReservation(r); setModal("reservation") }}>
+                      <Eye className="mr-1 h-4 w-4" /> Détails
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
-        <TabsContent value="ads">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between"><div><CardTitle>Publicités Trouvetou</CardTitle><CardDescription>Contenu promotionnel temporaire : événement, offre ou période d'inscription.</CardDescription></div><Button onClick={() => setModal("ad")}><Plus className="mr-2 h-4 w-4" /> Créer</Button></CardHeader>
-            <CardContent>{ads.length === 0 ? <EmptyState text="Aucune publicité." /> : <div className="divide-y divide-border/50">{ads.map((ad:any)=><div key={ad.id} className="flex items-center justify-between gap-3 py-3"><div><p className="font-medium">{ad.title}</p><p className="text-xs text-muted-foreground">{ad.message}</p><p className="text-xs text-muted-foreground">{ad.start_date} → {ad.end_date}</p></div><Badge variant={ad.is_active ? "default" : "secondary"}>{ad.is_active ? "Active" : "Inactive"}</Badge></div>)}</div>}</CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>Publicités</CardTitle>
+              <CardDescription>Contenu promotionnel temporaire.</CardDescription>
+            </div>
+            <Button size="sm" onClick={() => setModal("ad")}>
+              <Plus className="mr-2 h-4 w-4" /> Ajouter
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {ads.length === 0 ? (
+              <EmptyState text="Aucune publicité." />
+            ) : (
+              <div className="divide-y divide-border/50">
+                {ads.slice(0, 5).map((ad: any) => (
+                  <div key={ad.id} className="flex items-center justify-between gap-3 py-3">
+                    <div className="min-w-0">
+                      <p className="truncate font-medium">{ad.title}</p>
+                      <p className="truncate text-xs text-muted-foreground">{ad.message}</p>
+                    </div>
+                    <Badge variant={ad.is_active ? "default" : "secondary"}>
+                      {ad.is_active ? "Active" : "Inactive"}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       <Dialog open={modal === "profile"} onOpenChange={(open) => setModal(open ? "profile" : null)} label="Modifier le profil public">
         <DialogContent>
@@ -419,6 +486,28 @@ export function TrouvetouAdminClient({
                 Ta fiche établissement est actuellement publiée sur Trouvetou.
               </p>
             )}
+            {!published && !hasPublicationPhoto && (
+              <div className="rounded-xl border border-amber-300/70 bg-amber-50/70 p-3 text-sm dark:bg-amber-950/20">
+                <p className="font-medium text-amber-900 dark:text-amber-200">⚠️ Publication bloquée</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Il faut au moins 1 photo. Tu peux téléverser une photo ou coller son lien ci-dessous.
+                </p>
+                <div className="mt-3">
+                  <Field label="Lien de la photo">
+                    <Input value={coverPhoto} onChange={e=>setCoverPhoto(e.target.value)} placeholder="https://..." />
+                  </Field>
+                </div>
+                <Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => { setModal("media") }}>
+                  <Camera className="mr-2 h-4 w-4" /> Ajouter une photo
+                </Button>
+              </div>
+            )}
+            {!published && hasPublicationPhoto && (
+              <p className="rounded-xl bg-emerald-50 p-3 text-xs text-emerald-800 dark:bg-emerald-950/20 dark:text-emerald-200">
+                <CheckCircle2 className="mr-1 inline h-3.5 w-3.5" />
+                Ta fiche possède au moins une photo et peut être publiée.
+              </p>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={()=>setModal(null)}>Annuler</Button>
@@ -439,6 +528,9 @@ export function TrouvetouAdminClient({
                     public_email: email,
                     public_website_url: website,
                     video_url: videoUrl,
+                    cover_photo_url: coverPhoto,
+                    gallery_photos: gallery,
+                    photos_360: photos360,
                   }),
                 })
                 const profileData = await profileRes.json()
@@ -461,7 +553,7 @@ export function TrouvetouAdminClient({
               } finally {
                 setLoading(false)
               }
-            }} disabled={loading}>
+            }} disabled={loading || (!published && !hasPublicationPhoto)}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {published ? <><PowerOff className="mr-2 h-4 w-4" />Dépublier</> : <><Megaphone className="mr-2 h-4 w-4" />Publier sur Trouvetou</>}
             </Button>
@@ -500,7 +592,7 @@ export function TrouvetouAdminClient({
 }
 
 function AlertIcon(){ return <Info className="h-4 w-4 text-amber-600" /> }
-function QuickCard({icon,title,value,action}:{icon:React.ReactNode,title:string,value:string,action:()=>void}){return <Card className="cursor-pointer transition hover:-translate-y-0.5" onClick={action}><CardContent className="flex items-center gap-3 p-4"><div className="rounded-xl bg-muted p-2.5">{icon}</div><div className="min-w-0"><p className="text-sm font-medium">{title}</p><p className="truncate text-xs text-muted-foreground">{value}</p></div></CardContent></Card>}
+function KpiCard({icon,label,value,hint}:{icon:React.ReactNode,label:string,value:string,hint:string}){return <Card><CardContent className="p-4"><div className="flex items-center justify-between gap-3"><div className="rounded-xl bg-muted p-2.5">{icon}</div><span className="text-2xl font-semibold">{value}</span></div><p className="mt-3 text-sm font-medium">{label}</p><p className="mt-0.5 text-xs text-muted-foreground">{hint}</p></CardContent></Card>}\nfunction QuickCard({icon,title,value,action}:{icon:React.ReactNode,title:string,value:string,action:()=>void}){return <Card className="cursor-pointer transition hover:-translate-y-0.5" onClick={action}><CardContent className="flex items-center gap-3 p-4"><div className="rounded-xl bg-muted p-2.5">{icon}</div><div className="min-w-0"><p className="text-sm font-medium">{title}</p><p className="truncate text-xs text-muted-foreground">{value}</p></div></CardContent></Card>}
 function InfoLine({icon,label,value}:{icon:React.ReactNode,label:string,value:string}){return <div className="flex gap-3 rounded-xl border border-border/60 bg-muted/25 p-3"><div className="mt-0.5 text-muted-foreground [&>svg]:h-4 [&>svg]:w-4">{icon}</div><div className="min-w-0"><p className="text-xs text-muted-foreground">{label}</p><p className="break-words text-sm font-medium">{value}</p></div></div>}
 function Field({label,hint,children}:{label:string,hint?:string,children:React.ReactNode}){return <div className="space-y-1.5"><Label>{label}</Label>{children}{hint&&<p className="text-xs text-muted-foreground">{hint}</p>}</div>}
 function EmptyState({text}:{text:string}){return <div className="py-12 text-center text-sm text-muted-foreground">{text}</div>}
