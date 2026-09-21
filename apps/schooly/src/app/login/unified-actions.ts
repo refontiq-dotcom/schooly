@@ -3,6 +3,7 @@
 import { createClient } from "@/utils/supabase/server"
 import { createClient as createAdminClient } from "@supabase/supabase-js"
 import { redirect } from "next/navigation"
+import { headers } from "next/headers"
 import { roleHome } from "@/utils/supabase/route-rules"
 
 export type LoginResult = {
@@ -59,6 +60,67 @@ async function getActiveStaffRole(
     .limit(1)
 
   return data?.[0]
+}
+
+
+export async function forgotPasswordAction(
+  prevState: { error: string | null; success?: boolean },
+  formData: FormData
+): Promise<{ error: string | null; success?: boolean }> {
+  const email = String(formData.get("email") ?? "").trim()
+
+  if (!email || !email.includes("@")) {
+    return { error: "Veuillez saisir une adresse email valide." }
+  }
+
+  const supabase = await createClient()
+  const headerStore = await headers()
+  const origin =
+    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ??
+    headerStore.get("origin") ??
+    `https://${headerStore.get("host")}`
+
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${origin}/auth/callback?next=/login/reset-password`,
+  })
+
+  if (error) {
+    return { error: "Impossible d'envoyer le lien de réinitialisation. Vérifiez l'adresse puis réessayez." }
+  }
+
+  return { error: null, success: true }
+}
+
+export async function resetPasswordAction(
+  prevState: { error: string | null; success?: boolean },
+  formData: FormData
+): Promise<{ error: string | null; success?: boolean }> {
+  const password = String(formData.get("password") ?? "")
+  const confirmPassword = String(formData.get("confirmPassword") ?? "")
+
+  if (password.length < 8) {
+    return { error: "Le mot de passe doit contenir au moins 8 caractères." }
+  }
+
+  if (password !== confirmPassword) {
+    return { error: "Les deux mots de passe ne correspondent pas." }
+  }
+
+  const supabase = await createClient()
+  const { data } = await supabase.auth.getUser()
+
+  if (!data.user) {
+    return { error: "Le lien de réinitialisation est invalide ou a expiré. Demandez un nouveau lien." }
+  }
+
+  const { error } = await supabase.auth.updateUser({ password })
+
+  if (error) {
+    return { error: "Impossible d'enregistrer le nouveau mot de passe. Réessayez." }
+  }
+
+  await supabase.auth.signOut()
+  return { error: null, success: true }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
