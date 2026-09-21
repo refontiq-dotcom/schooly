@@ -4,7 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useState } from "react"
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion"
-import { ChevronLeft, LogOut, Sparkles } from "lucide-react"
+import { ChevronLeft, LogOut, Menu, Sparkles } from "lucide-react"
 import { NAV_BY_ROLE, type NavItem } from "@/lib/nav"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -19,6 +19,7 @@ type SidebarProps = {
 export function Sidebar({ role, schoolName, userName }: SidebarProps) {
   const pathname = usePathname()
   const [collapsed, setCollapsed] = useState(false)
+  const [mobileHidden, setMobileHidden] = useState(false)
   const navItems: NavItem[] = NAV_BY_ROLE[role] ?? []
   const reduceMotion = useReducedMotion()
 
@@ -35,11 +36,31 @@ export function Sidebar({ role, schoolName, userName }: SidebarProps) {
     surveillance: "Surveillance",
   }
 
+  const closeMobileAfterNavigation = () => {
+    if (typeof window !== "undefined" && window.matchMedia("(max-width: 639px)").matches) {
+      setMobileHidden(true)
+    }
+  }
+
   return (
-    <aside
-      className={cn(
+    <>
+      {mobileHidden && (
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          className="fixed left-3 top-3 z-50 h-10 w-10 rounded-xl border-border/70 bg-background/90 shadow-lg backdrop-blur-xl sm:hidden"
+          onClick={() => setMobileHidden(false)}
+          aria-label="Ouvrir le menu"
+        >
+          <Menu className="h-5 w-5" />
+        </Button>
+      )}
+      <aside
+        className={cn(
         "schooly-sidebar flex h-full shrink-0 flex-col overflow-hidden rounded-2xl border transition-[width] duration-300 ease-[cubic-bezier(.2,.8,.2,1)]",
-        collapsed ? "w-16" : "w-64"
+        collapsed ? "w-16" : "w-64",
+        mobileHidden && "hidden sm:flex"
       )}
     >
       <div className="flex min-h-[72px] items-center justify-between border-b border-white/10 p-4">
@@ -93,6 +114,7 @@ export function Sidebar({ role, schoolName, userName }: SidebarProps) {
             <Link
               key={`${item.href}-${item.label}`}
               href={item.href}
+              onClick={closeMobileAfterNavigation}
               aria-current={isActive ? "page" : undefined}
               className={cn(
                 "relative isolate flex items-center gap-3 overflow-hidden rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 ease-out",
@@ -139,6 +161,7 @@ export function Sidebar({ role, schoolName, userName }: SidebarProps) {
           </Button>
         </form>
       </div>
-    </aside>
+      </aside>
+    </>
   )
 }
