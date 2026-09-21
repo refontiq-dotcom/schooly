@@ -234,14 +234,14 @@ export function TrouvetouAdminClient({
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <div className="mb-2 flex items-center gap-2">
-            <Badge variant={published ? "default" : "secondary"}>{published ? "Publié" : "Brouillon"}</Badge>
+            <Badge variant={published ? "default" : "secondary"}>{published ? "Fiche publiée" : "Fiche non publiée"}</Badge>
             <Badge variant="outline"><Sparkles className="mr-1 h-3.5 w-3.5" /> Profil intelligent</Badge>
           </div>
           <h1 className="text-2xl font-semibold tracking-tight">{school?.name || "Trouvetou"}</h1>
           <p className="mt-1 text-sm text-muted-foreground">Prépare la vitrine publique de ton établissement et transforme les demandes en inscriptions.</p>
         </div>
         <div className="flex gap-2">
-          <Button onClick={() => setModal("publication")}><Plus className="mr-2 h-4 w-4" /> {published ? "Gérer mon annonce" : "Ajouter une annonce"}</Button>
+          <Button onClick={() => setModal("publication")}><Plus className="mr-2 h-4 w-4" /> {published ? "Gérer ma fiche Trouvetou" : "Publier ma fiche Trouvetou"}</Button>
         </div>
       </div>
 
@@ -331,7 +331,7 @@ export function TrouvetouAdminClient({
 
         <TabsContent value="ads">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between"><div><CardTitle>Publicités</CardTitle><CardDescription>Promouvoir un événement, une offre ou une période d'inscription.</CardDescription></div><Button onClick={() => setModal("ad")}><Plus className="mr-2 h-4 w-4" /> Créer</Button></CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between"><div><CardTitle>Publicités Trouvetou</CardTitle><CardDescription>Contenu promotionnel temporaire : événement, offre ou période d'inscription.</CardDescription></div><Button onClick={() => setModal("ad")}><Plus className="mr-2 h-4 w-4" /> Créer</Button></CardHeader>
             <CardContent>{ads.length === 0 ? <EmptyState text="Aucune publicité." /> : <div className="divide-y divide-border/50">{ads.map((ad:any)=><div key={ad.id} className="flex items-center justify-between gap-3 py-3"><div><p className="font-medium">{ad.title}</p><p className="text-xs text-muted-foreground">{ad.message}</p><p className="text-xs text-muted-foreground">{ad.start_date} → {ad.end_date}</p></div><Badge variant={ad.is_active ? "default" : "secondary"}>{ad.is_active ? "Active" : "Inactive"}</Badge></div>)}</div>}</CardContent>
           </Card>
         </TabsContent>
@@ -367,10 +367,10 @@ export function TrouvetouAdminClient({
         </DialogContent>
       </Dialog>
 
-      <Dialog open={modal === "publication"} onOpenChange={(open) => setModal(open ? "publication" : null)} label="Créer une annonce Trouvetou">
+      <Dialog open={modal === "publication"} onOpenChange={(open) => setModal(open ? "publication" : null)} label="Gérer ma fiche Trouvetou">
         <DialogContent className="max-w-xl">
           <DialogHeader>
-            <DialogTitle>{published ? "Mon annonce Trouvetou" : "Ajouter une annonce"}</DialogTitle>
+            <DialogTitle>{published ? "Mon annonce Trouvetou" : "Publier ma fiche Trouvetou"}</DialogTitle>
             <DialogDescription>
               Renseigne uniquement les informations que tu veux montrer aux familles. Les informations techniques sont gérées automatiquement par Schooly.
             </DialogDescription>
@@ -416,7 +416,7 @@ export function TrouvetouAdminClient({
             {published && (
               <p className="rounded-xl bg-muted/60 p-3 text-xs text-muted-foreground">
                 <CheckCircle2 className="mr-1 inline h-3.5 w-3.5" />
-                Ton annonce est actuellement publiée sur Trouvetou.
+                Ta fiche établissement est actuellement publiée sur Trouvetou.
               </p>
             )}
           </div>
@@ -454,7 +454,7 @@ export function TrouvetouAdminClient({
 
                 setPublished(true)
                 setModal(null)
-                toast.success("Annonce publiée sur Trouvetou")
+                toast.success("Fiche établissement publiée sur Trouvetou")
                 router.refresh()
               } catch (error: any) {
                 toast.error(error.message || "Erreur lors de la publication")
@@ -488,9 +488,9 @@ export function TrouvetouAdminClient({
         </DialogContent>
       </Dialog>
 
-      <Dialog open={modal === "ad"} onOpenChange={(open)=>setModal(open ? "ad" : null)} label="Créer une publicité">
+      <Dialog open={modal === "ad"} onOpenChange={(open)=>setModal(open ? "ad" : null)} label="Créer une publicité Trouvetou">
         <DialogContent>
-          <DialogHeader><DialogTitle>Nouvelle publicité</DialogTitle><DialogDescription>Crée une campagne courte sans quitter la page Trouvetou.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>Nouvelle publicité Trouvetou</DialogTitle><DialogDescription>Cette publicité est distincte de la fiche de ton établissement. Elle peut avoir sa propre période, image et lien.</DialogDescription></DialogHeader>
           <div className="space-y-3 py-4"><Field label="Titre"><Input value={adTitle} onChange={e=>setAdTitle(e.target.value)} /></Field><Field label="Message"><Textarea value={adMessage} onChange={e=>setAdMessage(e.target.value)} /></Field><Field label="Image (URL facultative)"><Input value={adImageUrl} onChange={e=>setAdImageUrl(e.target.value)} /></Field><Field label="Lien (facultatif)"><Input value={adTargetUrl} onChange={e=>setAdTargetUrl(e.target.value)} /></Field><div className="grid gap-3 sm:grid-cols-2"><Field label="Début"><Input type="date" value={adStartDate} onChange={e=>setAdStartDate(e.target.value)} /></Field><Field label="Fin"><Input type="date" value={adEndDate} onChange={e=>setAdEndDate(e.target.value)} /></Field></div></div>
           <DialogFooter><Button variant="outline" onClick={()=>setModal(null)}>Annuler</Button><Button onClick={createAd} disabled={loading}>{loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Créer</Button></DialogFooter><DialogClose onClick={()=>setModal(null)} />
         </DialogContent>
