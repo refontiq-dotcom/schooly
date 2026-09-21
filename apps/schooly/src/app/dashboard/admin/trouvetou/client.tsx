@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog"
+import { getInclusiveDays, getTrouvetouAdDailyRate } from "@/lib/trouvetou/ad-pricing"
 
 interface TrouvetouAdminClientProps {
   schoolId: string
@@ -65,6 +66,12 @@ export function TrouvetouAdminClient({
   const [adTargetUrl, setAdTargetUrl] = useState("")
   const [adStartDate, setAdStartDate] = useState("")
   const [adEndDate, setAdEndDate] = useState("")
+  const [adContactPhone, setAdContactPhone] = useState("")
+  const [adCtaLabel, setAdCtaLabel] = useState("En savoir plus")
+
+  const adDurationDays = useMemo(() => getInclusiveDays(adStartDate, adEndDate), [adStartDate, adEndDate])
+  const adDailyRate = useMemo(() => getTrouvetouAdDailyRate(adDurationDays), [adDurationDays])
+  const adTotalAmount = adDailyRate ? adDailyRate * adDurationDays : 0
 
   const completion = useMemo(() => {
     const checks = [
@@ -125,7 +132,7 @@ export function TrouvetouAdminClient({
     }
   }, [description, latitude, longitude, itineraire, videoUrl, coverPhoto, gallery, photos360, address, phone, email, website, highlights, admissionNotes, router])
 
-  const uploadMedia = useCallback(async (file: File, kind: "cover" | "gallery" | "360") => {
+  const uploadMedia = useCallback(async (file: File, kind: "cover" | "gallery" | "360" | "ad") => {
     const form = new FormData()
     form.append("file", file)
     form.append("kind", kind)
@@ -184,8 +191,12 @@ export function TrouvetouAdminClient({
   }, [published, hasPublicationPhoto, router])
 
   const createAd = useCallback(async () => {
-    if (!adTitle.trim() || !adMessage.trim() || !adStartDate || !adEndDate) {
-      toast.error("Complète le titre, message et période")
+    if (!adTitle.trim() || !adMessage.trim() || !adImageUrl.trim() || !adStartDate || !adEndDate) {
+      toast.error("Complète l'affiche, le titre, le message et la période")
+      return
+    }
+    if (!adDailyRate || adDurationDays < 1) {
+      toast.error("La période de diffusion est invalide")
       return
     }
     setLoading(true)
@@ -193,21 +204,24 @@ export function TrouvetouAdminClient({
       const res = await fetch("/api/v1/admin/trouvetou/ads", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: adTitle, message: adMessage, image_url: adImageUrl, target_url: adTargetUrl, start_date: adStartDate, end_date: adEndDate }),
+        body: JSON.stringify({
+          title: adTitle, message: adMessage, image_url: adImageUrl, target_url: adTargetUrl,
+          contact_phone: adContactPhone, cta_label: adCtaLabel, start_date: adStartDate, end_date: adEndDate,
+        }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Échec")
-      setAds(prev => [{ id: crypto.randomUUID(), title: adTitle, message: adMessage, image_url: adImageUrl, target_url: adTargetUrl, start_date: adStartDate, end_date: adEndDate, is_active: true }, ...prev])
-      setAdTitle(""); setAdMessage(""); setAdImageUrl(""); setAdTargetUrl(""); setAdStartDate(""); setAdEndDate("")
+      setAds(prev => [{ ...data.ad, title: adTitle, message: adMessage, image_url: adImageUrl, target_url: adTargetUrl, start_date: adStartDate, end_date: adEndDate, is_active: false }, ...prev])
+      setAdTitle(""); setAdMessage(""); setAdImageUrl(""); setAdTargetUrl(""); setAdStartDate(""); setAdEndDate(""); setAdContactPhone(""); setAdCtaLabel("En savoir plus")
       setModal(null)
-      toast.success("Publicité créée")
+      toast.success("Publicité créée : " + Number(data.ad.total_amount).toLocaleString("fr-FR") + " FCFA à payer.")
       router.refresh()
     } catch (error: any) {
       toast.error(error.message || "Erreur")
     } finally {
       setLoading(false)
     }
-  }, [adTitle, adMessage, adImageUrl, adTargetUrl, adStartDate, adEndDate, router])
+  }, [adTitle, adMessage, adImageUrl, adTargetUrl, adStartDate, adEndDate, adContactPhone, adCtaLabel, adDailyRate, adDurationDays, router])
 
   const updateReservation = useCallback(async () => {
     if (!selectedReservation) return
@@ -268,7 +282,7 @@ export function TrouvetouAdminClient({
       <div className="grid gap-3 sm:grid-cols-3">
         <KpiCard icon={<Eye className="h-5 w-5" />} label="Visites de la fiche" value="—" hint="Suivi des visites à connecter" />
         <KpiCard icon={<Users className="h-5 w-5" />} label="Demandes reçues" value={String(reservations.length)} hint="Depuis Trouvetou" />
-        <KpiCard icon={<Megaphone className="h-5 w-5" />} label="Publicités actives" value={String(ads.filter((ad: any) => ad.is_active).length)} hint="Campagnes temporaires" />
+        <KpiCard icon={<Megaphone className="h-5 w-5" />} label="Publicités actives" value={String(ads.filter((ad: any) => ad.payment_status === "active" && ad.is_active).length)} hint="Campagnes temporaires" />
       </div>
 
       {!hasPublicationPhoto && (
@@ -391,10 +405,10 @@ export function TrouvetouAdminClient({
                   <div key={ad.id} className="flex items-center justify-between gap-3 py-3">
                     <div className="min-w-0">
                       <p className="truncate font-medium">{ad.title}</p>
-                      <p className="truncate text-xs text-muted-foreground">{ad.message}</p>
+                      <p className="truncate text-xs text-muted-foreground">{ad.message}</p><p className="text-xs text-muted-foreground">{ad.duration_days || "—"} jour(s) • {ad.total_amount ? Number(ad.total_amount).toLocaleString("fr-FR") : "—"} FCFA</p>
                     </div>
                     <Badge variant={ad.is_active ? "default" : "secondary"}>
-                      {ad.is_active ? "Active" : "Inactive"}
+                      {ad.payment_status === "active" && ad.is_active ? "Active" : ad.payment_status === "pending_payment" ? "Paiement en attente" : ad.payment_status === "expired" ? "Expirée" : "Brouillon"}
                     </Badge>
                   </div>
                 ))}
@@ -583,7 +597,28 @@ export function TrouvetouAdminClient({
       <Dialog open={modal === "ad"} onOpenChange={(open)=>setModal(open ? "ad" : null)} label="Créer une publicité Trouvetou">
         <DialogContent>
           <DialogHeader><DialogTitle>Nouvelle publicité Trouvetou</DialogTitle><DialogDescription>Cette publicité est distincte de la fiche de ton établissement. Elle peut avoir sa propre période, image et lien.</DialogDescription></DialogHeader>
-          <div className="space-y-3 py-4"><Field label="Titre"><Input value={adTitle} onChange={e=>setAdTitle(e.target.value)} /></Field><Field label="Message"><Textarea value={adMessage} onChange={e=>setAdMessage(e.target.value)} /></Field><Field label="Image (URL facultative)"><Input value={adImageUrl} onChange={e=>setAdImageUrl(e.target.value)} /></Field><Field label="Lien (facultatif)"><Input value={adTargetUrl} onChange={e=>setAdTargetUrl(e.target.value)} /></Field><div className="grid gap-3 sm:grid-cols-2"><Field label="Début"><Input type="date" value={adStartDate} onChange={e=>setAdStartDate(e.target.value)} /></Field><Field label="Fin"><Input type="date" value={adEndDate} onChange={e=>setAdEndDate(e.target.value)} /></Field></div></div>
+          <div className="space-y-3 py-4">
+            <div className="rounded-xl border border-dashed p-4">
+              <Field label="Affiche publicitaire" hint="JPG, PNG ou WebP • 8 Mo maximum">
+                <Input type="file" accept="image/jpeg,image/png,image/webp" onChange={async e => {
+                  const file = e.target.files?.[0]
+                  if (!file) return
+                  setLoading(true)
+                  try {
+                    const url = await uploadMedia(file, "ad")
+                    setAdImageUrl(url)
+                    toast.success("Affiche ajoutée")
+                  } catch (error: any) {
+                    toast.error(error.message || "Upload impossible")
+                  } finally {
+                    setLoading(false)
+                    e.target.value = ""
+                  }
+                }} />
+              </Field>
+              {adImageUrl && <img src={adImageUrl} alt="Aperçu de l'affiche" className="mt-3 max-h-44 w-full rounded-lg object-cover" />}
+            </div>
+            <Field label="Titre"><Input value={adTitle} onChange={e=>setAdTitle(e.target.value)} placeholder="Ex. Journée portes ouvertes" /></Field><Field label="Message"><Textarea value={adMessage} onChange={e=>setAdMessage(e.target.value)} /></Field><Field label="Lien de l’affiche (facultatif)"><Input value={adImageUrl} onChange={e=>setAdImageUrl(e.target.value)} placeholder="https://..." /></Field><div className="grid gap-3 sm:grid-cols-2"><Field label="Lien de destination"><Input value={adTargetUrl} onChange={e=>setAdTargetUrl(e.target.value)} placeholder="https://..." /></Field><Field label="Téléphone / WhatsApp"><Input value={adContactPhone} onChange={e=>setAdContactPhone(e.target.value)} placeholder="+225..." /></Field></div><Field label="Bouton d’action"><Input value={adCtaLabel} onChange={e=>setAdCtaLabel(e.target.value)} placeholder="En savoir plus" /></Field><div className="grid gap-3 sm:grid-cols-2"><Field label="Début"><Input type="date" value={adStartDate} onChange={e=>setAdStartDate(e.target.value)} /></Field><Field label="Fin"><Input type="date" value={adEndDate} onChange={e=>setAdEndDate(e.target.value)} /></Field></div>{adDurationDays > 0 && adDailyRate ? <div className="rounded-xl border bg-muted/40 p-4"><div className="flex items-center justify-between text-sm"><span>Durée</span><strong>{adDurationDays} jour(s)</strong></div><div className="mt-2 flex items-center justify-between text-sm"><span>Tarif journalier</span><strong>{adDailyRate.toLocaleString("fr-FR")} FCFA / jour</strong></div><div className="mt-3 flex items-center justify-between border-t pt-3"><span className="font-medium">Total à payer</span><strong className="text-lg">{adTotalAmount.toLocaleString("fr-FR")} FCFA</strong></div><p className="mt-2 text-xs text-muted-foreground">La publicité reste en attente jusqu'à confirmation du paiement.</p></div> : <p className="rounded-xl bg-muted/50 p-3 text-xs text-muted-foreground">Choisis une période valide pour calculer automatiquement le prix.</p>}</div>
           <DialogFooter><Button variant="outline" onClick={()=>setModal(null)}>Annuler</Button><Button onClick={createAd} disabled={loading}>{loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Créer</Button></DialogFooter><DialogClose onClick={()=>setModal(null)} />
         </DialogContent>
       </Dialog>
