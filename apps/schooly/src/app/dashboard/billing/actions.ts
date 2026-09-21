@@ -58,22 +58,70 @@ export async function getSchoolBillingSummary() {
   const { schoolId } = await getBillingContext()
   const admin = getAdmin()
   const config = await getSchoolyConfig()
-  const { count: activeEnrollments } = await admin.from("enrollments")
-    .select("id", { count: "exact", head: true }).eq("school_id", schoolId)
-    .in("status", ["confirmed", "active"]).is("deleted_at", null)
-  const { data: requests } = await admin.from("subscription_payment_requests")
-    .select("id, amount, status, created_at").eq("product_id", "schooly")
-    .eq("tenant_id", schoolId).order("created_at", { ascending: false })
-  const totalEvents = activeEnrollments ?? 0
+
+  const { data: academicYear } = await admin
+    .from("academic_years")
+    .select("id, label, start_date, end_date, status")
+    .eq("school_id", schoolId)
+    .is("deleted_at", null)
+    .eq("status", "en_cours")
+    .order("start_date", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (!academicYear) {
+    return {
+      eventAmount: config.eventAmount,
+      academicYear: null,
+      billableStudents: 0,
+      billedAmount: 0,
+      validatedSum: 0,
+      pendingSum: 0,
+      remainingAmount: 0,
+      pendingRequests: [],
+      totalRequests: 0,
+      billingEvents: 0,
+    }
+  }
+
+  const { data: ledger } = await admin
+    .from("platform_fee_ledger")
+    .select("id, event_id, amount, status, created_at")
+    .eq("product_id", "schooly")
+    .eq("tenant_id", schoolId)
+    .eq("academic_year_id", academicYear.id)
+    .eq("event_type", "enrollment_confirmed")
+    .order("created_at", { ascending: false })
+
+  const { data: requests } = await admin
+    .from("subscription_payment_requests")
+    .select("id, amount, status, created_at")
+    .eq("product_id", "schooly")
+    .eq("tenant_id", schoolId)
+    .gte("created_at", `${academicYear.start_date}T00:00:00.000Z`)
+    .lte("created_at", `${academicYear.end_date}T23:59:59.999Z`)
+    .order("created_at", { ascending: false })
+
+  const billingEvents = ledger ?? []
+  const billedAmount = billingEvents.reduce((sum, row) => sum + Number(row.amount || 0), 0)
   const pending = (requests ?? []).filter((r) => r.status === "pending")
   const validated = (requests ?? []).filter((r) => r.status === "validated")
-  const pendingSum = pending.reduce((s, r) => s + (r.amount || 0), 0)
-  const validatedSum = validated.reduce((s, r) => s + (r.amount || 0), 0)
-  const billedUnits = Math.round(pendingSum / config.eventAmount) + Math.round(validatedSum / config.eventAmount)
-  const remainingEvents = Math.max(0, totalEvents - billedUnits)
-  return { eventAmount: config.eventAmount, totalEvents, remainingEvents,
-    expectedAmount: remainingEvents * config.eventAmount, pendingRequests: pending,
-    pendingSum, validatedSum, totalRequests: (requests ?? []).length }
+  const pendingSum = pending.reduce((sum, row) => sum + Number(row.amount || 0), 0)
+  const validatedSum = validated.reduce((sum, row) => sum + Number(row.amount || 0), 0)
+  const remainingAmount = Math.max(0, billedAmount - validatedSum - pendingSum)
+
+  return {
+    eventAmount: config.eventAmount,
+    academicYear,
+    billableStudents: billingEvents.length,
+    billedAmount,
+    validatedSum,
+    pendingSum,
+    remainingAmount,
+    pendingRequests: pending,
+    totalRequests: (requests ?? []).length,
+    billingEvents: billingEvents.length,
+  }
 }
 
 export async function createSubscriptionPaymentRequest(formData: FormData): Promise<ActionResult<{ schoolId: string; amount: number }>> {
