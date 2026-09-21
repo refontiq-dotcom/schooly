@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation"
-import { Building2, User, Info, CheckCircle2 } from "lucide-react"
+import { Building2, User, Info, CheckCircle2, Download, Printer } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { getSchoolSettings, type SchoolSettings } from "./actions"
@@ -80,6 +80,35 @@ export default async function SettingsPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base"><Download className="h-4 w-4" />Données et départ de Schooly</CardTitle>
+          <CardDescription>
+            Vous pouvez récupérer les données de votre établissement à tout moment, notamment avant un changement de solution.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3 sm:flex-row">
+          <a
+            href="/api/school/export?format=json"
+            download
+            className="inline-flex h-10 items-center justify-center rounded-md border px-4 text-sm font-medium hover:bg-muted"
+          >
+            <Download className="mr-2 h-4 w-4" /> Télécharger l’archive des données
+          </a>
+          <a
+            href="/api/school/export?format=html"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+          >
+            <Printer className="mr-2 h-4 w-4" /> Imprimer / enregistrer en PDF
+          </a>
+        </CardContent>
+        <CardContent className="pt-0 text-xs text-muted-foreground">
+          L’export exclut les mots de passe, clés techniques et secrets d’authentification. Le document imprimable contient les données récupérables et les journaux disponibles dans Schooly.
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Info className="h-4 w-4" />Informations du compte</CardTitle><CardDescription>Informations de référence, sans réglage inutile à modifier.</CardDescription></CardHeader>
