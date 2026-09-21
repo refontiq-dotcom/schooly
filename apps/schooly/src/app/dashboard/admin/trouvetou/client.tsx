@@ -241,8 +241,7 @@ export function TrouvetouAdminClient({
           <p className="mt-1 text-sm text-muted-foreground">Prépare la vitrine publique de ton établissement et transforme les demandes en inscriptions.</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setModal("profile")}><Pencil className="mr-2 h-4 w-4" /> Modifier le profil</Button>
-          <Button onClick={() => setModal("publication")}><Megaphone className="mr-2 h-4 w-4" /> {published ? "Gérer la publication" : "Publier"}</Button>
+          <Button onClick={() => setModal("publication")}><Plus className="mr-2 h-4 w-4" /> {published ? "Gérer mon annonce" : "Ajouter une annonce"}</Button>
         </div>
       </div>
 
@@ -368,15 +367,105 @@ export function TrouvetouAdminClient({
         </DialogContent>
       </Dialog>
 
-      <Dialog open={modal === "publication"} onOpenChange={(open) => setModal(open ? "publication" : null)} label="Gérer la publication">
-        <DialogContent>
-          <DialogHeader><DialogTitle>{published ? "Publication Trouvetou" : "Préparer la publication"}</DialogTitle><DialogDescription>{published ? "Ton établissement est actuellement visible." : "Schooly vérifie les informations renseignées avant publication."}</DialogDescription></DialogHeader>
-          <div className="space-y-3 py-4">
-            <div className="rounded-xl bg-muted/60 p-4"><p className="font-medium">Qualité du profil : {completion.percent}%</p><p className="mt-1 text-sm text-muted-foreground">{completion.done}/{completion.total} éléments recommandés.</p></div>
-            {!published && completion.percent < 75 && <p className="text-sm text-amber-700"><Info className="mr-1 inline h-4 w-4" />Tu peux publier, mais il est recommandé de compléter les éléments manquants.</p>}
-            {published && <p className="text-sm text-muted-foreground">La désactivation retire l'établissement du catalogue Trouvetou sans supprimer ses données.</p>}
+      <Dialog open={modal === "publication"} onOpenChange={(open) => setModal(open ? "publication" : null)} label="Créer une annonce Trouvetou">
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>{published ? "Mon annonce Trouvetou" : "Ajouter une annonce"}</DialogTitle>
+            <DialogDescription>
+              Renseigne uniquement les informations que tu veux montrer aux familles. Les informations techniques sont gérées automatiquement par Schooly.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="rounded-xl border bg-muted/40 p-4">
+              <p className="text-sm font-medium">{school?.name || "Mon établissement"}</p>
+              <p className="text-xs text-muted-foreground">{school?.city || "Ville non renseignée"}</p>
+            </div>
+
+            <Field label="Présentation" hint="Quelques phrases pour présenter simplement l'établissement.">
+              <Textarea value={description} onChange={e=>setDescription(e.target.value)} rows={4} placeholder="Présente ton établissement aux familles..." />
+            </Field>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Site web" hint="Facultatif — si l'école possède un site.">
+                <Input type="url" value={website} onChange={e=>setWebsite(e.target.value)} placeholder="https://www.ecole.ci" />
+              </Field>
+              <Field label="Vidéo YouTube" hint="Facultatif — lien vers une vidéo de présentation.">
+                <Input type="url" value={videoUrl} onChange={e=>setVideoUrl(e.target.value)} placeholder="https://www.youtube.com/watch?v=..." />
+              </Field>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Adresse publique" hint="Facultatif">
+                <Input value={address} onChange={e=>setAddress(e.target.value)} placeholder="Quartier, rue..." />
+              </Field>
+              <Field label="Téléphone" hint="Facultatif">
+                <Input value={phone} onChange={e=>setPhone(e.target.value)} placeholder="+225..." />
+              </Field>
+            </div>
+
+            <Field label="Email" hint="Facultatif">
+              <Input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="contact@ecole.ci" />
+            </Field>
+
+            {!published && (
+              <p className="rounded-xl bg-muted/60 p-3 text-xs text-muted-foreground">
+                <Info className="mr-1 inline h-3.5 w-3.5" />
+                Tu peux publier même si certains champs facultatifs ne sont pas renseignés.
+              </p>
+            )}
+            {published && (
+              <p className="rounded-xl bg-muted/60 p-3 text-xs text-muted-foreground">
+                <CheckCircle2 className="mr-1 inline h-3.5 w-3.5" />
+                Ton annonce est actuellement publiée sur Trouvetou.
+              </p>
+            )}
           </div>
-          <DialogFooter><Button variant="outline" onClick={()=>setModal(null)}>Annuler</Button><Button variant={published ? "destructive" : "default"} onClick={togglePublish} disabled={loading}>{loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{published ? <><PowerOff className="mr-2 h-4 w-4" />Dépublier</> : <><Power className="mr-2 h-4 w-4" />Publier</>}</Button></DialogFooter>
+          <DialogFooter>
+            <Button variant="outline" onClick={()=>setModal(null)}>Annuler</Button>
+            <Button variant={published ? "destructive" : "default"} onClick={async()=>{
+              if (published) {
+                await togglePublish()
+                return
+              }
+              setLoading(true)
+              try {
+                const profileRes = await fetch("/api/v1/admin/trouvetou/profile", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    description_publique: description,
+                    public_address: address,
+                    public_phone: phone,
+                    public_email: email,
+                    public_website_url: website,
+                    video_url: videoUrl,
+                  }),
+                })
+                const profileData = await profileRes.json()
+                if (!profileRes.ok) throw new Error(profileData.error || "Impossible d'enregistrer l'annonce")
+
+                const publishRes = await fetch("/api/v1/admin/trouvetou/publish", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ published: true }),
+                })
+                const publishData = await publishRes.json()
+                if (!publishRes.ok) throw new Error(publishData.error || "Impossible de publier l'annonce")
+
+                setPublished(true)
+                setModal(null)
+                toast.success("Annonce publiée sur Trouvetou")
+                router.refresh()
+              } catch (error: any) {
+                toast.error(error.message || "Erreur lors de la publication")
+              } finally {
+                setLoading(false)
+              }
+            }} disabled={loading}>
+              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {published ? <><PowerOff className="mr-2 h-4 w-4" />Dépublier</> : <><Megaphone className="mr-2 h-4 w-4" />Publier sur Trouvetou</>}
+            </Button>
+          </DialogFooter>
           <DialogClose onClick={()=>setModal(null)} />
         </DialogContent>
       </Dialog>
