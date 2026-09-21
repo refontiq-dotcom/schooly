@@ -59,6 +59,12 @@ export async function getSchoolBillingSummary() {
   const admin = getAdmin()
   const config = await getSchoolyConfig()
 
+  const { data: access } = await admin
+    .from("school_billing_access")
+    .select("status,oldest_unpaid_at,days_overdue,remaining_amount,last_evaluated_at")
+    .eq("school_id", schoolId)
+    .maybeSingle()
+
   const { data: academicYear } = await admin
     .from("academic_years")
     .select("id, label, start_date, end_date, status")
@@ -81,6 +87,7 @@ export async function getSchoolBillingSummary() {
       pendingRequests: [],
       totalRequests: 0,
       billingEvents: 0,
+      access: access ?? { status: "active", oldest_unpaid_at: null, days_overdue: 0, remaining_amount: 0, last_evaluated_at: null },
     }
   }
 
@@ -121,6 +128,7 @@ export async function getSchoolBillingSummary() {
     pendingRequests: pending,
     totalRequests: (requests ?? []).length,
     billingEvents: billingEvents.length,
+    access: access ?? { status: "active", oldest_unpaid_at: null, days_overdue: 0, remaining_amount: remainingAmount, last_evaluated_at: null },
   }
 }
 
