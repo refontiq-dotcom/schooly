@@ -31,7 +31,7 @@ export async function POST(req: Request) {
           payment_reference: typeof body.controlCenterRequestId === "string" ? body.controlCenterRequestId : null,
           paid_at: action === "validate" ? new Date().toISOString() : null,
         })
-        .eq("id", requestId)
+        .eq("id", typeof body.produitRef === "string" ? body.produitRef : requestId)
         .select("id,payment_status,is_active,payment_reference,paid_at")
         .single();
 
