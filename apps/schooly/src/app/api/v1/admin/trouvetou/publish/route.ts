@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { TROUVETOU_ADMIN_ROLES } from "@/utils/supabase/roles"
 import { createClient } from "@/utils/supabase/server"
-import { createClient as createAdminClient } from "@supabase/supabase-js"
+import { createClient as createAdminClient, type SupabaseClient } from "@supabase/supabase-js"
 
 type SyncLevel = {
   id: string
@@ -22,7 +22,7 @@ function getTrouvetouConfig() {
   }
 }
 
-async function syncSchoolToTrouvetou(admin: any, schoolId: string, published: boolean) {
+async function syncSchoolToTrouvetou(admin: SupabaseClient, schoolId: string, published: boolean) {
   const { data: school, error: schoolError } = await admin
     .from("schools")
     .select("id, name, city, latitude, longitude, description_publique, itineraire, photos_360, video_url, grille_tarifaire_publique, cover_photo_url, gallery_photos, public_address, public_phone, public_email, public_website_url, public_highlights, admission_notes")
@@ -93,7 +93,7 @@ export async function POST(request: Request) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: "Non authentifie" }, { status: 401 })
 
-    const admin: any = createAdminClient(
+    const admin: SupabaseClient = createAdminClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SECRET_KEY!
     )
