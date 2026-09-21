@@ -7,6 +7,7 @@ import {
   legacyRedirectFor,
   roleHome,
   isRoleAllowedPath,
+  isBillingAccessPath,
 } from "./route-rules"
 
 export async function updateSession(request: NextRequest) {
@@ -53,7 +54,22 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   if (isPublicPath(path)) {
-    if (!user || !isEntryPath(path)) {
+    if (!user) {
+      return supabaseResponse
+    }
+
+    const billingStatus = await resolveBillingStatus(user.id)
+    if (billingStatus && (billingStatus === "restricted" || billingStatus === "suspended") && !isBillingAccessPath(path)) {
+      if (path.startsWith("/api/")) {
+        return NextResponse.json({ error: "SCHOOL_BILLING_RESTRICTED", status: billingStatus }, { status: 402 })
+      }
+      const url = request.nextUrl.clone()
+      url.pathname = "/dashboard/billing"
+      url.searchParams.set("access", billingStatus)
+      return NextResponse.redirect(url)
+    }
+
+    if (!isEntryPath(path)) {
       return supabaseResponse
     }
 
@@ -65,6 +81,17 @@ export async function updateSession(request: NextRequest) {
 
     const url = request.nextUrl.clone()
     url.pathname = destination
+    return NextResponse.redirect(url)
+  }
+
+  const billingStatus = await resolveBillingStatus(user.id)
+  if (billingStatus && (billingStatus === "restricted" || billingStatus === "suspended") && !isBillingAccessPath(path)) {
+    if (path.startsWith("/api/")) {
+      return NextResponse.json({ error: "SCHOOL_BILLING_RESTRICTED", status: billingStatus }, { status: 402 })
+    }
+    const url = request.nextUrl.clone()
+    url.pathname = "/dashboard/billing"
+    url.searchParams.set("access", billingStatus)
     return NextResponse.redirect(url)
   }
 
@@ -108,6 +135,31 @@ async function resolveHomePath(
 
   const role = await resolveRoleCodeFromDatabase(userId)
   return roleHome(role ?? undefined)
+}
+
+async function resolveBillingStatus(userId: string): Promise<string | null> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+  if (!url || !key) return null
+
+  const { createClient } = await import("@supabase/supabase-js")
+  const client = createClient(url, key)
+  const { data: roles } = await client
+    .from("user_school_roles")
+    .select("school_id")
+    .eq("user_id", userId)
+    .eq("is_active", true)
+    .order("created_at", { ascending: true })
+    .limit(1)
+  const schoolId = roles?.[0]?.school_id
+  if (!schoolId) return null
+
+  const { data } = await client
+    .from("school_billing_access")
+    .select("status")
+    .eq("school_id", schoolId)
+    .maybeSingle()
+  return data?.status ?? null
 }
 
 async function resolveRoleCodeFromDatabase(userId: string): Promise<string | null> {
