@@ -73,7 +73,10 @@ begin
         from public.subscription_payment_requests spr
         where spr.product_id = 'schooly'
           and spr.tenant_id = s.id
-          and spr.status in ('validated', 'pending')
+          and (
+            spr.status = 'validated'
+            or (spr.status = 'pending' and spr.created_at >= now() - interval '7 days')
+          )
       ), 0)::bigint as covered_amount
     from public.schools s
     left join ledger l on l.school_id = s.id
