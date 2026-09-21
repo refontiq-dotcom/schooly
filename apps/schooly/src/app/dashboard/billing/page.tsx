@@ -27,6 +27,14 @@ export default async function BillingPage() {
   const billing = await getSchoolBillingSummary()
   const myRequests = await getMyPaymentRequests()
   const hasPending = billing.pendingRequests.length > 0
+  const accessStatus = billing.access?.status ?? "active"
+  const accessMeta = accessStatus === "suspended"
+    ? { label: "Service suspendu", className: "border-red-300 bg-red-50 text-red-800", description: "L’accès aux fonctions de Schooly est suspendu jusqu’à validation du règlement. La facturation, le paiement et l’export des données restent accessibles." }
+    : accessStatus === "restricted"
+      ? { label: "Accès restreint", className: "border-amber-300 bg-amber-50 text-amber-800", description: "L’établissement est en retard de paiement. Seuls les espaces nécessaires au règlement restent accessibles." }
+      : accessStatus === "grace"
+        ? { label: "Période de grâce", className: "border-orange-200 bg-orange-50 text-orange-800", description: "Un solde reste dû, mais l’établissement conserve pour le moment toutes les fonctionnalités." }
+        : { label: "Service actif", className: "border-green-200 bg-green-50 text-green-800", description: "Aucun blocage de service lié à la facturation." }
 
   return (
     <div className="space-y-6">
@@ -36,6 +44,22 @@ export default async function BillingPage() {
           {school?.name || "Mon établissement"}{school?.city ? ` — ${school.city}` : ""}
         </p>
       </div>
+
+      <Card className={accessMeta.className}>
+        <CardContent className="pt-5">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="font-semibold">{accessMeta.label}</p>
+              <p className="text-sm mt-1">{accessMeta.description}</p>
+            </div>
+            {billing.access?.oldest_unpaid_at && accessStatus !== "active" ? (
+              <Badge variant="outline" className="w-fit bg-white/70">
+                Retard : {billing.access.days_overdue} jour{billing.access.days_overdue > 1 ? "s" : ""}
+              </Badge>
+            ) : null}
+          </div>
+        </CardContent>
+      </Card>
 
       <Card className="border-blue-200 bg-blue-50/60 dark:border-blue-900 dark:bg-blue-950/30">
         <CardContent className="pt-6">
@@ -124,6 +148,10 @@ export default async function BillingPage() {
               <div className="flex items-start gap-3">
                 <span className="font-semibold text-slate-900 dark:text-white">3.</span>
                 <p>Un départ en cours d’année ne supprime pas la facturation déjà acquise pour cette année scolaire.</p>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="font-semibold text-slate-900 dark:text-white">4.</span>
+                <p>Les inscriptions tardives restent facturables lorsqu’elles sont confirmées : une inscription confirmée en janvier ou février de la même année scolaire ajoute 1 000 FCFA au solde, avec son propre délai de paiement.</p>
               </div>
             </CardContent>
           </Card>
