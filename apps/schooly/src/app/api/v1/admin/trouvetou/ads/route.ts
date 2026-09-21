@@ -38,7 +38,37 @@ export async function POST(request: Request) {
     }).select("id, title, start_date, end_date, duration_days, daily_rate, total_amount, payment_status").single()
 
     if (error) throw error
-    return NextResponse.json({ success: true, payment_required: true, ad })
+
+    const controlCenterUrl = (process.env.CONTROL_CENTER_URL || "").replace(/\/$/, "")
+    const sharedSecret = process.env.METRICS_PUSH_SECRET
+    if (controlCenterUrl && sharedSecret) {
+      const controlCenterResponse = await fetch(`${controlCenterUrl}/api/billing`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${sharedSecret}`,
+        },
+        body: JSON.stringify({
+          produit: "trouvetou",
+          produit_ref: ad.id,
+          plan: "trouvetou_publicite",
+          amount: totalAmount,
+          requested_by: user.id,
+          sender_phone: contactPhone || null,
+          notes: `Publicité: ${title} • ${durationDays} jour(s) • ${startDate} → ${endDate} • Établissement: ${role.school_id}`,
+        }),
+        signal: AbortSignal.timeout(10_000),
+      })
+
+      if (!controlCenterResponse.ok) {
+        await admin.from("trouvetou_ads").delete().eq("id", ad.id)
+        const body = await controlCenterResponse.text()
+        console.error("[Trouvetou billing] Control Center refused request:", controlCenterResponse.status, body)
+        return NextResponse.json({ error: "Impossible d'enregistrer la demande de paiement centralisée." }, { status: 502 })
+      }
+    }
+
+    return NextResponse.json({ success: true, payment_required: true, payment_provider: "wave_business", ad })
   } catch (err: any) {
     return NextResponse.json({ error: err.message || "Erreur" }, { status: 500 })
   }
