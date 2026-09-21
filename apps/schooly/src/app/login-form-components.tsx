@@ -154,6 +154,14 @@ export function SchoolLoginForm({
         <span>Un nouveau collaborateur active son compte par code de vérification.</span>
       </div>
 
+      {state.mode === "password" && (
+        <div className="text-center pt-0">
+          <a href="/login/forgot-password" className="text-xs text-primary hover:underline font-medium">
+            Mot de passe oublié ?
+          </a>
+        </div>
+      )}
+
       <div className="text-center pt-1">
         <span className="text-xs text-muted-foreground">Nouveau sur Schooly ? </span>
         <a href="/register-school" className="text-xs text-primary hover:underline font-medium">Créer votre établissement →</a>
