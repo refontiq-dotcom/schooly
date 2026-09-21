@@ -110,6 +110,45 @@ export async function POST(request: Request) {
     const { published } = await request.json()
     const nextPublished = !!published
 
+    if (nextPublished) {
+      const { data: publicationSchool, error: publicationSchoolError } = await admin
+        .from("schools")
+        .select("cover_photo_url, gallery_photos, photos_360")
+        .eq("id", role.school_id)
+        .is("deleted_at", null)
+        .single()
+
+      if (publicationSchoolError || !publicationSchool) {
+        return NextResponse.json(
+          { error: "Impossible de vérifier les photos de l'établissement." },
+          { status: 500 }
+        )
+      }
+
+      const hasPhoto = Boolean(
+        typeof publicationSchool.cover_photo_url === "string" &&
+          publicationSchool.cover_photo_url.trim()
+      ) ||
+        (Array.isArray(publicationSchool.gallery_photos) &&
+          publicationSchool.gallery_photos.some(
+            (photo) => typeof photo === "string" && photo.trim()
+          )) ||
+        (Array.isArray(publicationSchool.photos_360) &&
+          publicationSchool.photos_360.some(
+            (photo) => typeof photo === "string" && photo.trim()
+          ))
+
+      if (!hasPhoto) {
+        return NextResponse.json(
+          {
+            error: "Publication impossible : ajoutez au moins une photo ou renseignez le lien d'une photo avant de publier la fiche Trouvetou.",
+            code: "PHOTO_REQUIRED",
+          },
+          { status: 400 }
+        )
+      }
+    }
+
     const { error: updateError } = await admin
       .from("schools")
       .update({ published_to_trouvetou: nextPublished })
