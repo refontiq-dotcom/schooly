@@ -43,24 +43,30 @@ export async function GET(request: Request) {
   const format = url.searchParams.get("format") === "html" ? "html" : "json"
   const { admin, schoolId, userId } = context
 
-  const [{ data: school }, { data: tableRows, error: tableError }] = await Promise.all([
-    admin.from("schools").select("id, name, city, school_type, academic_year_id, mena_code, drena_code, created_at").eq("id", schoolId).single(),
-    admin.rpc("get_school_export_table_names", { p_school_id: schoolId }),
-  ])
+  const { data: school } = await admin
+    .from("schools")
+    .select("id, name, city, school_type, academic_year_id, mena_code, drena_code, created_at")
+    .eq("id", schoolId)
+    .single()
 
-  let tableNames: string[] = []
-  if (!tableError && Array.isArray(tableRows)) {
-    tableNames = tableRows.map((row: { table_name?: string }) => row.table_name).filter((name): name is string => Boolean(name))
-  } else {
-    const { data: columns } = await admin
-      .from("information_schema.columns")
-      .select("table_name")
-      .eq("table_schema", "public")
-      .eq("column_name", "school_id")
-    tableNames = [...new Set((columns ?? []).map((row: { table_name: string }) => row.table_name))]
-  }
-
-  tableNames = tableNames.filter((name) => !EXCLUDED_TABLES.has(name)).sort()
+  // Tables de données de l'établissement. La liste est volontairement explicite
+  // pour éviter qu'une future table technique ou secrète soit exportée par erreur.
+  const tableNames = [
+    "academic_decisions", "academic_years", "accounting_exports",
+    "admission_assignment_batches", "admission_import_batches", "attendance_records",
+    "boarding_subscriptions", "bus_routes", "bus_stops", "canteen_attendance",
+    "canteen_menus", "canteen_subscriptions", "cash_sessions", "class_subject_assignments",
+    "classes", "course_sessions", "detentions", "door_entries", "dorm_rooms", "dormitories",
+    "dropout_alerts", "enrollment_checklist_items", "enrollments", "evaluation_assessments",
+    "evaluation_periods", "evaluation_rules", "family_reliability_scores", "fee_discounts",
+    "fee_schedules", "financial_profiles", "grade_corrections", "grade_entries", "grade_levels",
+    "homeworks", "legal_document_acceptances", "moratoriums", "payment_reminders", "payments",
+    "pre_enrollments", "receipts", "report_cards", "required_documents", "school_features",
+    "school_payment_methods", "school_supplies", "student_fee_items",
+    "student_movement_activation_audit", "student_movement_activations", "student_movement_requests",
+    "student_qr_codes", "students", "subjects", "syscohada_export_log", "syscohada_settings",
+    "transport_subscriptions", "trouvetou_ads", "trouvetou_reservations", "year_rollover_logs",
+  ].sort()
 
   const data: Record<string, unknown[]> = {}
   const errors: string[] = []
