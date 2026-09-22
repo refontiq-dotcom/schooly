@@ -173,15 +173,7 @@ export default async function SettingsPage({
                       </div>
                     </CardContent>
                   </Card>
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Fiche de renseignement</CardTitle>
-                      <CardDescription>Définissez les pièces que la famille devra préparer pour le dossier d’inscription.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      {requiredDocuments?.ok ? <RequiredDocuments initialDocuments={requiredDocuments.documents} /> : <p className="text-sm text-muted-foreground">{requiredDocuments?.error ?? "Configuration indisponible."}</p>}
-                    </CardContent>
-                  </Card>
+                  {requiredDocuments?.ok ? <RequiredDocuments initialDocuments={requiredDocuments.documents} /> : <Card><CardContent className="p-6 text-sm text-muted-foreground">{requiredDocuments?.error ?? "Configuration indisponible."}</CardContent></Card>}
                   <InformationsWizard state={fiche.state} />
                 </div>
               ) : (
