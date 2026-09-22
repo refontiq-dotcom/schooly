@@ -51,7 +51,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (!selectedLevel) return NextResponse.json({ error: "Ce niveau ne correspond pas à la formation choisie." }, { status: 400 })
 
     const { data: reservation, error } = await supabase.from("trouvetou_reservations").insert({
-      school_id: schoolId, grade_level_id: levelId, student_full_name: studentFullName,
+      school_id: schoolId, grade_level_id: level.id, student_full_name: studentFullName,
       student_birthdate: studentBirthdate, parent_full_name: parentFullName, parent_phone: parentPhone,
       parent_email: parentEmail || null, status: "pending_payment"
     }).select("id, status, created_at").single()
