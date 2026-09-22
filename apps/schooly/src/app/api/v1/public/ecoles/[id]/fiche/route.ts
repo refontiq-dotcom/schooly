@@ -28,7 +28,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   const { data: school, error } = await sb
     .from("schools")
-    .select("id, name, city, communes, public_address, public_phone, public_email, cover_photo_url, cycles_offered, fees_structure, optional_services, required_documents")
+    .select("id, name, city, communes, public_address, public_phone, public_email, cover_photo_url, cycles_offered, fees_structure, optional_services")
     .eq("id", id)
     .eq("published_to_trouvetou", true)
     .is("deleted_at", null)
@@ -38,9 +38,18 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const cycles = parseCyclesOffered((school as { cycles_offered: unknown }).cycles_offered)
   const fees = parseFeesStructure((school as { fees_structure: unknown }).fees_structure)
   const services = parseOptionalServices((school as { optional_services: unknown }).optional_services)
-  const requiredDocuments = Array.isArray((school as { required_documents?: unknown }).required_documents)
-    ? (school as { required_documents: unknown[] }).required_documents.filter((item): item is { id: string; label: string; required: boolean } => Boolean(item && typeof item === "object" && typeof (item as { id?: unknown }).id === "string" && typeof (item as { label?: unknown }).label === "string")).map((item) => ({ id: item.id, label: item.label, required: item.required !== false }))
-    : []
+  const { data: requiredDocumentRows } = await sb
+    .from("required_documents")
+    .select("id, nom, obligatoire, applicable_to_level_id")
+    .eq("school_id", id)
+    .is("deleted_at", null)
+    .order("created_at", { ascending: true })
+  const requiredDocuments = (requiredDocumentRows ?? []).map((item) => ({
+    id: String(item.id),
+    label: String(item.nom),
+    required: item.obligatoire !== false,
+    applicable_to_level_id: item.applicable_to_level_id ? String(item.applicable_to_level_id) : null,
+  }))
   const selectedCycle = formation ? cycles.cycles.find((cycle) => cycle.key === formation) ?? null : null
   const selectedFees = formation && fees.fee_profiles?.[formation as keyof typeof fees.fee_profiles] ? fees.fee_profiles[formation as keyof typeof fees.fee_profiles] : fees
 
