@@ -28,7 +28,7 @@ async function schoolIdForCurrentUser(): Promise<string | null> {
 }
 
 function normalizeDocuments(value: unknown): RequiredDocument[] {
-  if (!Array.isArray(value)) return DEFAULT_REQUIRED_DOCUMENTS.map((item) => ({ ...item }))
+  if (!Array.isArray(value) || value.length === 0) return DEFAULT_REQUIRED_DOCUMENTS.map((item) => ({ ...item }))
   const out: RequiredDocument[] = []
   const seen = new Set<string>()
   for (const item of value) {
