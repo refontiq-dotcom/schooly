@@ -47,17 +47,16 @@ export const NAV_BY_ROLE: Record<string, NavItem[]> = {
     { label: "Services", href: "/dashboard/services/transport", icon: Bus },
   ],
   compta: [
-    { label: "Tableau de bord financier", href: "/dashboard/direction/finance", icon: LayoutDashboard },
     { label: "Finance", href: "/dashboard/direction/finance", icon: CreditCard },
     { label: "Relances", href: "/dashboard/direction/finance/reminders", icon: Bell },
     { label: "Rapports", href: "/dashboard/direction/reports", icon: BookOpen },
   ],
   informatique: [
     { label: "Tableau de bord", href: "/dashboard/informatique", icon: LayoutDashboard },
-    { label: "Configuration", href: "/dashboard/academic-structure", icon: Wrench },
+    { label: "Structure académique", href: "/dashboard/academic-structure", icon: Wrench },
     { label: "Emploi du temps", href: "/dashboard/informatique/emploi-du-temps", icon: CalendarDays },
-    { label: "Paramètres établissement", href: "/dashboard/direction/settings", icon: Settings },
-    { label: "Bulletins & rapports", href: "/dashboard/direction/reports", icon: BookOpen },
+    { label: "Paramètres", href: "/dashboard/direction/settings", icon: Settings },
+    { label: "Rapports", href: "/dashboard/direction/reports", icon: BookOpen },
     { label: "Demandes de notes", href: "/dashboard/informatique/grade-change-requests", icon: ShieldCheck },
   ],
   caisse: [
