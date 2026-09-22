@@ -44,6 +44,24 @@ export type FicheLoadResult =
 
 export type FicheSaveResult = { ok: boolean; error?: string }
 
+function syncExamFeeRows(cycles: CyclesOffered, fees: FeesStructure): FeesStructure {
+  const detected = cycles.cycles.flatMap((cycle) => cycle.levels).map((level) => {
+    const name = level.grade_level_name.trim()
+    const key = name.toLowerCase()
+    if (key === "cm2" || key === "cm2") return { class_name: name, exam_name: "CEPE", diploma: "cep" as const }
+    if (key === "3e") return { class_name: name, exam_name: "BEPC", diploma: "bepc" as const }
+    if (key === "terminale" || key === "terminale technique") return { class_name: name, exam_name: "BAC", diploma: "bac" as const }
+    return null
+  }).filter((item): item is { class_name: string; exam_name: string; diploma: "cep"|"bepc"|"bac" } => Boolean(item))
+  const existing = fees.exam_fees ?? []
+  const merged = [...existing]
+  for (const item of detected) {
+    if (merged.some((row) => row.class_name === item.class_name && row.exam_name === item.exam_name)) continue
+    merged.push({ ...item, amount: 0, is_mandatory: true })
+  }
+  return { ...fees, exam_fees: merged }
+}
+
 function adminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const key = process.env.SUPABASE_SECRET_KEY
@@ -121,7 +139,7 @@ export async function getFicheState(): Promise<FicheLoadResult> {
       schoolName: data.name ?? ctx.schoolName,
       state: {
         cycles: parseCyclesOffered(data.cycles_offered),
-        fees: parseFeesStructure(data.fees_structure),
+        fees: syncExamFeeRows(parseCyclesOffered(data.cycles_offered), parseFeesStructure(data.fees_structure)),
         services: parseOptionalServices(data.optional_services),
       },
     }
@@ -142,7 +160,7 @@ export async function saveSchoolConfiguration(
 
     // Normalisation défensive : les parseurs garantissent la conformité.
     const cycles = parseCyclesOffered(payload.cycles)
-    const fees = parseFeesStructure(payload.fees)
+    const fees = syncExamFeeRows(cycles, parseFeesStructure(payload.fees))
     const services = parseOptionalServices(payload.services)
 
     if (!cycles.cycles.length) {
