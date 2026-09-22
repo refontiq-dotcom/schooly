@@ -145,10 +145,25 @@ export interface FeeInstallment {
   status: FeeStatus
 }
 
+/** Droit d'examen associé automatiquement à une classe diplômante. */
+export interface ExamFeeItem {
+  class_name: string
+  exam_name: string
+  diploma: DiplomaKind
+  amount: number
+  is_mandatory: boolean
+}
+
 /** Contenu de `schools.fees_structure`. */
 export interface FeesStructure {
+  /** Champs historiques conservés pour compatibilité. */
   registration_fee?: FeeItem
   academic_fee?: FeeItem
+  /** Tarifs distincts selon l'affectation. */
+  registration_fees?: FeeItem[]
+  school_fees?: FeeItem[]
+  /** Droits d'examen par classe diplômante. */
+  exam_fees?: ExamFeeItem[]
   installments: FeeInstallment[]
   /** Code devise ISO 4217 — « XOF » par défaut en Côte d'Ivoire. */
   currency: string
