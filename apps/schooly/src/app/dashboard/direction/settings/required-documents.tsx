@@ -60,3 +60,4 @@ export function RequiredDocuments({ initialDocuments }: { initialDocuments: Requ
       <div className="flex flex-wrap gap-2"><Button type="button" variant="secondary" onClick={resetDefaults}><RotateCcw className="size-4" />Réinitialiser les propositions</Button><Button type="button" disabled={pending} onClick={save}>{pending ? <Loader2 className="size-4 animate-spin" /> : <FileCheck2 className="size-4" />}Enregistrer</Button></div>
     </CardContent>
   </Card>
+}
