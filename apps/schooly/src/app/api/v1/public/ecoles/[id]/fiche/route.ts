@@ -44,7 +44,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     .eq("school_id", id)
     .is("deleted_at", null)
     .order("created_at", { ascending: true })
-  const requiredDocuments = (requiredDocumentRows ?? []).map((item) => ({
+  const seenRequiredDocumentLabels = new Set<string>()
+  const requiredDocuments = (requiredDocumentRows ?? []).filter((item) => {
+    const key = String(item.nom).trim().toLowerCase()
+    if (seenRequiredDocumentLabels.has(key)) return false
+    seenRequiredDocumentLabels.add(key)
+    return true
+  }).map((item) => ({
     id: String(item.id),
     label: String(item.nom),
     required: item.obligatoire !== false,
