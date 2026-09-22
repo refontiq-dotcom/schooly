@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { totalInstallments } from "@/lib/fiches/normalize"
-import type { CustomFeeItem, ExamFeeItem, FeeItem, FeesStructure } from "@/lib/fiches/types"
+import type { CustomFeeItem, ExamFeeItem, FeeItem, FeesStructure, EducationCycle } from "@/lib/fiches/types"
 import { fcfa } from "./wizard-steps-a"
 
 function emptyFee(label: string, status: "affecte" | "non_affecte"): FeeItem {
@@ -50,7 +50,8 @@ function FeePair({ title, fees, onChange }: { title: string; fees: FeeItem[]; on
   )
 }
 
-export function StepFees({ fees, onChange }: { fees: FeesStructure; onChange: (next: FeesStructure) => void }) {
+export function StepFees({ fees, onChange, cycles }: { fees: FeesStructure; onChange: (next: FeesStructure) => void; cycles: EducationCycle[] }) {
+  const [activeCycle, setActiveCycle] = useState<EducationCycle>(cycles[0] ?? "general")
   const [instLabel, setInstLabel] = useState("")
   const [instAmount, setInstAmount] = useState("")
   const [examClass, setExamClass] = useState("")
@@ -61,12 +62,18 @@ export function StepFees({ fees, onChange }: { fees: FeesStructure; onChange: (n
   const [customAmount, setCustomAmount] = useState("")
   const [customStatus, setCustomStatus] = useState<"affecte" | "non_affecte">("non_affecte")
 
-  const registrationFees = fees.registration_fees?.length ? fees.registration_fees : fees.registration_fee ? [fees.registration_fee] : []
-  const schoolFees = fees.school_fees?.length ? fees.school_fees : fees.academic_fee ? [fees.academic_fee] : []
+  const activeFees = fees.fee_profiles?.[activeCycle] ?? fees
+  function updateActive(next: FeesStructure) {
+    const { fee_profiles: _ignored, ...profile } = next
+    onChange({ ...fees, fee_profiles: { ...(fees.fee_profiles ?? {}), [activeCycle]: profile } })
+  }
+
+  const registrationFees = activeFees.registration_fees?.length ? activeFees.registration_fees : activeFees.registration_fee ? [activeFees.registration_fee] : []
+  const schoolFees = activeFees.school_fees?.length ? activeFees.school_fees : activeFees.academic_fee ? [activeFees.academic_fee] : []
 
   function addInstallment() {
-    const label = instLabel.trim() || "Tranche " + (fees.installments.length + 1)
-    onChange({ ...fees, installments: [...fees.installments, { label, position: fees.installments.length + 1, amount: Number(instAmount) || 0, due_date: null, status: "non_affecte" }] })
+    const label = instLabel.trim() || "Tranche " + (activeFees.installments.length + 1)
+    onChange({ ...fees, installments: [...activeFees.installments, { label, position: activeFees.installments.length + 1, amount: Number(instAmount) || 0, due_date: null, status: "non_affecte" }] })
     setInstLabel(""); setInstAmount("")
   }
 
@@ -81,7 +88,7 @@ export function StepFees({ fees, onChange }: { fees: FeesStructure; onChange: (n
       status: customStatus,
       applies_to: "all",
     }
-    onChange({ ...fees, custom_fees: [...(fees.custom_fees ?? []), item] })
+    onChange({ ...fees, custom_fees: [...(activeFees.custom_fees ?? []), item] })
     setCustomLabel(""); setCustomAmount("")
   }
 
@@ -98,12 +105,24 @@ export function StepFees({ fees, onChange }: { fees: FeesStructure; onChange: (n
       amount_non_affecte: Number(examAmountNonAffecte) || 0,
       is_mandatory: true,
     }
-    onChange({ ...fees, exam_fees: [...(fees.exam_fees ?? []), item] })
+    onChange({ ...fees, exam_fees: [...(activeFees.exam_fees ?? []), item] })
     setExamClass(""); setExamName(""); setExamAmount(""); setExamAmountNonAffecte("")
   }
 
   return (
     <div className="space-y-4">
+    <div className="space-y-2">
+      <p className="text-sm font-medium">Tarifs par formation</p>
+      <p className="text-xs text-muted-foreground">Chaque pôle peut avoir ses propres préinscriptions, tarifs, examens et échéancier.</p>
+      <div className="flex flex-wrap gap-2">
+        {cycles.map((cycle) => (
+          <Button key={cycle} variant={activeCycle === cycle ? "default" : "outline"} size="sm" onClick={() => setActiveCycle(cycle)}>
+            {cycle === "general" ? "Général" : cycle === "technique" ? "Technique" : cycle === "professionnel" ? "Professionnel" : cycle === "superieur" ? "Supérieur" : cycle === "primaire" ? "Primaire" : "Islamique"}
+          </Button>
+        ))}
+      </div>
+    </div>
+
       <FeePair title="Frais d'inscription" fees={registrationFees} onChange={(registration_fees) => onChange({ ...fees, registration_fees })} />
       <FeePair title="Frais de scolarité" fees={schoolFees} onChange={(school_fees) => onChange({ ...fees, school_fees })} />
 
