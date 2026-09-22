@@ -93,17 +93,21 @@ export async function saveRequiredDocuments(documents: RequiredDocument[]): Prom
 
     const existingRows = existing ?? []
     const keptIds = new Set<string>()
+    const persisted: RequiredDocument[] = []
 
     for (const item of normalized) {
-      const existingRow = existingRows.find((row) => String(row.id) === item.id || false)
+      const existingRow = existingRows.find((row) => String(row.id) === item.id)
       if (existingRow) {
         keptIds.add(String(existingRow.id))
         const { error } = await admin.from("required_documents").update({ nom: item.label, obligatoire: item.required, applicable_to_level_id: item.applicableToLevelId ?? null }).eq("id", existingRow.id).eq("school_id", schoolId)
         if (error) return { ok: false, error: "Enregistrement impossible." }
+        persisted.push({ ...item, id: String(existingRow.id) })
       } else {
         const { data, error } = await admin.from("required_documents").insert({ school_id: schoolId, nom: item.label, obligatoire: item.required, applicable_to_level_id: item.applicableToLevelId ?? null }).select("id").single()
         if (error || !data) return { ok: false, error: "Enregistrement impossible." }
-        keptIds.add(String(data.id))
+        const persistedId = String(data.id)
+        keptIds.add(persistedId)
+        persisted.push({ ...item, id: persistedId })
       }
     }
 
@@ -116,7 +120,7 @@ export async function saveRequiredDocuments(documents: RequiredDocument[]): Prom
 
     revalidatePath("/dashboard/direction/settings")
     revalidatePath("/dashboard/direction")
-    return { ok: true, documents: normalized }
+    return { ok: true, documents: persisted }
   } catch {
     return { ok: false, error: "Enregistrement impossible." }
   }
