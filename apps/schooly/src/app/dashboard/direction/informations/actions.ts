@@ -73,6 +73,19 @@ function syncExamFeeRows(cycles: CyclesOffered, fees: FeesStructure): FeesStruct
   return { ...fees, exam_fees: merged }
 }
 
+function syncFeeProfiles(cycles: CyclesOffered, fees: FeesStructure): FeesStructure {
+  if (!fees.fee_profiles) return fees
+  const profiles = { ...fees.fee_profiles }
+  for (const cycle of cycles.cycles) {
+    const profile = profiles[cycle.key]
+    if (!profile) continue
+    const synced = syncExamFeeRows({ ...cycles, cycles: [cycle] }, profile)
+    const { fee_profiles: _ignored, ...cleanProfile } = synced
+    profiles[cycle.key] = cleanProfile
+  }
+  return { ...fees, fee_profiles: profiles }
+}
+
 function adminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const key = process.env.SUPABASE_SECRET_KEY
@@ -150,7 +163,7 @@ export async function getFicheState(): Promise<FicheLoadResult> {
       schoolName: data.name ?? ctx.schoolName,
       state: {
         cycles: parseCyclesOffered(data.cycles_offered),
-        fees: syncExamFeeRows(parseCyclesOffered(data.cycles_offered), parseFeesStructure(data.fees_structure)),
+        fees: syncFeeProfiles(parseCyclesOffered(data.cycles_offered), syncExamFeeRows(parseCyclesOffered(data.cycles_offered), parseFeesStructure(data.fees_structure))),
         services: parseOptionalServices(data.optional_services),
       },
     }
@@ -171,7 +184,7 @@ export async function saveSchoolConfiguration(
 
     // Normalisation défensive : les parseurs garantissent la conformité.
     const cycles = parseCyclesOffered(payload.cycles)
-    const fees = syncExamFeeRows(cycles, parseFeesStructure(payload.fees))
+    const fees = syncFeeProfiles(cycles, syncExamFeeRows(cycles, parseFeesStructure(payload.fees)))
     const services = parseOptionalServices(payload.services)
 
     if (!cycles.cycles.length) {
