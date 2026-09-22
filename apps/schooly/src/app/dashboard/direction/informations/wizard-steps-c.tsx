@@ -136,22 +136,25 @@ export function StepFees({ fees, onChange }: { fees: FeesStructure; onChange: (n
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Droits d'examen</CardTitle>
-          <p className="text-sm text-muted-foreground">Schooly peut identifier automatiquement les classes d'examen. Vous indiquez simplement le montant applicable à votre établissement.</p>
+          <p className="text-sm text-muted-foreground">Les classes d'examen détectées par Schooly sont affichées automatiquement. Saisissez le montant pour chaque catégorie d'élève.</p>
         </CardHeader>
         <CardContent className="space-y-3">
           {(fees.exam_fees ?? []).map((item, i) => (
-            <div key={i} className="flex flex-wrap items-center gap-2 rounded-lg border p-3">
-              <span className="text-sm font-medium">{item.class_name}</span>
-              <span className="text-sm text-muted-foreground">{item.exam_name}</span>
-              <Input type="number" className="max-w-32" value={String(item.amount)} onChange={(e) => { const next = [...(fees.exam_fees ?? [])]; next[i] = { ...item, amount: Number(e.target.value) || 0 }; onChange({ ...fees, exam_fees: next }) }} />
-              <span className="text-xs text-muted-foreground">{fcfa(item.amount)}</span>
-              <Button variant="ghost" size="icon" onClick={() => onChange({ ...fees, exam_fees: (fees.exam_fees ?? []).filter((_, x) => x !== i) })}><Trash2 className="size-4" /></Button>
+            <div key={item.class_name + item.exam_name} className="rounded-lg border p-3 space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <div><p className="text-sm font-medium">{item.class_name} — {item.exam_name}</p><p className="text-xs text-muted-foreground">Droit lié à l'examen</p></div>
+                <Button variant="ghost" size="icon" onClick={() => onChange({ ...fees, exam_fees: (fees.exam_fees ?? []).filter((_, x) => x !== i) })}><Trash2 className="size-4" /></Button>
+              </div>
+              <div className="grid gap-3 md:grid-cols-2">
+                <div><Label className="text-xs">Élève affecté</Label><Input type="number" value={String(item.amount_affecte ?? item.amount ?? 0)} onChange={(e) => { const next=[...(fees.exam_fees ?? [])]; next[i]={...item, amount_affecte:Number(e.target.value)||0}; onChange({...fees,exam_fees:next}) }} /></div>
+                <div><Label className="text-xs">Élève non affecté</Label><Input type="number" value={String(item.amount_non_affecte ?? item.amount ?? 0)} onChange={(e) => { const next=[...(fees.exam_fees ?? [])]; next[i]={...item, amount_non_affecte:Number(e.target.value)||0}; onChange({...fees,exam_fees:next}) }} /></div>
+              </div>
             </div>
           ))}
           <div className="grid gap-2 md:grid-cols-3">
             <Input placeholder="Classe (ex. 3e)" value={examClass} onChange={(e) => setExamClass(e.target.value)} />
             <Input placeholder="Examen (ex. BEPC)" value={examName} onChange={(e) => setExamName(e.target.value)} />
-            <Input type="number" placeholder="Montant" value={examAmount} onChange={(e) => setExamAmount(e.target.value)} />
+            <Input type="number" placeholder="Montant affecté (optionnel)" value={examAmount} onChange={(e) => setExamAmount(e.target.value)} />
           </div>
           <Button variant="outline" size="sm" onClick={addExamFee}><Plus className="size-4" /> Ajouter un droit d'examen</Button>
         </CardContent>
