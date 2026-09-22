@@ -75,6 +75,12 @@ export function FicheEcole({ schoolId, apiBase }: { schoolId: string; apiBase: s
   const selectedFormation = data.formations?.find((x) => x.key === formation) ?? data.formation
   const activeLevels = selectedFormation?.levels ?? []
   const f = data.fournitures
+  const registrationTotal = (data.tarifs.registration_fees ?? []).reduce((sum, item) => sum + item.amount, 0) || data.tarifs.registration_fee?.amount || 0
+  const schoolTotal = (data.tarifs.school_fees ?? []).reduce((sum, item) => sum + item.amount, 0) || data.tarifs.academic_fee?.amount || 0
+  const customTotal = (data.tarifs.custom_fees ?? []).reduce((sum, item) => sum + item.amount, 0)
+  const scheduleTotal = (data.tarifs.installments ?? []).reduce((sum, item) => sum + item.amount, 0)
+  const totalPole = registrationTotal + schoolTotal + customTotal
+  const totalWithSchedule = totalPole + (scheduleTotal > 0 ? scheduleTotal : 0)
   return (
     <div className="mx-auto max-w-2xl space-y-4 p-4 sm:p-6">
       <Card><CardContent className="flex items-center gap-3 pt-4">
