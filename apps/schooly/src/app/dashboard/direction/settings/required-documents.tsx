@@ -7,7 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
-import { saveRequiredDocuments, DEFAULT_REQUIRED_DOCUMENTS, type RequiredDocument } from "./required-documents-actions"
+import { saveRequiredDocuments } from "./required-documents-actions"
+import { DEFAULT_REQUIRED_DOCUMENTS, type RequiredDocument } from "./required-documents-types"
 
 export function RequiredDocuments({ initialDocuments }: { initialDocuments: RequiredDocument[] }) {
   const [documents, setDocuments] = useState(initialDocuments)
