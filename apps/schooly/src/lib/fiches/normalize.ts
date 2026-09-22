@@ -270,7 +270,7 @@ function parseCustomFees(value: unknown): CustomFeeItem[] {
       amount: money(rawItem.amount),
       is_mandatory: bool(rawItem.is_mandatory, true),
       status: str(rawItem.status) === "affecte" ? "affecte" : "non_affecte",
-      applies_to: str(rawItem.applies_to) === "nouveaux" ? "nouveaux" : str(rawItem.applies_to) === "anciens" ? "anciens" : "all",
+      applies_to: str(rawItem.applies_to) === "new_students" ? "new_students" : str(rawItem.applies_to) === "returning" ? "returning" : "all",
     })
   }
   return out
@@ -322,7 +322,7 @@ function parseFeeProfile(value: unknown): import("./types").FeeProfile {
     school_fees: parseFeeItems(raw.school_fees),
     exam_fees: parseExamFees(raw.exam_fees),
     custom_fees: parseCustomFees(raw.custom_fees),
-    installments: parseInstallments(raw.installments),
+    installments: asArray(raw.installments).map(parseInstallment).filter((item): item is FeeInstallment => Boolean(item)),
     currency: str(raw.currency) || DEFAULT_CURRENCY,
     ...(str(raw.notes) ? { notes: str(raw.notes) } : {}),
   }
