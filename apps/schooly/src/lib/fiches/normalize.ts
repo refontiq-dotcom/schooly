@@ -28,6 +28,7 @@ import {
   type CyclesOffered,
   type EducationCycle,
   type FeeInstallment,
+  type ExamFeeItem,
   type FeeItem,
   type FeesStructure,
   type Frequency,
