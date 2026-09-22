@@ -245,12 +245,16 @@ function ModeBDocumentComponent({ data }: { data: ModeBData }) {
       amount: f.amount,
     })
   }
-  if (data.fees.academic_fee) {
-    const f = data.fees.academic_fee
-    feeRows.push({
-      label: `${f.label ?? "Scolarité annuelle"} (${AUDIENCE_LABELS[f.applies_to] ?? "tous les élèves"})`,
-      amount: f.amount,
-    })
+  const registrationFees = data.fees.registration_fees?.length ? data.fees.registration_fees : data.fees.registration_fee ? [data.fees.registration_fee] : []
+  const schoolFees = data.fees.school_fees?.length ? data.fees.school_fees : data.fees.academic_fee ? [data.fees.academic_fee] : []
+  for (const f of registrationFees) {
+    feeRows.push({ label: "Frais d'inscription — " + (STATUS_LABELS[f.status] ?? "tous"), amount: f.amount })
+  }
+  for (const f of schoolFees) {
+    feeRows.push({ label: "Frais de scolarité — " + (STATUS_LABELS[f.status] ?? "tous"), amount: f.amount })
+  }
+  for (const f of data.fees.exam_fees ?? []) {
+    feeRows.push({ label: "Droit d'examen — " + f.class_name + " / " + f.exam_name, amount: f.amount })
   }
   const installmentLines = [...data.fees.installments].sort(
     (a, b) => a.position - b.position,
