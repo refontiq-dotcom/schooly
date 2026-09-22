@@ -347,7 +347,6 @@ export function parseFeesStructure(value: unknown): FeesStructure {
     installments: installments.map((item, index) => ({ ...item, position: index + 1 })),
     currency: str(raw.currency) || DEFAULT_CURRENCY,
     ...(notes ? { notes } : {}),
-    ...(Object.keys(fee_profiles).length ? { fee_profiles } : {}),
   }
 }
 
