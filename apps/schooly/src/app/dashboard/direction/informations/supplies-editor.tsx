@@ -17,7 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { listSupplyClassNames } from "@/lib/fiches/normalize"
 import { SUPPLY_KIT_PRESETS } from "@/lib/fiches/presets"
 import type { ClassSuppliesConfiguration, SchoolSuppliesByClass } from "@/lib/fiches/types"
-import { applyKitPreset, deleteClassSupplies, duplicateSupplies, saveClassSupplies, setClassSupplyStatus } from "./supplies-actions"
+import { applyKitPreset, deleteClassSupplies, duplicateSupplies, getSuppliesState, saveClassSupplies, setClassSupplyStatus } from "./supplies-actions"
 
 function emptyConfig(name: string): ClassSuppliesConfiguration {
   return { status: "draft", class_label: name, level: 0, cycle: "", year: "", manuals: [], stationery: [], equipment: [] }
@@ -36,11 +36,17 @@ export function SuppliesEditor({ initial }: { initial: SchoolSuppliesByClass }) 
     if (!selected) return
     setSupplies((s) => ({ ...s, [selected]: next }))
   }
-  function run(p: Promise<{ ok: boolean; error?: string }>, okMsg: string) {
+  async function reload() {
+    const res = await getSuppliesState()
+    if (res.ok) setSupplies(res.supplies)
+  }
+  function run(p: Promise<{ ok: boolean; error?: string }>, okMsg: string, onOk?: () => void | Promise<void>) {
     startTransition(async () => {
       const r = await p
-      if (r.ok) toast.success(okMsg)
-      else toast.error(r.error ?? "Operation impossible.")
+      if (r.ok) {
+        toast.success(okMsg)
+        await onOk?.()
+      } else toast.error(r.error ?? "Operation impossible.")
     })
   }
   function createClass() {
@@ -74,7 +80,7 @@ export function SuppliesEditor({ initial }: { initial: SchoolSuppliesByClass }) 
               <SelectContent>{names.map((n) => (<SelectItem key={n} value={n}>{n} {supplies[n].status === "published" ? "(publie)" : "(brouillon)"}</SelectItem>))}</SelectContent>
             </Select>
             <Badge variant={current.status === "published" ? "default" : "secondary"}>{current.status === "published" ? "Publie" : "Brouillon"}</Badge>
-            <Button variant="outline" size="sm" disabled={pending || !selected} onClick={() => run(setClassSupplyStatus(selected, current.status === "published" ? "draft" : "published"), "Statut mis a jour.")}><Check className="size-4" /> {current.status === "published" ? "Repasser en brouillon" : "Publier"}</Button>
+            <Button variant="outline" size="sm" disabled={pending || !selected} onClick={() => run(setClassSupplyStatus(selected, current.status === "published" ? "draft" : "published"), "Statut mis a jour.", reload)}><Check className="size-4" /> {current.status === "published" ? "Repasser en brouillon" : "Publier"}</Button>
             <Button variant="ghost" size="sm" disabled={pending || !selected} onClick={() => { if (confirm(`Supprimer la fiche de ${selected} ?`)) run(deleteClassSupplies(selected).then((r) => { if (r.ok) { setSupplies((s) => { const n = { ...s }; delete n[selected]; return n }); setSelected("") } return r }), "Fiche supprimee.") }}><Trash2 className="size-4" /> Supprimer</Button>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -83,13 +89,13 @@ export function SuppliesEditor({ initial }: { initial: SchoolSuppliesByClass }) 
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Input className="max-w-52" placeholder="Dupliquer vers (ex. 5eme)" value={dupTarget} onChange={(e) => setDupTarget(e.target.value)} />
-            <Button variant="outline" size="sm" disabled={pending || !selected || !dupTarget.trim()} onClick={() => run(duplicateSupplies(selected, dupTarget.trim()).then((r) => { if (r.ok) setDupTarget(""); return r }), `Duplique vers ${dupTarget.trim()}.`)}><Copy className="size-4" /> Dupliquer la papeterie</Button>
+            <Button variant="outline" size="sm" disabled={pending || !selected || !dupTarget.trim()} onClick={() => { const target = dupTarget.trim(); run(duplicateSupplies(selected, target), `Duplique vers ${target}.`, async () => { await reload(); setSelected(target); setDupTarget("") }) }}><Copy className="size-4" /> Dupliquer la papeterie</Button>
           </div>
           <div className="space-y-1.5">
             <Label>Kits prereglés (programmes nationaux)</Label>
             <div className="flex flex-wrap gap-1.5">
               {SUPPLY_KIT_PRESETS.map((k) => (
-                <Button key={k.id} variant="outline" size="sm" disabled={pending || !selected} title={k.description} onClick={() => run(applyKitPreset(selected, k.id), `Kit « ${k.label} » applique.`)}><Plus className="size-4" /> {k.label}</Button>
+                <Button key={k.id} variant="outline" size="sm" disabled={pending || !selected} title={k.description} onClick={() => run(applyKitPreset(selected, k.id), `Kit « ${k.label} » applique.`, reload)}><Plus className="size-4" /> {k.label}</Button>
               ))}
             </div>
           </div>
