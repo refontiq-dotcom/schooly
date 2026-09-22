@@ -115,7 +115,7 @@ export async function submitTeacherSupplyProposal(assignmentId:string):Promise<R
   if(!year)return {ok:false,error:"Aucune année scolaire en cours."}
   const {data:assignment}=await admin.from("class_subject_assignments").select("id,class_id,subject_id,classes(name)").eq("id",assignmentId).eq("school_id",ctx.schoolId).eq("teacher_id",ctx.userId).is("deleted_at",null).maybeSingle()
   if(!assignment)return {ok:false,error:"Affectation introuvable."}
-  const {data:proposal}=await admin.from("school_supply_proposals").select("id,configurations").eq("school_id",ctx.schoolId).eq("academic_year_id",year.id).eq("class_id",(assignment as any).class_id).eq("subject_id",(assignment as any).subject_id).eq("teacher_id",ctx.userId).is("deleted_at",null).maybeSingle()
+  const {data:proposal}=await admin.from("school_supply_proposals").select("id,configurations").eq("school_id",ctx.schoolId).eq("academic_year_id",year.id).eq("assignment_id",assignmentId).eq("teacher_id",ctx.userId).is("deleted_at",null).maybeSingle()
   if(!proposal)return {ok:false,error:"Enregistrez votre proposition avant de la soumettre."}
   const parsed=parseClassSupplies(proposal.configurations,String((assignment as any).classes?.name ?? ""))
   if(!parsed.manuals.length&&!parsed.stationery.length&&!parsed.equipment.length)return {ok:false,error:"Ajoutez au moins une fourniture."}
