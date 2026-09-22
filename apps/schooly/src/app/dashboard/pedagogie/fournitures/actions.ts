@@ -35,6 +35,7 @@ export type TeacherSupplyAssignment = {
   grade_level_name: string
   subject_id: string
   subject_name: string
+  scope: "class" | "subject" | "module" | "course" | "program" | "custom"
 }
 
 export type TeacherSupplyProposal = {
@@ -48,6 +49,7 @@ export type TeacherSupplyProposal = {
   revision: number
   review_note: string | null
   configurations: ClassSuppliesConfiguration
+  scope: "class" | "subject" | "module" | "course" | "program" | "custom"
 }
 
 export async function getTeacherSupplyAssignments(): Promise<Result<TeacherSupplyAssignment[]>> {
@@ -56,16 +58,31 @@ export async function getTeacherSupplyAssignments(): Promise<Result<TeacherSuppl
   const admin = adminClient()
   const year = await currentYearId(admin, ctx.schoolId)
   if (!year) return { ok: true, data: [] }
+  const { data: school } = await admin.from("schools").select("school_type").eq("id",ctx.schoolId).maybeSingle()
+  if (school?.school_type === "primaire") {
+    const { data, error } = await admin.from("pedagogical_assignments").select(
+      "id,class_id,scope,classes(id,name,grade_level_id,grade_levels(id,name)),pedagogical_assignment_members!inner(user_id,role,is_primary)"
+    ).eq("school_id",ctx.schoolId).eq("academic_year_id",year.id).eq("scope","class").eq("status","active").is("deleted_at",null)
+      .eq("pedagogical_assignment_members.user_id",ctx.userId)
+    if (error) return { ok:false,error:error.message }
+    const rows = (data ?? []) as any[]
+    return { ok:true, data:rows.map(r=>({
+      assignment_id:String(r.id), class_id:String(r.class_id), class_name:String(r.classes?.name ?? ""),
+      grade_level_id:String(r.classes?.grade_level_id ?? r.classes?.grade_levels?.id ?? ""),
+      grade_level_name:String(r.classes?.grade_levels?.name ?? ""),
+      subject_id:"", subject_name:"Toute la classe", scope:"class" as const
+    })).filter(r=>r.class_name) }
+  }
   const { data, error } = await admin.from("class_subject_assignments").select(
-    "id,class_id,subject_id,classes(id,name,grade_level_id,grade_levels(id,name)),subjects(id,name)"
+    "id,class_id,subject_id,pedagogical_assignment_id,classes(id,name,grade_level_id,grade_levels(id,name)),subjects(id,name)"
   ).eq("school_id",ctx.schoolId).eq("teacher_id",ctx.userId).is("deleted_at",null)
   if (error) return { ok:false,error:error.message }
   const rows = (data ?? []) as any[]
   return { ok:true, data:rows.map(r=>({
-    assignment_id:String(r.id), class_id:String(r.class_id), class_name:String(r.classes?.name ?? ""),
+    assignment_id:String(r.pedagogical_assignment_id ?? r.id), class_id:String(r.class_id), class_name:String(r.classes?.name ?? ""),
     grade_level_id:String(r.classes?.grade_level_id ?? r.classes?.grade_levels?.id ?? ""),
     grade_level_name:String(r.classes?.grade_levels?.name ?? ""),
-    subject_id:String(r.subject_id), subject_name:String(r.subjects?.name ?? "")
+    subject_id:String(r.subject_id), subject_name:String(r.subjects?.name ?? ""), scope:"subject" as const
   })).filter(r=>r.class_name && r.subject_name) }
 }
 
@@ -83,7 +100,7 @@ export async function getTeacherSupplyProposals(): Promise<Result<TeacherSupplyP
   return { ok:true,data:assignments.data.map(a=>{
     const p=(byKey.get(a.assignment_id) ?? byKey.get(a.class_id+":"+a.subject_id+":"+ctx.userId)) as any
     const config=parseClassSupplies(p?.configurations,a.class_name)
-    return { id:p?.id,assignment_id:a.assignment_id,class_id:a.class_id,subject_id:a.subject_id,class_name:a.class_name,subject_name:a.subject_name,status:p?.status ?? "draft",revision:Number(p?.revision ?? 1),review_note:p?.review_note ?? null,configurations:config }
+    return { id:p?.id,assignment_id:a.assignment_id,class_id:a.class_id,subject_id:a.subject_id,class_name:a.class_name,subject_name:a.subject_name,status:p?.status ?? "draft",revision:Number(p?.revision ?? 1),review_note:p?.review_note ?? null,configurations:config,scope:a.scope }
   }) }
 }
 
@@ -93,13 +110,14 @@ export async function saveTeacherSupplyProposal(assignmentId:string, configurati
   const admin=adminClient()
   const year=await currentYearId(admin,ctx.schoolId)
   if(!year)return {ok:false,error:"Aucune année scolaire en cours."}
-  const {data:assignment}=await admin.from("class_subject_assignments").select("id,class_id,subject_id,classes(name),subjects(name)").eq("id",assignmentId).eq("school_id",ctx.schoolId).eq("teacher_id",ctx.userId).is("deleted_at",null).maybeSingle()
+  const {data:assignment}=await admin.from("class_subject_assignments").select("id,class_id,subject_id,pedagogical_assignment_id,classes(name),subjects(name)").eq("id",assignmentId).eq("school_id",ctx.schoolId).eq("teacher_id",ctx.userId).is("deleted_at",null).maybeSingle()
   if(!assignment)return {ok:false,error:"Cette affectation pédagogique est introuvable."}
   const className=String((assignment as any).classes?.name ?? "")
   const parsed=parseClassSupplies(configurations,className)
-  const {data:existing}=await admin.from("school_supply_proposals").select("id,revision,status").eq("school_id",ctx.schoolId).eq("academic_year_id",year.id).eq("class_id",(assignment as any).class_id).eq("subject_id",(assignment as any).subject_id).eq("teacher_id",ctx.userId).eq("assignment_id",assignmentId).is("deleted_at",null).maybeSingle()
+  const universalId=String((assignment as any).pedagogical_assignment_id ?? assignmentId)
+  const {data:existing}=await admin.from("school_supply_proposals").select("id,revision,status").eq("school_id",ctx.schoolId).eq("academic_year_id",year.id).eq("pedagogical_assignment_id",universalId).eq("teacher_id",ctx.userId).is("deleted_at",null).maybeSingle()
   const nextStatus=existing?.status === "approved" ? "submitted" : (existing?.status === "submitted" ? "submitted" : "draft")
-  const payload={school_id:ctx.schoolId,academic_year_id:year.id,assignment_id:assignmentId,class_id:(assignment as any).class_id,subject_id:(assignment as any).subject_id,teacher_id:ctx.userId,configurations:parsed,status:nextStatus,revision:Number(existing?.revision ?? 0)+1,review_note:null}
+  const payload={school_id:ctx.schoolId,academic_year_id:year.id,assignment_id:assignmentId,pedagogical_assignment_id:universalId,class_id:(assignment as any).class_id,subject_id:(assignment as any).subject_id || null,teacher_id:ctx.userId,configurations:parsed,status:nextStatus,revision:Number(existing?.revision ?? 0)+1,review_note:null}
   const {error}=await admin.from("school_supply_proposals").upsert(payload,{onConflict:"school_id,academic_year_id,class_id,subject_id,teacher_id"})
   if(error)return {ok:false,error:error.message}
   revalidatePath("/dashboard/pedagogie/fournitures")
