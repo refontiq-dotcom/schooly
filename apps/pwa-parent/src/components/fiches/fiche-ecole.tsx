@@ -14,6 +14,8 @@ import { BadgeCycle, BadgeSerie, ServiceIcon } from "@/components/fiches/badges"
 
 type FicheResponse = {
   ecole: { id: string; nom: string; ville: string | null; adresse: string | null; telephone: string | null; email: string | null; logo: string | null }
+  formations: { key: string; label: string; levels: { grade_level_name: string; series: string[]; diploma: string }[] }[]
+  formation: { key: string; label: string; levels: { grade_level_name: string; series: string[]; diploma: string }[] } | null
   cycles: { cycles: { key: string; label: string; levels: { grade_level_name: string; series: string[]; diploma: string }[] }[] }
   tarifs: { currency: string; registration_fee?: { amount: number }; academic_fee?: { amount: number }; registration_fees?: { amount: number; status: string }[]; school_fees?: { amount: number; status: string }[]; exam_fees?: { class_name: string; exam_name: string; amount: number; amount_affecte?: number; amount_non_affecte?: number }[]; custom_fees?: { id: string; label: string; amount: number; status: string }[]; installments: { label: string; amount: number; due_date: string | null }[]; notes?: string }
   services: { transport: { enabled: boolean; vehicle_icon: string; zones: { name: string; price: number }[] }; cantine: { enabled: boolean; meal_icon: string; regimes: { name: string; price: number }[] }; tenues: { enabled: boolean; items: { name: string }[] } }
@@ -27,6 +29,7 @@ function fcfa(n: number): string {
 
 export function FicheEcole({ schoolId, apiBase }: { schoolId: string; apiBase: string }) {
   const [data, setData] = useState<FicheResponse | null>(null)
+  const [formation, setFormation] = useState("")
   const [classe, setClasse] = useState("")
   const [loadingF, setLoadingF] = useState(false)
   const [error, setError] = useState("")
@@ -37,6 +40,11 @@ export function FicheEcole({ schoolId, apiBase }: { schoolId: string; apiBase: s
       .then((j: FicheResponse) => setData(j))
       .catch(() => setError("Fiche introuvable ou ecole non publiee."))
   }, [apiBase, schoolId])
+
+  function selectFormation(next: string) {
+    setFormation(next)
+    setClasse("")
+  }
 
   async function selectClasse(next: string) {
     setClasse(next)
@@ -51,6 +59,8 @@ export function FicheEcole({ schoolId, apiBase }: { schoolId: string; apiBase: s
 
   if (error) return (<div className="mx-auto max-w-2xl space-y-2 p-6"><h1 className="text-xl font-semibold">Fiche ecole</h1><p className="text-sm text-muted-foreground">{error}</p></div>)
   if (!data) return (<div className="mx-auto flex max-w-2xl items-center gap-2 p-6 text-sm text-muted-foreground"><Loader2 className="size-4 animate-spin" /> Chargement de la fiche…</div>)
+  const selectedFormation = data.formations?.find((x) => x.key === formation) ?? data.formation
+  const activeLevels = selectedFormation?.levels ?? []
   const f = data.fournitures
   return (
     <div className="mx-auto max-w-2xl space-y-4 p-4 sm:p-6">
@@ -63,6 +73,9 @@ export function FicheEcole({ schoolId, apiBase }: { schoolId: string; apiBase: s
           {data.ecole.email ? (<span className="flex items-center gap-1"><Mail className="size-3.5" />{data.ecole.email}</span>) : null}
         </p></div>
       </CardContent></Card>
+      <Card><CardHeader><CardTitle className="text-base">Choisir votre formation</CardTitle></CardHeader>
+      <CardContent className="space-y-3"><p className="text-sm text-muted-foreground">Un seul établissement, plusieurs pôles : choisissez le parcours qui correspond à votre enfant.</p>
+      <div className="grid gap-2 sm:grid-cols-2">{data.formations.map((c) => (<button key={c.key} type="button" onClick={() => selectFormation(c.key)} className={`rounded-lg border p-3 text-left transition ${formation === c.key ? "border-primary bg-primary/5 ring-1 ring-primary" : "hover:bg-muted/50"}`}><div className="font-medium">{c.label}</div><div className="mt-1 text-xs text-muted-foreground">{c.levels.length} niveau{c.levels.length > 1 ? "x" : ""} proposé{c.levels.length > 1 ? "s" : ""}</div></button>))}</div></CardContent></Card>
       <Card><CardHeader><CardTitle className="text-base">Offre academique</CardTitle></CardHeader>
       <CardContent className="space-y-3">
         {data.cycles.cycles.map((c) => (
@@ -80,13 +93,13 @@ export function FicheEcole({ schoolId, apiBase }: { schoolId: string; apiBase: s
           </div>
         ))}
       </CardContent></Card>
-      <Card><CardHeader><CardTitle className="text-base">Tarifs ({data.tarifs.currency})</CardTitle></CardHeader>
+      <Card><CardHeader><CardTitle className="text-base">Parcours {selectedFormation?.label ? `— ${selectedFormation.label}` : ""}</CardTitle></CardHeader><CardContent className="space-y-1.5">{selectedFormation ? selectedFormation.levels.map((l) => <div key={l.grade_level_name} className="rounded-md border p-2 text-sm"><span className="font-medium">{l.grade_level_name}</span>{l.series.length ? <span className="ml-2 text-muted-foreground">{l.series.join(" · ")}</span> : null}{l.diploma !== "aucun" ? <Badge variant="secondary" className="ml-2">{l.diploma}</Badge> : null}</div>) : <p className="text-sm text-muted-foreground">Sélectionnez un pôle pour voir son parcours.</p>}</CardContent></Card><Card><CardHeader><CardTitle className="text-base">Tarifs {selectedFormation?.label ? `— ${selectedFormation.label}` : ""} ({data.tarifs.currency})</CardTitle></CardHeader>
       <CardContent className="space-y-2 text-sm">
         {data.tarifs.registration_fees?.length ? data.tarifs.registration_fees.map((f) => <p key={`ins-${f.status}`}>Frais d'inscription — {f.status === "affecte" ? "élève affecté" : "élève non affecté"} : <strong>{fcfa(f.amount)}</strong></p>) : data.tarifs.registration_fee ? (<p>Frais d'inscription : <strong>{fcfa(data.tarifs.registration_fee.amount)}</strong></p>) : null}
         {data.tarifs.school_fees?.length ? data.tarifs.school_fees.map((f) => <p key={`sco-${f.status}`}>Frais de scolarité — {f.status === "affecte" ? "élève affecté" : "élève non affecté"} : <strong>{fcfa(f.amount)}</strong></p>) : data.tarifs.academic_fee ? (<p>Frais de scolarité : <strong>{fcfa(data.tarifs.academic_fee.amount)}</strong></p>) : null}
         {data.tarifs.custom_fees?.length ? <div className="border-t pt-2"><p className="font-medium">Autres frais</p>{data.tarifs.custom_fees.map((f) => <p key={f.id}>{f.label} — {f.status === "affecte" ? "élève affecté" : "élève non affecté"} : <strong>{fcfa(f.amount)}</strong></p>)}</div> : null}
         {data.tarifs.exam_fees?.length ? <div className="border-t pt-2"><p className="font-medium">Droits d'examen</p>{data.tarifs.exam_fees.map((f) => <div key={f.class_name + f.exam_name}><p>{f.class_name} — {f.exam_name}</p><p className="pl-3">Élève affecté : <strong>{fcfa(f.amount_affecte ?? f.amount)}</strong></p><p className="pl-3">Élève non affecté : <strong>{fcfa(f.amount_non_affecte ?? f.amount)}</strong></p></div>)}</div> : null}
-        {data.tarifs.installments.map((t, i) => (<p key={i}>{t.label} : <strong>{fcfa(t.amount)}</strong>{t.due_date ? ` — ${t.due_date}` : ""}</p>))}
+        {(data.tarifs.installments ?? []).map((t, i) => (<p key={i}>{t.label} : <strong>{fcfa(t.amount)}</strong>{t.due_date ? ` — ${t.due_date}` : ""}</p>))}
         {data.tarifs.notes ? <p className="text-muted-foreground">{data.tarifs.notes}</p> : null}
       </CardContent></Card>
       <Card><CardHeader><CardTitle className="text-base">Services optionnels</CardTitle></CardHeader>
@@ -98,7 +111,7 @@ export function FicheEcole({ schoolId, apiBase }: { schoolId: string; apiBase: s
       </CardContent></Card>
       <Card><CardHeader><CardTitle className="text-base">Fournitures par classe</CardTitle></CardHeader>
       <CardContent className="space-y-3">
-        <label className="block space-y-1.5"><span className="text-xs text-muted-foreground">Classe de votre enfant</span><Select value={classe} onChange={(e) => selectClasse(e.target.value)}><option value="">Choisir une classe…</option>{data.classes.map((c) => (<option key={c} value={c}>{c}</option>))}</Select></label>
+        <label className="block space-y-1.5"><span className="text-xs text-muted-foreground">Classe de votre enfant</span><Select value={classe} onChange={(e) => selectClasse(e.target.value)}><option value="">Choisir une classe…</option>{(activeLevels.length ? activeLevels.map((x) => x.grade_level_name) : data.classes).map((c) => (<option key={c} value={c}>{c}</option>))}</Select></label>
         {loadingF ? (<p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="size-4 animate-spin" /> Chargement…</p>) : null}
         {classe && f ? (
           <div className="space-y-3 text-sm">
@@ -126,7 +139,7 @@ export function FicheEcole({ schoolId, apiBase }: { schoolId: string; apiBase: s
         ) : classe && !f ? (
           <p className="text-sm text-muted-foreground">Liste en cours de publication par l&apos;ecole.</p>
         ) : (
-          <p className="text-sm text-muted-foreground">Selectionnez une classe pour afficher tarifs et fournitures.</p>
+          <p className="text-sm text-muted-foreground">{formation ? "Sélectionnez une classe pour poursuivre le parcours." : "Sélectionnez d’abord un pôle de formation."}</p>
         )}
       </CardContent></Card>
     </div>
