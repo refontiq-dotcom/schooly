@@ -70,6 +70,28 @@ export async function requestGradeChange(form: FormData): Promise<{ error?: stri
   return {}
 }
 
+export async function getGradesForIT(): Promise<{ error?: string; data?: Array<{
+  id: string; revision: number; label: string; value: number | null; max_value: number;
+  absence_status: string; student: string; subject: string
+}> }> {
+  const db = await createClient()
+  const guard = await requireSchoolRole(db, { allowedRoles: ["informatique"] })
+  if (!guard.ok) return { error: denial(guard.reason, null).error }
+  const { data, error } = await db.from("grade_entries")
+    .select("id,revision,label,value,max_value,absence_status,enrollments(students(first_name,last_name)),subjects(name)")
+    .eq("school_id", guard.context.schoolId).is("deleted_at", null)
+    .order("created_at", { ascending: false }).limit(500)
+  if (error) return { error: error.message }
+  return {
+    data: (data ?? []).map((row: any) => ({
+      id: row.id, revision: row.revision, label: row.label ?? "Évaluation",
+      value: row.value, max_value: row.max_value, absence_status: row.absence_status,
+      student: [row.enrollments?.students?.last_name, row.enrollments?.students?.first_name].filter(Boolean).join(" "),
+      subject: row.subjects?.name ?? "Matière",
+    }))
+  }
+}
+
 export async function listPendingGradeChangeRequests(): Promise<{ error?: string; data?: GradeChangeRequest[] }> {
   const db = await createClient()
   const guard = await requireSchoolRole(db, { allowedRoles: [...TEACHING_ROLES, "informatique", "direction", "super_admin"] })
