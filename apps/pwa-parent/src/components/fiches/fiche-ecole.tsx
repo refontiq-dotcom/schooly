@@ -14,7 +14,7 @@ import { Select } from "@/components/ui/select"
 import { BadgeCycle, BadgeSerie, ServiceIcon } from "@/components/fiches/badges"
 
 type FicheResponse = {
-  ecole: { id: string; nom: string; ville: string | null; adresse: string | null; telephone: string | null; email: string | null; logo: string | null }
+  ecole: { id: string; nom: string; ville: string | null; communes: string[]; adresse: string | null; telephone: string | null; email: string | null; logo: string | null }
   formations: { key: string; label: string; levels: { grade_level_name: string; series: string[]; diploma: string }[] }[]
   formation: { key: string; label: string; levels: { grade_level_name: string; series: string[]; diploma: string }[] } | null
   cycles: { cycles: { key: string; label: string; levels: { grade_level_name: string; series: string[]; diploma: string }[] }[] }
@@ -87,7 +87,7 @@ export function FicheEcole({ schoolId, apiBase }: { schoolId: string; apiBase: s
         {data.ecole.logo ? <img src={data.ecole.logo} alt="" className="size-16 rounded-lg border object-contain" /> : null}
         <div><h1 className="text-xl font-semibold">{data.ecole.nom}</h1>
         <p className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-          {data.ecole.ville ? (<span className="flex items-center gap-1"><MapPin className="size-3.5" />{data.ecole.ville}</span>) : null}
+          {data.ecole.communes?.length ? (<span className="flex items-center gap-1"><MapPin className="size-3.5" />{data.ecole.communes.join(" · ")}</span>) : data.ecole.ville ? (<span className="flex items-center gap-1"><MapPin className="size-3.5" />{data.ecole.ville}</span>) : null}
           {data.ecole.telephone ? (<span className="flex items-center gap-1"><Phone className="size-3.5" />{data.ecole.telephone}</span>) : null}
           {data.ecole.email ? (<span className="flex items-center gap-1"><Mail className="size-3.5" />{data.ecole.email}</span>) : null}
         </p></div>
