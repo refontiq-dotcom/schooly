@@ -172,6 +172,16 @@ export interface ExamFeeItem {
 }
 
 /** Contenu de `schools.fees_structure`. */
+export interface FeeProfile {
+  registration_fees?: FeeItem[]
+  school_fees?: FeeItem[]
+  exam_fees?: ExamFeeItem[]
+  custom_fees?: CustomFeeItem[]
+  installments: FeeInstallment[]
+  currency: string
+  notes?: string
+}
+
 export interface FeesStructure {
   /** Champs historiques conservés pour compatibilité. */
   registration_fee?: FeeItem
@@ -181,6 +191,8 @@ export interface FeesStructure {
   school_fees?: FeeItem[]
   /** Droits d'examen par classe diplômante. */
   exam_fees?: ExamFeeItem[]
+  /** Tarification séparée par pôle d'enseignement. */
+  fee_profiles?: Partial<Record<EducationCycle, FeeProfile>>
   /** Frais personnalisés ajoutés par le directeur. */
   custom_fees?: CustomFeeItem[]
   installments: FeeInstallment[]
