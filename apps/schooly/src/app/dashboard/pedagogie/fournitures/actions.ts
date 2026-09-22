@@ -110,16 +110,46 @@ export async function saveTeacherSupplyProposal(assignmentId:string, configurati
   const admin=adminClient()
   const year=await currentYearId(admin,ctx.schoolId)
   if(!year)return {ok:false,error:"Aucune année scolaire en cours."}
-  const {data:assignment}=await admin.from("class_subject_assignments").select("id,class_id,subject_id,pedagogical_assignment_id,classes(name),subjects(name)").eq("id",assignmentId).eq("school_id",ctx.schoolId).eq("teacher_id",ctx.userId).is("deleted_at",null).maybeSingle()
-  if(!assignment)return {ok:false,error:"Cette affectation pédagogique est introuvable."}
-  const className=String((assignment as any).classes?.name ?? "")
+
+  const {data:universal}=await admin.from("pedagogical_assignments")
+    .select("id,class_id,scope,classes(name)")
+    .eq("id",assignmentId).eq("school_id",ctx.schoolId).eq("academic_year_id",year.id)
+    .eq("status","active").is("deleted_at",null).maybeSingle()
+
+  let assignment:any=universal
+  if(!assignment){
+    const {data:legacy}=await admin.from("class_subject_assignments")
+      .select("id,class_id,subject_id,pedagogical_assignment_id,classes(name),subjects(name)")
+      .eq("id",assignmentId).eq("school_id",ctx.schoolId).eq("teacher_id",ctx.userId).is("deleted_at",null).maybeSingle()
+    if(!legacy)return {ok:false,error:"Cette affectation pédagogique est introuvable."}
+    assignment=legacy
+  } else {
+    const {data:member}=await admin.from("pedagogical_assignment_members")
+      .select("id").eq("assignment_id",assignmentId).eq("user_id",ctx.userId).eq("is_primary",true).maybeSingle()
+    if(!member)return {ok:false,error:"Vous n'êtes pas responsable de cette affectation."}
+    assignment.subject_id=null
+  }
+
+  const className=String(assignment.classes?.name ?? "")
   const parsed=parseClassSupplies(configurations,className)
-  const universalId=String((assignment as any).pedagogical_assignment_id ?? assignmentId)
-  const {data:existing}=await admin.from("school_supply_proposals").select("id,revision,status").eq("school_id",ctx.schoolId).eq("academic_year_id",year.id).eq("pedagogical_assignment_id",universalId).eq("teacher_id",ctx.userId).is("deleted_at",null).maybeSingle()
+  const universalId=String(assignment.pedagogical_assignment_id ?? assignment.id)
+  const {data:existing}=await admin.from("school_supply_proposals")
+    .select("id,revision,status")
+    .eq("school_id",ctx.schoolId).eq("academic_year_id",year.id)
+    .eq("pedagogical_assignment_id",universalId).eq("teacher_id",ctx.userId)
+    .is("deleted_at",null).maybeSingle()
+
   const nextStatus=existing?.status === "approved" ? "submitted" : (existing?.status === "submitted" ? "submitted" : "draft")
-  const payload={school_id:ctx.schoolId,academic_year_id:year.id,assignment_id:assignmentId,pedagogical_assignment_id:universalId,class_id:(assignment as any).class_id,subject_id:(assignment as any).subject_id || null,teacher_id:ctx.userId,configurations:parsed,status:nextStatus,revision:Number(existing?.revision ?? 0)+1,review_note:null}
-  const {error}=await admin.from("school_supply_proposals").upsert(payload,{onConflict:"school_id,academic_year_id,class_id,subject_id,teacher_id"})
-  if(error)return {ok:false,error:error.message}
+  const payload={
+    school_id:ctx.schoolId,academic_year_id:year.id,
+    assignment_id:universalId,pedagogical_assignment_id:universalId,
+    class_id:assignment.class_id,subject_id:assignment.subject_id || null,teacher_id:ctx.userId,
+    configurations:parsed,status:nextStatus,revision:Number(existing?.revision ?? 0)+1,review_note:null
+  }
+  let write:any
+  if(existing?.id) write=await admin.from("school_supply_proposals").update(payload).eq("id",existing.id).eq("teacher_id",ctx.userId)
+  else write=await admin.from("school_supply_proposals").insert(payload)
+  if(write.error)return {ok:false,error:write.error.message}
   revalidatePath("/dashboard/pedagogie/fournitures")
   revalidatePath("/dashboard/direction/informations")
   return {ok:true,data:{status:nextStatus}}
@@ -131,9 +161,19 @@ export async function submitTeacherSupplyProposal(assignmentId:string):Promise<R
   const admin=adminClient()
   const year=await currentYearId(admin,ctx.schoolId)
   if(!year)return {ok:false,error:"Aucune année scolaire en cours."}
-  const {data:assignment}=await admin.from("class_subject_assignments").select("id,class_id,subject_id,classes(name)").eq("id",assignmentId).eq("school_id",ctx.schoolId).eq("teacher_id",ctx.userId).is("deleted_at",null).maybeSingle()
-  if(!assignment)return {ok:false,error:"Affectation introuvable."}
-  const {data:proposal}=await admin.from("school_supply_proposals").select("id,configurations").eq("school_id",ctx.schoolId).eq("academic_year_id",year.id).eq("assignment_id",assignmentId).eq("teacher_id",ctx.userId).is("deleted_at",null).maybeSingle()
+
+  const {data:assignment}=await admin.from("pedagogical_assignments")
+    .select("id,class_id,scope,classes(name)")
+    .eq("id",assignmentId).eq("school_id",ctx.schoolId).eq("academic_year_id",year.id)
+    .eq("status","active").is("deleted_at",null).maybeSingle()
+  if(!assignment)return {ok:false,error:"Affectation pédagogique introuvable."}
+  const {data:member}=await admin.from("pedagogical_assignment_members")
+    .select("id").eq("assignment_id",assignmentId).eq("user_id",ctx.userId).eq("is_primary",true).maybeSingle()
+  if(!member)return {ok:false,error:"Vous n'êtes pas responsable de cette affectation."}
+
+  const {data:proposal}=await admin.from("school_supply_proposals")
+    .select("id,configurations").eq("school_id",ctx.schoolId).eq("academic_year_id",year.id)
+    .eq("pedagogical_assignment_id",assignmentId).eq("teacher_id",ctx.userId).is("deleted_at",null).maybeSingle()
   if(!proposal)return {ok:false,error:"Enregistrez votre proposition avant de la soumettre."}
   const parsed=parseClassSupplies(proposal.configurations,String((assignment as any).classes?.name ?? ""))
   if(!parsed.manuals.length&&!parsed.stationery.length&&!parsed.equipment.length)return {ok:false,error:"Ajoutez au moins une fourniture."}
