@@ -174,7 +174,7 @@ export default async function SettingsPage({
                     </CardContent>
                   </Card>
                   {requiredDocuments?.ok ? <RequiredDocuments initialDocuments={requiredDocuments.documents} /> : <Card><CardContent className="p-6 text-sm text-muted-foreground">{requiredDocuments?.error ?? "Configuration indisponible."}</CardContent></Card>}
-                  <InformationsWizard state={fiche.state} />
+                  <InformationsWizard state={fiche} />
                 </div>
               ) : (
                 <Card><CardContent className="p-6 text-sm text-muted-foreground">{fiche?.error ?? "Cette rubrique n’est pas disponible pour votre compte."}</CardContent></Card>
