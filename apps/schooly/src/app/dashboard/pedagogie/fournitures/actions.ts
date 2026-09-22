@@ -97,7 +97,7 @@ export async function getTeacherSupplyProposals(): Promise<Result<TeacherSupplyP
   const proposals = await admin.from("school_supply_proposals").select("id,assignment_id,class_id,subject_id,status,revision,review_note,configurations").eq("school_id",ctx.schoolId).eq("academic_year_id",year.id).eq("teacher_id",ctx.userId).is("deleted_at",null)
   if (proposals.error) return { ok:false,error:proposals.error.message }
   const byKey = new Map((proposals.data ?? []).map((p:any)=>[String(p.assignment_id ?? "") || String(p.class_id)+":"+String(p.subject_id)+":"+String(ctx.userId),p]))
-  return { ok:true,data:assignments.data.map(a=>{
+  return { ok:true,data:(assignments.data ?? []).map(a=>{
     const p=(byKey.get(a.assignment_id) ?? byKey.get(a.class_id+":"+a.subject_id+":"+ctx.userId)) as any
     const config=parseClassSupplies(p?.configurations,a.class_name)
     return { id:p?.id,assignment_id:a.assignment_id,class_id:a.class_id,subject_id:a.subject_id,class_name:a.class_name,subject_name:a.subject_name,status:p?.status ?? "draft",revision:Number(p?.revision ?? 1),review_note:p?.review_note ?? null,configurations:config,scope:a.scope }
