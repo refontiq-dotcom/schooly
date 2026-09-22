@@ -254,7 +254,8 @@ function ModeBDocumentComponent({ data }: { data: ModeBData }) {
     feeRows.push({ label: "Frais de scolarité — " + (STATUS_LABELS[f.status] ?? "tous"), amount: f.amount })
   }
   for (const f of data.fees.exam_fees ?? []) {
-    feeRows.push({ label: "Droit d'examen — " + f.class_name + " / " + f.exam_name, amount: f.amount })
+    feeRows.push({ label: "Droit d'examen — " + f.class_name + " / " + f.exam_name + " — affecté", amount: f.amount_affecte ?? f.amount })
+    feeRows.push({ label: "Droit d'examen — " + f.class_name + " / " + f.exam_name + " — non affecté", amount: f.amount_non_affecte ?? f.amount })
   }
   for (const f of data.fees.custom_fees ?? []) {
     feeRows.push({ label: "Autres frais — " + f.label + " / " + (STATUS_LABELS[f.status] ?? "tous"), amount: f.amount })
