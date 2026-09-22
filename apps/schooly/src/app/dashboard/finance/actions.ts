@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache"
 import crypto from "crypto"
 import { generateFeeItemsForEnrollment } from "@/lib/finance-fees"
 import { planSiblingDiscounts } from "@/lib/discounts"
+import { recordPayment } from "@/lib/record-payment"
 
 type ActionResult<T = void> = {
   error?: string
@@ -146,89 +147,36 @@ export async function createPayment(formData: FormData): Promise<ActionResult<{ 
     process.env.SUPABASE_SECRET_KEY!
   )
 
-  const { data: enrollment } = await admin
-    .from("enrollments")
-    .select("school_id")
-    .eq("id", enrollmentId)
-    .single()
-
-  if (!enrollment || enrollment.school_id !== schoolId) {
-    return { error: "Inscription introuvable ou accès non autorisé." }
-  }
-
-  // Session de caisse OBLIGATOIRE pour l'espèces : l'argent physique doit être
-  // retrouvé à la clôture. L'id de session vient du SERVEUR — jamais du client.
-  let sessionId: string | null = null
-  if (paymentMethod === "cash") {
-    const { data: openSession } = await admin
-      .from("cash_sessions")
-      .select("id")
-      .eq("school_id", schoolId)
-      .eq("status", "open")
-      .is("deleted_at", null)
-      .maybeSingle()
-    if (!openSession) {
-      return { error: "Ouvrez une session de caisse avant d'encaisser en espèces." }
-    }
-    sessionId = openSession.id
-  }
-
-  // Solde : impossible d'encaisser au-delà du reste à payer sans le déclarer
-  // explicitement comme une avance volontaire.
-  const { data: feeRows } = await admin
-    .from("student_fee_items")
-    .select("amount")
-    .eq("enrollment_id", enrollmentId)
-    .is("deleted_at", null)
-  const { data: paidRows } = await admin
-    .from("payments")
-    .select("amount")
-    .eq("enrollment_id", enrollmentId)
-    .is("deleted_at", null)
-  const hasFeeItems = (feeRows ?? []).length > 0
-  const expected = (feeRows ?? []).reduce((s: number, r: { amount: number }) => s + r.amount, 0)
-  const paid = (paidRows ?? []).reduce((s: number, r: { amount: number }) => s + r.amount, 0)
-  const balance = expected - paid
-  if (hasFeeItems && amount > balance && !allowOverpay) {
-    return {
-      error:
-        balance > 0
-          ? `Montant supérieur au solde restant (${balance.toLocaleString("fr-FR")} FCFA). Cochez « Enregistrer comme avance » si c'est volontaire.`
-          : "Cet élève est déjà soldé. Cochez « Enregistrer comme avance » pour un versement volontaire.",
-    }
-  }
-
-  const { data: payment, error: paymentError } = await admin.from("payments").insert({
-    school_id: schoolId,
-    enrollment_id: enrollmentId,
+  // P0-2 : écriture atomique + idempotente via la RPC `record_payment`
+  // (remplace les 5 requêtes + le double insert payment→receipt).
+  // Clé serveur par appel : un retry réseau rejoue la même clé.
+  // requireCashSession=true : discipline de clôture (cash sans session refusé).
+  const outcome = await recordPayment(admin, {
+    schoolId,
+    enrollmentId,
     amount,
-    payment_method: paymentMethod,
+    paymentMethod,
     reference: reference || null,
-    cash_session_id: sessionId,
-    received_by: userId,
-  }).select("id").single()
-
-  if (paymentError) return { error: paymentError.message }
-
-  const verificationCode = crypto.randomBytes(16).toString("hex").toUpperCase()
-  const receiptNumber = `R-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`
-  const qrCodeData = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/verify/${verificationCode}`
-
-  const { error: receiptError } = await admin.from("receipts").insert({
-    school_id: schoolId,
-    payment_id: payment.id,
-    receipt_number: receiptNumber,
-    verification_code: verificationCode,
-    qr_code_data: qrCodeData,
-    issued_by: userId,
+    cashSessionId: null,
+    receivedBy: userId,
+    idempotencyKey: crypto.randomUUID(),
+    allowOverpay,
+    requireCashSession: true,
+    appUrl: process.env.NEXT_PUBLIC_APP_URL || null,
   })
 
-  if (receiptError) return { error: receiptError.message }
+  if (!outcome.ok) return { error: outcome.error }
 
   revalidatePath("/dashboard/caisse")
   revalidatePath("/dashboard/caisse/history")
   revalidatePath("/dashboard/direction/finance")
-  return { data: { receiptNumber, verificationCode, balanceAfter: hasFeeItems ? balance - amount : null } }
+  return {
+    data: {
+      receiptNumber: outcome.row.receipt_number,
+      verificationCode: outcome.row.verification_code,
+      balanceAfter: outcome.row.balance_after,
+    },
+  }
 }
 
 // ============================================ SESSIONS DE CAISSE ================
@@ -310,7 +258,14 @@ export async function openCashSession(formData: FormData): Promise<ActionResult>
     status: "open",
   })
 
-  if (error) return { error: error.message }
+  if (error) {
+    // Course sur l'index partiel uq_cash_open_per_school : la garde
+    // `existing` ci-dessus ne tient pas sous concurrence, l'index tranche.
+    if (error.code === "23505" || error.message.includes("uq_cash_open_per_school")) {
+      return { error: "Une session de caisse est déjà ouverte." }
+    }
+    return { error: error.message }
+  }
 
   revalidatePath("/dashboard/caisse")
   return {}

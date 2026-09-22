@@ -11,6 +11,7 @@ import {
 } from "@/utils/supabase/require-role"
 import { alertEnrollmentConfirmed } from "@/lib/telegram"
 import { generateFeeItemsForEnrollment } from "@/lib/finance-fees"
+import { recordPayment } from "@/lib/record-payment"
 import {
   generateEnrollmentMatricule,
   isPaymentMethod,
@@ -178,7 +179,12 @@ export async function createPreEnrollment(formData: FormData): Promise<ActionRes
     expires_at: expiresAt.toISOString(),
   })
 
-  if (error) return { error: error.message }
+  if (error) {
+    if (error.code === "23505" || error.message.includes("uq_pre_enrollments_school_code")) {
+      return { error: "Code déjà utilisé — réessayez." }
+    }
+    return { error: error.message }
+  }
 
   revalidatePath(`/enroll/${schoolId}`)
   return { data: { code } }
@@ -334,36 +340,32 @@ async function collectPayment(opts: {
   paymentMethod: PaymentMethod
   reference: string | null
 }): Promise<ActionResult<{ receiptNumber: string; verificationCode: string }>> {
-  const { data: payment, error: paymentError } = await opts.admin
-    .from("payments")
-    .insert({
-      school_id: opts.schoolId,
-      enrollment_id: opts.enrollmentId,
-      amount: opts.amount,
-      payment_method: opts.paymentMethod,
-      reference: opts.reference,
-      received_by: opts.userId,
-    })
-    .select("id")
-    .single()
-
-  if (paymentError) return { error: paymentError.message }
-
-  const verificationCode = crypto.randomBytes(16).toString("hex").toUpperCase()
-  const receiptNumber = `R-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`
-  const qrCodeData = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/verify/${verificationCode}`
-
-  const { error: receiptError } = await opts.admin.from("receipts").insert({
-    school_id: opts.schoolId,
-    payment_id: payment.id,
-    receipt_number: receiptNumber,
-    verification_code: verificationCode,
-    qr_code_data: qrCodeData,
-    issued_by: opts.userId,
+  // P0-2 : écriture atomique + idempotente via la RPC `record_payment`.
+  // requireCashSession=false : comportement historique du guichet — le cash
+  // sans session ouverte est toléré (paiement non rattaché). allowOverpay=true :
+  // le guichet ne connaît pas le solde au moment de l'encaissement (comportement
+  // historique : aucun contrôle de dépassement côté admissions).
+  const outcome = await recordPayment(opts.admin, {
+    schoolId: opts.schoolId,
+    enrollmentId: opts.enrollmentId,
+    amount: opts.amount,
+    paymentMethod: opts.paymentMethod,
+    reference: opts.reference,
+    cashSessionId: null,
+    receivedBy: opts.userId,
+    idempotencyKey: crypto.randomUUID(),
+    allowOverpay: true,
+    requireCashSession: false,
+    appUrl: process.env.NEXT_PUBLIC_APP_URL || null,
   })
 
-  if (receiptError) return { error: receiptError.message }
-  return { data: { receiptNumber, verificationCode } }
+  if (!outcome.ok) return { error: outcome.error }
+  return {
+    data: {
+      receiptNumber: outcome.row.receipt_number,
+      verificationCode: outcome.row.verification_code,
+    },
+  }
 }
 
 async function notifyEnrollment(schoolId: string, studentName: string, amount: number) {
