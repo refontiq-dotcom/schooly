@@ -21,6 +21,7 @@ type FicheResponse = {
   tarifs: { currency: string; registration_fee?: { amount: number }; academic_fee?: { amount: number }; registration_fees?: { amount: number; status: string }[]; school_fees?: { amount: number; status: string }[]; exam_fees?: { class_name: string; exam_name: string; amount: number; amount_affecte?: number; amount_non_affecte?: number }[]; custom_fees?: { id: string; label: string; amount: number; status: string }[]; installments: { label: string; amount: number; due_date: string | null }[]; notes?: string }
   services: { transport: { enabled: boolean; vehicle_icon: string; zones: { name: string; price: number }[] }; cantine: { enabled: boolean; meal_icon: string; regimes: { name: string; price: number }[] }; tenues: { enabled: boolean; items: { name: string }[] } }
   classes: string[]
+  pieces_a_fournir: { id: string; label: string; required: boolean }[]
   fournitures: { manuals: { subject: string; title: string; editor: string; icon: string; required_for_inscription: boolean }[]; stationery: { name: string; quantity: string; icon: string }[]; equipment: { name: string; quantity: string; icon: string; required_for_inscription: boolean }[] } | null
 }
 
@@ -128,7 +129,7 @@ export function FicheEcole({ schoolId, apiBase }: { schoolId: string; apiBase: s
         {data.services.tenues.enabled ? (<p className="flex items-center gap-2"><ServiceIcon name="shirt" />Tenues : {data.services.tenues.items.map((t) => t.name).join(" · ")}</p>) : null}
         {!data.services.transport.enabled && !data.services.cantine.enabled && !data.services.tenues.enabled ? (<p className="text-muted-foreground">Aucun service optionnel declare.</p>) : null}
       </CardContent></Card>
-      <PreinscriptionForm formations={data.formations} formation={formation} onFormationChange={selectFormation} schoolId={schoolId} />
+      <PreinscriptionForm formations={data.formations} formation={formation} onFormationChange={selectFormation} schoolId={schoolId} requiredDocuments={data.pieces_a_fournir} />
       <Card><CardHeader><CardTitle className="text-base">Fournitures par classe</CardTitle></CardHeader>
       <CardContent className="space-y-3">
         <label className="block space-y-1.5"><span className="text-xs text-muted-foreground">Classe de votre enfant</span><Select value={classe} onChange={(e) => selectClasse(e.target.value)}><option value="">Choisir une classe…</option>{(activeLevels.length ? activeLevels.map((x) => x.grade_level_name) : data.classes).map((c) => (<option key={c} value={c}>{c}</option>))}</Select></label>
