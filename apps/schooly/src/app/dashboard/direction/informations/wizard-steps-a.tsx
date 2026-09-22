@@ -239,11 +239,11 @@ export function StepOffre({ cycles, onChange }: { cycles: CyclesOffered; onChang
                       const enabled = cycle.series.includes(serie)
                       return <Badge key={serie} variant={enabled ? "default" : "outline"} className="cursor-pointer" onClick={() => {
                         const series = enabled ? cycle.series.filter((s) => s !== serie) : [...cycle.series, serie]
-                        onChange({ ...cycles, cycles: cycles.map((item) => item.key === cycle.key ? { ...item, series } : item) })
+                        onChange({ ...cycles, cycles: cycles.cycles.map((item) => item.key === cycle.key ? { ...item, series } : item) })
                       }}>{serie}</Badge>
                     })}
                     {cycle.series.filter((serie) => !SERIES_BY_CYCLE[cycle.key].includes(serie)).map((serie) => (
-                      <Badge key={serie} variant="default" className="cursor-pointer" onClick={() => onChange({ ...cycles, cycles: cycles.map((item) => item.key === cycle.key ? { ...item, series: item.series.filter((s) => s !== serie) } : item) })}>{serie} ×</Badge>
+                      <Badge key={serie} variant="default" className="cursor-pointer" onClick={() => onChange({ ...cycles, cycles: cycles.cycles.map((item) => item.key === cycle.key ? { ...item, series: item.series.filter((s) => s !== serie) } : item) })}>{serie} ×</Badge>
                     ))}
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -251,7 +251,7 @@ export function StepOffre({ cycles, onChange }: { cycles: CyclesOffered; onChang
                     <Button variant="outline" size="sm" onClick={() => {
                       const value = (customSeries[cycle.key] ?? "").trim()
                       if (!value || cycle.series.some((s) => s.toLowerCase() === value.toLowerCase())) return
-                      onChange({ ...cycles, cycles: cycles.map((item) => item.key === cycle.key ? { ...item, series: [...item.series, value] } : item) })
+                      onChange({ ...cycles, cycles: cycles.cycles.map((item) => item.key === cycle.key ? { ...item, series: [...item.series, value] } : item) })
                       setCustomSeries((state) => ({ ...state, [cycle.key]: "" }))
                     }}><Plus className="size-4" /> Ajouter une filière</Button>
                   </div>
