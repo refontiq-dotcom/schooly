@@ -57,10 +57,16 @@ export async function getRequiredDocuments(): Promise<Result> {
     const schoolId = await schoolIdForCurrentUser()
     if (!schoolId) return { ok: false, error: "Accès refusé." }
     const admin = createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SECRET_KEY!, { auth: { autoRefreshToken: false, persistSession: false } })
-    const { data, error } = await admin.from("required_documents").select("id, nom, obligatoire, applicable_to_level_id").eq("school_id", schoolId).is("deleted_at", null).order("created_at", { ascending: true })
+    const { data, error } = await admin.from("required_documents").select("id, nom, obligatoire, applicable_to_level_id").eq("school_id", schoolId).is("deleted_at", null).is("applicable_to_level_id", null).order("created_at", { ascending: true })
     if (error) return { ok: false, error: "Lecture impossible." }
 
-    const saved = (data ?? []).map((row) => ({
+    const seenLabels = new Set<string>()
+    const saved = (data ?? []).filter((row) => {
+      const key = String(row.nom).trim().toLowerCase()
+      if (seenLabels.has(key)) return false
+      seenLabels.add(key)
+      return true
+    }).map((row) => ({
       id: String(row.id),
       label: String(row.nom),
       required: row.obligatoire !== false,
@@ -82,7 +88,7 @@ export async function saveRequiredDocuments(documents: RequiredDocument[]): Prom
     if (!normalized.length) return { ok: false, error: "Ajoutez au moins une pièce à fournir." }
 
     const admin = createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SECRET_KEY!, { auth: { autoRefreshToken: false, persistSession: false } })
-    const { data: existing, error: existingError } = await admin.from("required_documents").select("id").eq("school_id", schoolId).is("deleted_at", null)
+    const { data: existing, error: existingError } = await admin.from("required_documents").select("id").eq("school_id", schoolId).is("deleted_at", null).is("applicable_to_level_id", null)
     if (existingError) return { ok: false, error: "Lecture impossible." }
 
     const existingIds = new Set((existing ?? []).map((row) => String(row.id)))
