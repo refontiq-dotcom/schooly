@@ -56,6 +56,7 @@ export function StepFees({ fees, onChange }: { fees: FeesStructure; onChange: (n
   const [examClass, setExamClass] = useState("")
   const [examName, setExamName] = useState("")
   const [examAmount, setExamAmount] = useState("")
+  const [examAmountNonAffecte, setExamAmountNonAffecte] = useState("")
   const [customLabel, setCustomLabel] = useState("")
   const [customAmount, setCustomAmount] = useState("")
   const [customStatus, setCustomStatus] = useState<"affecte" | "non_affecte">("non_affecte")
@@ -93,10 +94,12 @@ export function StepFees({ fees, onChange }: { fees: FeesStructure; onChange: (n
       exam_name: name,
       diploma: name.toLowerCase().includes("bepc") ? "bepc" : name.toLowerCase().includes("bac") ? "bac" : "aucun",
       amount: Number(examAmount) || 0,
+      amount_affecte: Number(examAmount) || 0,
+      amount_non_affecte: Number(examAmountNonAffecte) || 0,
       is_mandatory: true,
     }
     onChange({ ...fees, exam_fees: [...(fees.exam_fees ?? []), item] })
-    setExamClass(""); setExamName(""); setExamAmount("")
+    setExamClass(""); setExamName(""); setExamAmount(""); setExamAmountNonAffecte("")
   }
 
   return (
@@ -151,10 +154,11 @@ export function StepFees({ fees, onChange }: { fees: FeesStructure; onChange: (n
               </div>
             </div>
           ))}
-          <div className="grid gap-2 md:grid-cols-3">
-            <Input placeholder="Classe (ex. 3e)" value={examClass} onChange={(e) => setExamClass(e.target.value)} />
-            <Input placeholder="Examen (ex. BEPC)" value={examName} onChange={(e) => setExamName(e.target.value)} />
-            <Input type="number" placeholder="Montant affecté (optionnel)" value={examAmount} onChange={(e) => setExamAmount(e.target.value)} />
+          <div className="grid gap-2 md:grid-cols-4">
+            <Input placeholder="Classe (ex. 3e / CAP / BTS)" value={examClass} onChange={(e) => setExamClass(e.target.value)} />
+            <Input placeholder="Examen (ex. BEPC / CAP / BTS)" value={examName} onChange={(e) => setExamName(e.target.value)} />
+            <Input type="number" placeholder="Montant affecté" value={examAmount} onChange={(e) => setExamAmount(e.target.value)} />
+            <Input type="number" placeholder="Montant non affecté" value={examAmountNonAffecte} onChange={(e) => setExamAmountNonAffecte(e.target.value)} />
           </div>
           <Button variant="outline" size="sm" onClick={addExamFee}><Plus className="size-4" /> Ajouter un droit d'examen</Button>
         </CardContent>
