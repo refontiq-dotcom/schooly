@@ -3,10 +3,10 @@ import { createClient as createAdminClient } from "@supabase/supabase-js"
 import { redirect } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
 import { getPayments } from "@/app/dashboard/finance/actions"
 import { CancelPaymentButton } from "@/app/dashboard/direction/finance/cancel-payment-button"
-import { CreditCard, Download } from "lucide-react"
+import { totalOf } from "../_lib/helpers"
+import { normalizePayments } from "../_lib/types"
 
 export default async function CaisseHistoryPage() {
   const supabase = await createClient()
@@ -28,9 +28,12 @@ export default async function CaisseHistoryPage() {
 
   if (!roleData?.school_id) redirect("/login")
 
-  const { data: payments } = await getPayments(roleData.school_id)
+  const { data: rawPayments } = await getPayments(roleData.school_id)
 
-  const total = (payments || []).reduce((sum: number, p: any) => sum + p.amount, 0)
+  // Même garde de frontière que la page Caisse : aucun `any` sur les montants.
+  const payments = normalizePayments(rawPayments)
+
+  const total = totalOf(payments)
   const canCancel = ["direction", "compta"].includes(roleData.role_code)
 
   return (
@@ -39,7 +42,7 @@ export default async function CaisseHistoryPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Historique des encaissements</h1>
           <p className="text-muted-foreground text-sm mt-1">
-            Total : {total.toLocaleString("fr-FR")} FCFA · {(payments || []).length} transaction(s)
+            Total : {total.toLocaleString("fr-FR")} FCFA · {payments.length} transaction(s)
           </p>
         </div>
       </div>
@@ -61,7 +64,7 @@ export default async function CaisseHistoryPage() {
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {(payments || []).map((p: any) => (
+                {payments.map((p) => (
                   <tr key={p.id} className="hover:bg-muted/30">
                     <td className="p-3 text-muted-foreground">
                       {new Date(p.received_at).toLocaleString("fr-FR")}
@@ -89,7 +92,7 @@ export default async function CaisseHistoryPage() {
                     </td>
                   </tr>
                 ))}
-                {(payments || []).length === 0 && (
+                {payments.length === 0 && (
                   <tr>
                     <td colSpan={8} className="p-6 text-center text-muted-foreground">
                       Aucun encaissement enregistré.
