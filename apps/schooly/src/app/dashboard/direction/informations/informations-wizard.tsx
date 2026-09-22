@@ -89,7 +89,7 @@ export function InformationsWizard({
         />
       )}
       {step === 3 && (
-        <StepFees fees={draft.fees} onChange={(fees) => setDraft({ ...draft, fees })} />
+        <StepFees fees={draft.fees} cycles={draft.cycles.cycles.map((cycle) => cycle.key)} onChange={(fees) => setDraft({ ...draft, fees })} />
       )}
 
       <Card>
