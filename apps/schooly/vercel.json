@@ -3,5 +3,12 @@
   "buildCommand": "npm run build",
   "installCommand": "cd ../.. && npm install",
   "outputDirectory": ".next",
-  "regions": ["cdg1"]
+  "regions": ["cdg1"],
+  "crons": [
+    {
+      "path": "/api/cron/outbox-drain",
+      "schedule": "*/5 * * * *"
+    }
+  ]
 }
+

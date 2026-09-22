@@ -269,6 +269,7 @@ export default async function FinancePage() {
               <CardTitle className="text-base">Relances automatiques (WhatsApp)</CardTitle>
               <CardDescription>
                 File notification_outbox : J-5 préventif, J0 le jour même, J+1 formel, J+7 avertissement. Anti-doublon par échéance et palier.
+                Drain automatique toutes les 5 min — sans provider WhatsApp configuré, les messages partent en mode aperçu (contenu exact visible dans l&apos;historique, aucun envoi).
               </CardDescription>
             </CardHeader>
             <CardContent>
