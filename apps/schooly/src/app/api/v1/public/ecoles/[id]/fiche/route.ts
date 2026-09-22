@@ -91,5 +91,6 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     services,
     classes,
     fournitures: className ? (published[className] ?? null) : null,
+    pieces_a_fournir: requiredDocuments.map(({ id, label, required }) => ({ id, label, required })),
   })
 }
