@@ -2,6 +2,7 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/utils/supabase/server"
 import { createClient as createAdminClient } from "@supabase/supabase-js"
 import { TrouvetouAdminClient } from "./client"
+import { normalizeAds, normalizeReservations, normalizeSchool } from "./_lib/types"
 
 export default async function TrouvetouAdminPage() {
   const supabase = await createClient()
@@ -15,7 +16,7 @@ export default async function TrouvetouAdminPage() {
 
   const { data: roleData } = await admin
     .from("user_school_roles")
-    .select("role_code, school_id")
+    .select("school_id")
     .eq("user_id", user.id)
     .eq("is_active", true)
     .in("role_code", ["direction", "secretariat"])
@@ -46,21 +47,13 @@ export default async function TrouvetouAdminPage() {
     .order("created_at", { ascending: false })
     .limit(10)
 
-  const { data: levels } = await admin
-    .from("grade_levels")
-    .select("id, name, level, cycle")
-    .eq("school_id", schoolId)
-    .is("deleted_at", null)
-    .order("level", { ascending: true })
-
+  // Normalisation à la frontière serveur : le client reçoit déjà du typé,
+  // sans cast `any`. (La requête grade_levels était morte : jamais lue.)
   return (
     <TrouvetouAdminClient
-      schoolId={schoolId}
-      school={school}
-      reservations={reservations || []}
-      ads={ads || []}
-      levels={levels || []}
-      roleCode={roleData.role_code}
+      school={normalizeSchool(school)}
+      reservations={normalizeReservations(reservations)}
+      ads={normalizeAds(ads)}
     />
   )
 }

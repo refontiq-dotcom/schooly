@@ -16,22 +16,18 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog"
+import { errorMessage, profileCompletion, reservationLabel } from "./_lib/helpers"
+import type { TrouvetouAd, TrouvetouReservation, TrouvetouSchool } from "./_lib/types"
 
 interface TrouvetouAdminClientProps {
-  schoolId: string
-  school: any
-  reservations: any[]
-  ads: any[]
-  levels: any[]
-  roleCode: string
+  school: TrouvetouSchool | null
+  reservations: TrouvetouReservation[]
+  ads: TrouvetouAd[]
 }
 
 type Modal = "profile" | "media" | "publication" | "reservation" | "ad" | null
 
-const asStrings = (value: unknown): string[] => Array.isArray(value) ? value.filter((x): x is string => typeof x === "string") : []
-
 export function TrouvetouAdminClient({
-  schoolId: _schoolId,
   school,
   reservations: initialReservations,
   ads: initialAds,
@@ -40,7 +36,7 @@ export function TrouvetouAdminClient({
   const [loading, setLoading] = useState(false)
   const [activeTab, setActiveTab] = useState("overview")
   const [modal, setModal] = useState<Modal>(null)
-  const [selectedReservation, setSelectedReservation] = useState<any>(null)
+  const [selectedReservation, setSelectedReservation] = useState<TrouvetouReservation | null>(null)
   const [qualificationLoading, setQualificationLoading] = useState(false)
 
   const [published, setPublished] = useState(Boolean(school?.published_to_trouvetou))
@@ -50,13 +46,13 @@ export function TrouvetouAdminClient({
   const [itineraire, setItineraire] = useState(school?.itineraire || "")
   const [videoUrl, setVideoUrl] = useState(school?.video_url || "")
   const [coverPhoto, setCoverPhoto] = useState(school?.cover_photo_url || "")
-  const [gallery, setGallery] = useState<string[]>(asStrings(school?.gallery_photos))
-  const [photos360, setPhotos360] = useState<string[]>(asStrings(school?.photos_360))
+  const [gallery, setGallery] = useState<string[]>(school?.gallery_photos ?? [])
+  const [photos360, setPhotos360] = useState<string[]>(school?.photos_360 ?? [])
   const [address, setAddress] = useState(school?.public_address || "")
   const [phone, setPhone] = useState(school?.public_phone || "")
   const [email, setEmail] = useState(school?.public_email || "")
   const [website, setWebsite] = useState(school?.public_website_url || "")
-  const [highlights, setHighlights] = useState<string[]>(asStrings(school?.public_highlights))
+  const [highlights, setHighlights] = useState<string[]>(school?.public_highlights ?? [])
   const [admissionNotes, setAdmissionNotes] = useState(school?.admission_notes || "")
 
   const [reservations] = useState(initialReservations)
@@ -69,18 +65,19 @@ export function TrouvetouAdminClient({
   const [adEndDate, setAdEndDate] = useState("")
 
   const completion = useMemo(() => {
-    const checks = [
-      [Boolean(coverPhoto), "Photo principale"],
-      [Boolean(description.trim()), "Description"],
-      [Boolean(address.trim() || (latitude && longitude)), "Localisation"],
-      [Boolean(phone.trim() || email.trim()), "Contact"],
-      [gallery.length > 0, "Galerie photo"],
-      [Boolean(videoUrl.trim()), "Vidéo"],
-      [highlights.length > 0, "Services / points forts"],
-      [Boolean(admissionNotes.trim()), "Informations admission"],
-    ] as const
-    const done = checks.filter(([ok]) => ok).length
-    return { done, total: checks.length, percent: Math.round((done / checks.length) * 100), checks }
+    return profileCompletion({
+      coverPhoto,
+      description,
+      address,
+      latitude,
+      longitude,
+      phone,
+      email,
+      gallery,
+      videoUrl,
+      highlights,
+      admissionNotes,
+    })
   }, [coverPhoto, description, address, latitude, longitude, phone, email, gallery, videoUrl, highlights, admissionNotes])
 
   const saveProfile = useCallback(async () => {
@@ -111,8 +108,8 @@ export function TrouvetouAdminClient({
       toast.success("Profil Trouvetou mis à jour")
       setModal(null)
       router.refresh()
-    } catch (error: any) {
-      toast.error(error.message || "Erreur lors de la sauvegarde")
+    } catch (error) {
+      toast.error(errorMessage(error, "Erreur lors de la sauvegarde"))
     } finally {
       setLoading(false)
     }
@@ -141,8 +138,8 @@ export function TrouvetouAdminClient({
         else setPhotos360(prev => [...prev, ...urls])
       }
       toast.success("Image ajoutée")
-    } catch (error: any) {
-      toast.error(error.message || "Erreur lors de l'upload")
+    } catch (error) {
+      toast.error(errorMessage(error, "Erreur lors de l'upload"))
     } finally {
       setLoading(false)
       event.target.value = ""
@@ -164,8 +161,8 @@ export function TrouvetouAdminClient({
       toast.success(next ? "Établissement publié sur Trouvetou" : "Publication désactivée")
       setModal(null)
       router.refresh()
-    } catch (error: any) {
-      toast.error(error.message || "Erreur de publication")
+    } catch (error) {
+      toast.error(errorMessage(error, "Erreur de publication"))
     } finally {
       setLoading(false)
     }
@@ -190,8 +187,8 @@ export function TrouvetouAdminClient({
       setModal(null)
       toast.success("Publicité créée")
       router.refresh()
-    } catch (error: any) {
-      toast.error(error.message || "Erreur")
+    } catch (error) {
+      toast.error(errorMessage(error, "Erreur"))
     } finally {
       setLoading(false)
     }
@@ -218,8 +215,8 @@ export function TrouvetouAdminClient({
       setSelectedReservation(data.reservation)
       toast.success("Dossier qualifié et mis à jour")
       router.refresh()
-    } catch (error: any) {
-      toast.error(error.message || "Erreur de qualification")
+    } catch (error) {
+      toast.error(errorMessage(error, "Erreur de qualification"))
     } finally {
       setQualificationLoading(false)
     }
@@ -277,7 +274,7 @@ export function TrouvetouAdminClient({
                   </div>
                 ))}
               </div>
-              <p className="rounded-xl bg-muted/60 p-3 text-xs text-muted-foreground"><Sparkles className="mr-1 inline h-3.5 w-3.5" /> Schooly utilise cette complétude pour t'indiquer ce qui manque avant une publication de qualité.</p>
+              <p className="rounded-xl bg-muted/60 p-3 text-xs text-muted-foreground"><Sparkles className="mr-1 inline h-3.5 w-3.5" /> Schooly utilise cette complétude pour t&apos;indiquer ce qui manque avant une publication de qualité.</p>
             </div>
           </div>
         </CardContent>
@@ -285,7 +282,7 @@ export function TrouvetouAdminClient({
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
-          <TabsTrigger value="overview">Vue d'ensemble</TabsTrigger>
+          <TabsTrigger value="overview">Vue d&apos;ensemble</TabsTrigger>
           <TabsTrigger value="reservations"><Users className="mr-2 h-4 w-4" />Demandes ({reservations.length})</TabsTrigger>
           <TabsTrigger value="ads"><ImageIcon className="mr-2 h-4 w-4" />Publicités ({ads.length})</TabsTrigger>
         </TabsList>
@@ -318,7 +315,7 @@ export function TrouvetouAdminClient({
             <CardContent>
               {reservations.length === 0 ? <EmptyState text="Aucune demande pour le moment." /> : (
                 <div className="divide-y divide-border/50">
-                  {reservations.map((r: any) => (
+                  {reservations.map((r) => (
                     <div key={r.id} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
                       <div><p className="font-medium">{r.student_full_name}</p><p className="text-xs text-muted-foreground">Parent : {r.parent_full_name} • {r.parent_phone}</p><p className="text-xs text-muted-foreground">{new Date(r.created_at).toLocaleDateString("fr-FR")}</p></div>
                       <div className="flex items-center gap-2"><Badge variant="outline">{reservationLabel(r.status)}</Badge><Button size="sm" variant="outline" onClick={() => { setSelectedReservation(r); setModal("reservation") }}><Eye className="mr-1 h-4 w-4" /> Détails</Button>{r.status === "reserved" && <Button size="sm" onClick={() => { setSelectedReservation(r); setModal("reservation") }} disabled={loading}>Finaliser</Button>}</div>
@@ -332,8 +329,8 @@ export function TrouvetouAdminClient({
 
         <TabsContent value="ads">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between"><div><CardTitle>Publicités</CardTitle><CardDescription>Promouvoir un événement, une offre ou une période d'inscription.</CardDescription></div><Button onClick={() => setModal("ad")}><Plus className="mr-2 h-4 w-4" /> Créer</Button></CardHeader>
-            <CardContent>{ads.length === 0 ? <EmptyState text="Aucune publicité." /> : <div className="divide-y divide-border/50">{ads.map((ad:any)=><div key={ad.id} className="flex items-center justify-between gap-3 py-3"><div><p className="font-medium">{ad.title}</p><p className="text-xs text-muted-foreground">{ad.message}</p><p className="text-xs text-muted-foreground">{ad.start_date} → {ad.end_date}</p></div><Badge variant={ad.is_active ? "default" : "secondary"}>{ad.is_active ? "Active" : "Inactive"}</Badge></div>)}</div>}</CardContent>
+            <CardHeader className="flex flex-row items-center justify-between"><div><CardTitle>Publicités</CardTitle><CardDescription>Promouvoir un événement, une offre ou une période d&apos;inscription.</CardDescription></div><Button onClick={() => setModal("ad")}><Plus className="mr-2 h-4 w-4" /> Créer</Button></CardHeader>
+            <CardContent>{ads.length === 0 ? <EmptyState text="Aucune publicité." /> : <div className="divide-y divide-border/50">{ads.map((ad)=><div key={ad.id} className="flex items-center justify-between gap-3 py-3"><div><p className="font-medium">{ad.title}</p><p className="text-xs text-muted-foreground">{ad.message}</p><p className="text-xs text-muted-foreground">{ad.start_date} → {ad.end_date}</p></div><Badge variant={ad.is_active ? "default" : "secondary"}>{ad.is_active ? "Active" : "Inactive"}</Badge></div>)}</div>}</CardContent>
           </Card>
         </TabsContent>
       </Tabs>
@@ -357,7 +354,7 @@ export function TrouvetouAdminClient({
 
       <Dialog open={modal === "media"} onOpenChange={(open) => setModal(open ? "media" : null)} label="Gérer les photos">
         <DialogContent className="max-w-2xl">
-          <DialogHeader><DialogTitle>Médias de l'établissement</DialogTitle><DialogDescription>Ajoute directement les photos depuis ton téléphone ou ton ordinateur. Les images sont stockées dans Supabase Storage.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>Médias de l&apos;établissement</DialogTitle><DialogDescription>Ajoute directement les photos depuis ton téléphone ou ton ordinateur. Les images sont stockées dans Supabase Storage.</DialogDescription></DialogHeader>
           <div className="space-y-6 py-4">
             <MediaSection title="Photo principale" description="La photo de couverture de l'établissement." files={coverPhoto ? [coverPhoto] : []} multiple={false} onUpload={e=>handleMediaUpload(e,"cover")} onRemove={()=>setCoverPhoto("")} />
             <MediaSection title="Galerie photos" description="Photos des salles, cour, activités, équipements..." files={gallery} multiple onUpload={e=>handleMediaUpload(e,"gallery")} onRemove={i=>{ if(i!==undefined) removeItem(setGallery,i) }} />
@@ -374,7 +371,7 @@ export function TrouvetouAdminClient({
           <div className="space-y-3 py-4">
             <div className="rounded-xl bg-muted/60 p-4"><p className="font-medium">Qualité du profil : {completion.percent}%</p><p className="mt-1 text-sm text-muted-foreground">{completion.done}/{completion.total} éléments recommandés.</p></div>
             {!published && completion.percent < 75 && <p className="text-sm text-amber-700"><Info className="mr-1 inline h-4 w-4" />Tu peux publier, mais il est recommandé de compléter les éléments manquants.</p>}
-            {published && <p className="text-sm text-muted-foreground">La désactivation retire l'établissement du catalogue Trouvetou sans supprimer ses données.</p>}
+            {published && <p className="text-sm text-muted-foreground">La désactivation retire l&apos;établissement du catalogue Trouvetou sans supprimer ses données.</p>}
           </div>
           <DialogFooter><Button variant="outline" onClick={()=>setModal(null)}>Annuler</Button><Button variant={published ? "destructive" : "default"} onClick={togglePublish} disabled={loading}>{loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{published ? <><PowerOff className="mr-2 h-4 w-4" />Dépublier</> : <><Power className="mr-2 h-4 w-4" />Publier</>}</Button></DialogFooter>
           <DialogClose onClick={()=>setModal(null)} />
@@ -385,17 +382,17 @@ export function TrouvetouAdminClient({
         <DialogContent>
           <DialogHeader><DialogTitle>Demande de pré-inscription</DialogTitle><DialogDescription>Informations reçues depuis Trouvetou.</DialogDescription></DialogHeader>
           {selectedReservation && <div className="space-y-4 py-4">
-            <div className="rounded-xl bg-muted/60 p-3 text-sm"><Sparkles className="mr-1 inline h-4 w-4" />Qualification intelligente : complète les informations critiques avant de finaliser l'inscription.</div>
-            <Field label="Nom complet de l'élève"><Input value={selectedReservation.student_full_name || ""} onChange={e=>setSelectedReservation((v:any)=>({...v,student_full_name:e.target.value}))} /></Field>
+            <div className="rounded-xl bg-muted/60 p-3 text-sm"><Sparkles className="mr-1 inline h-4 w-4" />Qualification intelligente : complète les informations critiques avant de finaliser l&apos;inscription.</div>
+            <Field label="Nom complet de l'élève"><Input value={selectedReservation.student_full_name || ""} onChange={e=>setSelectedReservation((v)=>(v?{...v,student_full_name:e.target.value}:v))} /></Field>
             <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="Date de naissance"><Input type="date" value={selectedReservation.student_birthdate || ""} onChange={e=>setSelectedReservation((v:any)=>({...v,student_birthdate:e.target.value}))} /></Field>
-              <Field label="Téléphone parent"><Input value={selectedReservation.parent_phone || ""} onChange={e=>setSelectedReservation((v:any)=>({...v,parent_phone:e.target.value}))} /></Field>
+              <Field label="Date de naissance"><Input type="date" value={selectedReservation.student_birthdate || ""} onChange={e=>setSelectedReservation((v)=>(v?{...v,student_birthdate:e.target.value}:v))} /></Field>
+              <Field label="Téléphone parent"><Input value={selectedReservation.parent_phone || ""} onChange={e=>setSelectedReservation((v)=>(v?{...v,parent_phone:e.target.value}:v))} /></Field>
             </div>
-            <Field label="Nom complet du parent"><Input value={selectedReservation.parent_full_name || ""} onChange={e=>setSelectedReservation((v:any)=>({...v,parent_full_name:e.target.value}))} /></Field>
-            <Field label="Email parent"><Input type="email" value={selectedReservation.parent_email || ""} onChange={e=>setSelectedReservation((v:any)=>({...v,parent_email:e.target.value}))} /></Field>
+            <Field label="Nom complet du parent"><Input value={selectedReservation.parent_full_name || ""} onChange={e=>setSelectedReservation((v)=>(v?{...v,parent_full_name:e.target.value}:v))} /></Field>
+            <Field label="Email parent"><Input type="email" value={selectedReservation.parent_email || ""} onChange={e=>setSelectedReservation((v)=>(v?{...v,parent_email:e.target.value}:v))} /></Field>
             <div className="grid gap-3 sm:grid-cols-2"><InfoLine icon={<CheckCircle2 />} label="Statut" value={reservationLabel(selectedReservation.status)} /><InfoLine icon={<Info />} label="Reçue le" value={selectedReservation.created_at ? new Date(selectedReservation.created_at).toLocaleString("fr-FR") : "—"} /></div>
           </div>}
-          <DialogFooter><Button variant="outline" onClick={()=>setModal(null)}>Fermer</Button>{selectedReservation && ["pending_payment","reserved"].includes(selectedReservation.status) && <><Button onClick={updateReservation} disabled={qualificationLoading}>{qualificationLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Enregistrer la qualification</Button><Button onClick={async()=>{ if(!selectedReservation) return; setQualificationLoading(true); try { const res=await fetch("/api/v1/admin/trouvetou/reservations/finalize",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({reservation_id:selectedReservation.id})}); const data=await res.json(); if(!res.ok) throw new Error(data.error||"Finalisation impossible"); toast.success("Inscription finalisée"); setModal(null); router.refresh() } catch(error:any){ toast.error(error.message||"Finalisation impossible") } finally { setQualificationLoading(false) } }} disabled={qualificationLoading || selectedReservation?.status !== "reserved"}>{qualificationLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Finaliser l'inscription</Button></>}</DialogFooter><DialogClose onClick={()=>setModal(null)} />
+          <DialogFooter><Button variant="outline" onClick={()=>setModal(null)}>Fermer</Button>{selectedReservation && ["pending_payment","reserved"].includes(selectedReservation.status) && <><Button onClick={updateReservation} disabled={qualificationLoading}>{qualificationLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Enregistrer la qualification</Button><Button onClick={async()=>{ if(!selectedReservation) return; setQualificationLoading(true); try { const res=await fetch("/api/v1/admin/trouvetou/reservations/finalize",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({reservation_id:selectedReservation.id})}); const data=await res.json(); if(!res.ok) throw new Error(data.error||"Finalisation impossible"); toast.success("Inscription finalisée"); setModal(null); router.refresh() } catch(error){ toast.error(errorMessage(error,"Finalisation impossible")) } finally { setQualificationLoading(false) } }} disabled={qualificationLoading || selectedReservation?.status !== "reserved"}>{qualificationLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Finaliser l&apos;inscription</Button></>}</DialogFooter><DialogClose onClick={()=>setModal(null)} />
         </DialogContent>
       </Dialog>
 
@@ -415,5 +412,4 @@ function QuickCard({icon,title,value,action}:{icon:React.ReactNode,title:string,
 function InfoLine({icon,label,value}:{icon:React.ReactNode,label:string,value:string}){return <div className="flex gap-3 rounded-xl border border-border/60 bg-muted/25 p-3"><div className="mt-0.5 text-muted-foreground [&>svg]:h-4 [&>svg]:w-4">{icon}</div><div className="min-w-0"><p className="text-xs text-muted-foreground">{label}</p><p className="break-words text-sm font-medium">{value}</p></div></div>}
 function Field({label,hint,children}:{label:string,hint?:string,children:React.ReactNode}){return <div className="space-y-1.5"><Label>{label}</Label>{children}{hint&&<p className="text-xs text-muted-foreground">{hint}</p>}</div>}
 function EmptyState({text}:{text:string}){return <div className="py-12 text-center text-sm text-muted-foreground">{text}</div>}
-function reservationLabel(status:string){return status==="pending_payment"?"Attente paiement":status==="reserved"?"Réservée":status==="confirmed"?"Confirmée":status==="expired"?"Expirée":status}
 function MediaSection({title,description,files,multiple,onUpload,onRemove}:{title:string,description:string,files:string[],multiple:boolean,onUpload:(e:React.ChangeEvent<HTMLInputElement>)=>void,onRemove:(index?:number)=>void}){return <div><div className="mb-2 flex items-start justify-between gap-3"><div><p className="font-medium">{title}</p><p className="text-xs text-muted-foreground">{description}</p></div><label className="inline-flex cursor-pointer items-center rounded-lg border border-border bg-background px-3 py-2 text-xs font-medium hover:bg-muted"><Upload className="mr-2 h-4 w-4" />Ajouter<input type="file" accept="image/jpeg,image/png,image/webp" multiple={multiple} className="sr-only" onChange={onUpload} /></label></div>{files.length===0?<div className="rounded-xl border border-dashed p-5 text-center text-xs text-muted-foreground">Aucune image</div>:<div className="grid grid-cols-2 gap-3 sm:grid-cols-4">{files.map((url,i)=><div key={url+i} className="group relative overflow-hidden rounded-xl border bg-muted"><img src={url} alt={title} className="aspect-square w-full object-cover" /><button type="button" onClick={()=>onRemove(i)} className="absolute right-1.5 top-1.5 rounded-full bg-black/70 p-1.5 text-white opacity-0 transition group-hover:opacity-100" aria-label="Supprimer"><Trash2 className="h-3.5 w-3.5" /></button></div>)}</div>}</div>}
