@@ -32,14 +32,16 @@ export const SCHOOL_NATURES = [
 ] as const
 export type SchoolNature = (typeof SCHOOL_NATURES)[number]
 
-export const EDUCATION_CYCLES = ["general", "technique", "professionnel"] as const
+export const EDUCATION_CYCLES = ["primaire", "general", "technique", "professionnel", "islamique"] as const
 export type EducationCycle = (typeof EDUCATION_CYCLES)[number]
 
 /** Libellés d'affichage des cycles (aucune image : badge + couleur). */
 export const CYCLE_LABELS: Record<EducationCycle, string> = {
+  primaire: "Enseignement Primaire",
   general: "Enseignement Général",
   technique: "Enseignement Technique",
   professionnel: "Enseignement Professionnel",
+  islamique: "Enseignement Islamique / Franco-arabe",
 }
 
 /**
@@ -48,6 +50,8 @@ export const CYCLE_LABELS: Record<EducationCycle, string> = {
  * parce qu'un établissement étranger peut saisir une série hors nomenclature.
  */
 export const SERIES_BY_CYCLE: Record<EducationCycle, readonly string[]> = {
+  primaire: [],
+  islamique: [],
   general: ["A", "A1", "A2", "C", "D", "E"],
   technique: ["F1", "F2", "F3", "F4", "F5", "F6", "F7", "G1", "G2", "G3", "H"],
   professionnel: ["T1", "T2"],
