@@ -18,9 +18,9 @@ export function GradeChangeRequestPanel({ grades }: { grades: GradeEntryRow[] })
     const result = await listPendingGradeChangeRequests()
     if (result.error) setMessage(result.error)
     else setRequests(result.data ?? [])
-  }
+  }, [])
 
-  useEffect(() => { void load() }, [])
+  useEffect(() => { void load() }, [load])
 
   return (
     <section className="space-y-3 rounded border border-amber-300/60 bg-amber-50/50 p-4 dark:bg-amber-950/20">
