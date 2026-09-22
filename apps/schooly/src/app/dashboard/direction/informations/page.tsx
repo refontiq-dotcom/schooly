@@ -1,4 +1,3 @@
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { getFicheState } from "./actions"
 import { InformationsWizard } from "./informations-wizard"
 import { SuppliesSection } from "./supplies-section"
@@ -21,18 +20,7 @@ export default async function InformationsPage() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-4 p-4 sm:p-6">
-      <Tabs defaultValue="fiche">
-        <TabsList>
-          <TabsTrigger value="fiche">Fiche établissement</TabsTrigger>
-          <TabsTrigger value="fournitures">Fournitures par classe</TabsTrigger>
-        </TabsList>
-        <TabsContent value="fiche">
-          <InformationsWizard state={state} />
-        </TabsContent>
-        <TabsContent value="fournitures">
-          <SuppliesSection />
-        </TabsContent>
-      </Tabs>
+      <InformationsWizard state={state} supplies={<SuppliesSection />} />
     </div>
   )
 }
