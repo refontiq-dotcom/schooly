@@ -28,7 +28,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   const { data: school, error } = await sb
     .from("schools")
-    .select("id, name, city, public_address, public_phone, public_email, cover_photo_url, cycles_offered, fees_structure, optional_services")
+    .select("id, name, city, communes, public_address, public_phone, public_email, cover_photo_url, cycles_offered, fees_structure, optional_services")
     .eq("id", id)
     .eq("published_to_trouvetou", true)
     .is("deleted_at", null)
@@ -60,6 +60,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       id: school.id,
       nom: school.name,
       ville: (school as { city: string | null }).city,
+      communes: Array.isArray((school as { communes?: unknown }).communes) ? (school as { communes: unknown[] }).communes.filter((value): value is string => typeof value === "string") : [],
       adresse: (school as { public_address: string | null }).public_address,
       telephone: (school as { public_phone: string | null }).public_phone,
       email: (school as { public_email: string | null }).public_email,
