@@ -13,6 +13,7 @@ export function PreinscriptionForm({ formations, formation, onFormationChange, s
   formation: string
   onFormationChange: (key: string) => void
   schoolId: string
+  requiredDocuments?: { id: string; label: string; required: boolean }[]
   onCreated?: (result: { reservation_id: string; formation: { key: string; label: string }; level: { id: string; label: string } }) => void
 }) {
   const [level, setLevel] = useState("")
@@ -26,6 +27,7 @@ export function PreinscriptionForm({ formations, formation, onFormationChange, s
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
   const selected = formations.find((item) => item.key === formation)
+  const required = requiredDocuments ?? []
   // Les données de chaque pôle sont déjà isolées par l’API publique. On ne garde
   // donc jamais un niveau/série d’un autre pôle dans l’état du formulaire.
   const filteredLevels = useMemo(() => selected?.levels ?? [], [selected])
@@ -101,7 +103,17 @@ export function PreinscriptionForm({ formations, formation, onFormationChange, s
               <input className="flex h-10 w-full rounded-md border bg-background px-3 text-sm" type="email" placeholder="Email (facultatif)" value={email} onChange={(e) => setEmail(e.target.value)} />
             </div>
 
-            {required.length > 0 ? (\n              <div className="space-y-2 rounded-lg border bg-muted/20 p-3">\n                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">5. Pièces à préparer</p>\n                <div className="space-y-1.5 text-sm">\n                  {required.map((item) => <div key={item.id} className="flex items-center justify-between gap-3"><span>{item.label}</span><span className="text-xs text-muted-foreground">{item.required ? "Obligatoire" : "Facultative"}</span></div>)}\n                </div>\n                <p className="text-xs text-muted-foreground">La liste est définie par l’établissement. Le dépôt des fichiers pourra être effectué dans le dossier d’inscription.</p>\n              </div>\n            ) : null}\n\n            <Button type="button" className="w-full" disabled={submitting || !level || !student || !birthdate || !parent || !phone}
+            {required.length > 0 ? (\n              <div className="space-y-2 rounded-lg border bg-muted/20 p-3">\n                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">5. Pièces à préparer</p>\n                <div className="space-y-1.5 text-sm">\n                  {required.map((item) => <div key={item.id} className="flex items-center justify-between gap-3"><span>{item.label}</span><span className="text-xs text-muted-foreground">{item.required ? "Obligatoire" : "Facultative"}</span></div>)}\n                </div>\n                <p className="text-xs text-muted-foreground">La liste est définie par l’établissement. Le dépôt des fichiers pourra être effectué dans le dossier d’inscription.</p>\n              </div>\n            ) : null}\n\n            {required.length > 0 ? (
+              <div className="space-y-2 rounded-lg border bg-muted/20 p-3">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">5. Pièces à préparer</p>
+                <div className="space-y-1.5 text-sm">
+                  {required.map((item) => <div key={item.id} className="flex items-center justify-between gap-3"><span>{item.label}</span><span className="text-xs text-muted-foreground">{item.required ? "Obligatoire" : "Facultative"}</span></div>)}
+                </div>
+                <p className="text-xs text-muted-foreground">La liste est définie par l’établissement. Le dépôt des fichiers pourra être effectué dans le dossier d’inscription.</p>
+              </div>
+            ) : null}
+
+            <Button type="button" className="w-full" disabled={submitting || !level || !student || !birthdate || !parent || !phone}
               onClick={async () => {
                 setSubmitting(true)
                 setError("")
