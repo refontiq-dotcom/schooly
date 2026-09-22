@@ -336,8 +336,12 @@ export function parseFeesStructure(value: unknown): FeesStructure {
     if (installment) installments.push(installment)
   }
   installments.sort((a, b) => a.position - b.position)
-
   const notes = str(raw.notes)
+  const rawProfiles = isRecord(raw.fee_profiles) ? raw.fee_profiles : {}
+  const fee_profiles: Record<string, import("./types").FeeProfile> = {}
+  for (const cycle of EDUCATION_CYCLES) {
+    if (isRecord(rawProfiles[cycle])) fee_profiles[cycle] = parseFeeProfile(rawProfiles[cycle])
+  }
   return {
     registration_fee: parseFeeItem(raw.registration_fee),
     academic_fee: parseFeeItem(raw.academic_fee),
@@ -348,6 +352,7 @@ export function parseFeesStructure(value: unknown): FeesStructure {
     installments: installments.map((item, index) => ({ ...item, position: index + 1 })),
     currency: str(raw.currency) || DEFAULT_CURRENCY,
     ...(notes ? { notes } : {}),
+    ...(Object.keys(fee_profiles).length ? { fee_profiles } : {}),
   }
 }
 
