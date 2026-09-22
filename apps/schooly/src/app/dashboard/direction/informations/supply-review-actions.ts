@@ -33,7 +33,16 @@ export async function publishClassSupplyFromProposals(classId:string):Promise<Re
  if(!ps?.length)return{ok:false,error:"Aucune proposition validée ou soumise pour cette classe."}
  const configs=ps.map((p:any)=>parseClassSupplies(p.configurations,String((cls as any).name)))
  const merged:ClassSuppliesConfiguration={status:"published",class_label:String((cls as any).name),level:Number((cls as any).grade_levels?.level??0),cycle:String((cls as any).grade_levels?.cycle??""),year:String(y.label),manuals:uniqueBy(configs.flatMap(c=>c.manuals),m=>m.subject+"|"+m.title+"|"+m.editor),stationery:uniqueBy(configs.flatMap(c=>c.stationery),s=>s.category+"|"+s.name+"|"+s.quantity),equipment:uniqueBy(configs.flatMap(c=>c.equipment),e=>e.name+"|"+e.quantity+"|"+(e.color_hint??""))}
- const {error:upsertError}=await a.from("school_supplies").upsert({school_id:ctx.schoolId,class_name:String((cls as any).name),academic_year_id:y.id,grade_level_id:(cls as any).grade_level_id,configurations:merged,status:"published",published_at:new Date().toISOString()},{onConflict:"school_id,class_name,academic_year_id"})
- if(upsertError)return{ok:false,error:upsertError.message}
+ const payload={grade_level_id:(cls as any).grade_level_id,configurations:merged,status:"published",published_at:new Date().toISOString(),deleted_at:null}
+ const {data:existing}=await a.from("school_supplies").select("id").eq("school_id",ctx.schoolId).eq("class_name",String((cls as any).name)).eq("academic_year_id",y.id).maybeSingle()
+ let writeError:null|string=null
+ if(existing?.id){
+   const {error}=await a.from("school_supplies").update(payload).eq("id",existing.id).eq("school_id",ctx.schoolId)
+   writeError=error?.message??null
+ } else {
+   const {error}=await a.from("school_supplies").insert({school_id:ctx.schoolId,class_name:String((cls as any).name),academic_year_id:y.id,...payload})
+   writeError=error?.message??null
+ }
+ if(writeError)return{ok:false,error:writeError}
  revalidatePath("/dashboard/direction/informations");return{ok:true}
 }
