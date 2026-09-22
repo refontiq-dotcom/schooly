@@ -48,7 +48,7 @@ function syncExamFeeRows(cycles: CyclesOffered, fees: FeesStructure): FeesStruct
   const detected = cycles.cycles.flatMap((cycle) => cycle.levels).map((level) => {
     const name = level.grade_level_name.trim()
     const key = name.toLowerCase()
-    if (key === "cm2" || key === "cm2") return { class_name: name, exam_name: "CEPE", diploma: "cep" as const }
+    if (key === "cm2") return { class_name: name, exam_name: "CEPE", diploma: "cep" as const }
     if (key === "3e") return { class_name: name, exam_name: "BEPC", diploma: "bepc" as const }
     if (key === "terminale" || key === "terminale technique") return { class_name: name, exam_name: "BAC", diploma: "bac" as const }
     return null
