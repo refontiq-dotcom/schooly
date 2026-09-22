@@ -315,6 +315,19 @@ function parseInstallment(value: unknown): FeeInstallment | null {
  * puis renumérotées de 1 à n : le rang affiché au parent reflète l'ordre réel
  * de l'échéancier, même si le wizard a laissé des trous (1, 3, 7).
  */
+function parseFeeProfile(value: unknown): import("./types").FeeProfile {
+  const raw = isRecord(value) ? value : {}
+  return {
+    registration_fees: parseFeeItems(raw.registration_fees),
+    school_fees: parseFeeItems(raw.school_fees),
+    exam_fees: parseExamFees(raw.exam_fees),
+    custom_fees: parseCustomFees(raw.custom_fees),
+    installments: parseInstallments(raw.installments),
+    currency: str(raw.currency) || DEFAULT_CURRENCY,
+    ...(str(raw.notes) ? { notes: str(raw.notes) } : {}),
+  }
+}
+
 export function parseFeesStructure(value: unknown): FeesStructure {
   const raw = isRecord(value) ? value : {}
   const installments: FeeInstallment[] = []
@@ -461,10 +474,16 @@ function parseTenues(value: unknown): TenuesService {
  */
 export function parseOptionalServices(value: unknown): OptionalServices {
   const raw = isRecord(value) ? value : {}
+  const rawProfiles = isRecord(raw.fee_profiles) ? raw.fee_profiles : {}
+  const fee_profiles: Record<string, import("./types").FeeProfile> = {}
+  for (const cycle of EDUCATION_CYCLES) {
+    if (isRecord(rawProfiles[cycle])) fee_profiles[cycle] = parseFeeProfile(rawProfiles[cycle])
+  }
   return {
     transport: parseTransport(raw.transport),
     cantine: parseCantine(raw.cantine),
-    tenues: parseTenues(raw.tenues),
+    tenues: parseTenues(raw.tenues),,
+    fee_profiles: Object.keys(fee_profiles).length ? fee_profiles : undefined
   }
 }
 
