@@ -150,11 +150,11 @@ function addMonths(iso: string, months: number): string {
  * pas de série D, un collège n'a pas de filière professionnelle.
  */
 const NATURE_CYCLES: Record<SchoolNature, readonly EducationCycle[]> = {
-  primaire: [],
+  primaire: ["primaire"],
   college: ["general"],
   lycee: ["general", "technique"],
   professionnel: ["technique", "professionnel"],
-  islamique: ["general"],
+  islamique: ["islamique", "general"],
   superieur: ["general", "technique", "professionnel"],
 }
 
