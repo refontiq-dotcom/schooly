@@ -27,7 +27,9 @@ import {
   type ClassSuppliesConfiguration,
   type CyclesOffered,
   type EducationCycle,
+  type CustomFeeItem,
   type FeeInstallment,
+  type ExamFeeItem,
   type FeeItem,
   type FeesStructure,
   type Frequency,
@@ -148,12 +150,12 @@ function addMonths(iso: string, months: number): string {
  * pas de série D, un collège n'a pas de filière professionnelle.
  */
 const NATURE_CYCLES: Record<SchoolNature, readonly EducationCycle[]> = {
-  primaire: [],
+  primaire: ["primaire"],
   college: ["general"],
   lycee: ["general", "technique"],
   professionnel: ["technique", "professionnel"],
-  islamique: ["general"],
-  superieur: ["general", "technique", "professionnel"],
+  islamique: ["islamique", "general"],
+  superieur: ["superieur"],
 }
 
 /** Nature d'établissement, « lycee » par défaut (cas le plus complet). */
@@ -252,6 +254,48 @@ function parseFeeItem(value: unknown): FeeItem | undefined {
   }
 }
 
+function parseFeeItems(value: unknown): FeeItem[] {
+  return asArray(value).map(parseFeeItem).filter((item): item is FeeItem => Boolean(item))
+}
+
+function parseCustomFees(value: unknown): CustomFeeItem[] {
+  const out: CustomFeeItem[] = []
+  for (const rawItem of asArray(value)) {
+    if (!isRecord(rawItem)) continue
+    const label = str(rawItem.label)
+    if (!label) continue
+    out.push({
+      id: str(rawItem.id) || crypto.randomUUID(),
+      label,
+      amount: money(rawItem.amount),
+      is_mandatory: bool(rawItem.is_mandatory, true),
+      status: str(rawItem.status) === "affecte" ? "affecte" : "non_affecte",
+      applies_to: str(rawItem.applies_to) === "new_students" ? "new_students" : str(rawItem.applies_to) === "returning" ? "returning" : "all",
+    })
+  }
+  return out
+}
+
+function parseExamFees(value: unknown): ExamFeeItem[] {
+  const out: ExamFeeItem[] = []
+  for (const rawItem of asArray(value)) {
+    if (!isRecord(rawItem)) continue
+    const className = str(rawItem.class_name)
+    const examName = str(rawItem.exam_name)
+    if (!className || !examName) continue
+    out.push({
+      class_name: className,
+      exam_name: examName,
+      diploma: str(rawItem.diploma) || "aucun",
+      amount: money(rawItem.amount),
+      amount_affecte: money(rawItem.amount_affecte),
+      amount_non_affecte: money(rawItem.amount_non_affecte),
+      is_mandatory: bool(rawItem.is_mandatory, true),
+    })
+  }
+  return out
+}
+
 function parseInstallment(value: unknown): FeeInstallment | null {
   if (!isRecord(value)) return null
   const label = str(value.label)
@@ -271,6 +315,19 @@ function parseInstallment(value: unknown): FeeInstallment | null {
  * puis renumérotées de 1 à n : le rang affiché au parent reflète l'ordre réel
  * de l'échéancier, même si le wizard a laissé des trous (1, 3, 7).
  */
+function parseFeeProfile(value: unknown): import("./types").FeeProfile {
+  const raw = isRecord(value) ? value : {}
+  return {
+    registration_fees: parseFeeItems(raw.registration_fees),
+    school_fees: parseFeeItems(raw.school_fees),
+    exam_fees: parseExamFees(raw.exam_fees),
+    custom_fees: parseCustomFees(raw.custom_fees),
+    installments: asArray(raw.installments).map(parseInstallment).filter((item): item is FeeInstallment => Boolean(item)),
+    currency: str(raw.currency) || DEFAULT_CURRENCY,
+    ...(str(raw.notes) ? { notes: str(raw.notes) } : {}),
+  }
+}
+
 export function parseFeesStructure(value: unknown): FeesStructure {
   const raw = isRecord(value) ? value : {}
   const installments: FeeInstallment[] = []
@@ -279,11 +336,14 @@ export function parseFeesStructure(value: unknown): FeesStructure {
     if (installment) installments.push(installment)
   }
   installments.sort((a, b) => a.position - b.position)
-
   const notes = str(raw.notes)
   return {
     registration_fee: parseFeeItem(raw.registration_fee),
     academic_fee: parseFeeItem(raw.academic_fee),
+    registration_fees: parseFeeItems(raw.registration_fees),
+    school_fees: parseFeeItems(raw.school_fees),
+    exam_fees: parseExamFees(raw.exam_fees),
+    custom_fees: parseCustomFees(raw.custom_fees),
     installments: installments.map((item, index) => ({ ...item, position: index + 1 })),
     currency: str(raw.currency) || DEFAULT_CURRENCY,
     ...(notes ? { notes } : {}),
@@ -413,10 +473,16 @@ function parseTenues(value: unknown): TenuesService {
  */
 export function parseOptionalServices(value: unknown): OptionalServices {
   const raw = isRecord(value) ? value : {}
+  const rawProfiles = isRecord(raw.fee_profiles) ? raw.fee_profiles : {}
+  const fee_profiles: Record<string, import("./types").FeeProfile> = {}
+  for (const cycle of EDUCATION_CYCLES) {
+    if (isRecord(rawProfiles[cycle])) fee_profiles[cycle] = parseFeeProfile(rawProfiles[cycle])
+  }
   return {
     transport: parseTransport(raw.transport),
     cantine: parseCantine(raw.cantine),
-    tenues: parseTenues(raw.tenues),
+    tenues: parseTenues(raw.tenues)
+  
   }
 }
 

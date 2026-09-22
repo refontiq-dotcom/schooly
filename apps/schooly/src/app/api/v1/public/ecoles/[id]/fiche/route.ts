@@ -23,11 +23,12 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const { id } = await params
   const { searchParams } = new URL(request.url)
   const className = searchParams.get("classe")
+  const formation = searchParams.get("formation")
   const sb = supa()
 
   const { data: school, error } = await sb
     .from("schools")
-    .select("id, name, city, public_address, public_phone, public_email, cover_photo_url, cycles_offered, fees_structure, optional_services")
+    .select("id, name, city, communes, public_address, public_phone, public_email, cover_photo_url, cycles_offered, fees_structure, optional_services")
     .eq("id", id)
     .eq("published_to_trouvetou", true)
     .is("deleted_at", null)
@@ -37,6 +38,26 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const cycles = parseCyclesOffered((school as { cycles_offered: unknown }).cycles_offered)
   const fees = parseFeesStructure((school as { fees_structure: unknown }).fees_structure)
   const services = parseOptionalServices((school as { optional_services: unknown }).optional_services)
+  const { data: requiredDocumentRows } = await sb
+    .from("required_documents")
+    .select("id, nom, obligatoire, applicable_to_level_id")
+    .eq("school_id", id)
+    .is("deleted_at", null)
+    .order("created_at", { ascending: true })
+  const seenRequiredDocumentLabels = new Set<string>()
+  const requiredDocuments = (requiredDocumentRows ?? []).filter((item) => {
+    const key = String(item.nom).trim().toLowerCase()
+    if (seenRequiredDocumentLabels.has(key)) return false
+    seenRequiredDocumentLabels.add(key)
+    return true
+  }).map((item) => ({
+    id: String(item.id),
+    label: String(item.nom),
+    required: item.obligatoire !== false,
+    applicable_to_level_id: item.applicable_to_level_id ? String(item.applicable_to_level_id) : null,
+  }))
+  const selectedCycle = formation ? cycles.cycles.find((cycle) => cycle.key === formation) ?? null : null
+  const selectedFees = formation && fees.fee_profiles?.[formation as keyof typeof fees.fee_profiles] ? fees.fee_profiles[formation as keyof typeof fees.fee_profiles] : fees
 
   const { data: rows } = await sb
     .from("school_supplies")
@@ -57,15 +78,19 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       id: school.id,
       nom: school.name,
       ville: (school as { city: string | null }).city,
+      communes: Array.isArray((school as { communes?: unknown }).communes) ? (school as { communes: unknown[] }).communes.filter((value): value is string => typeof value === "string") : [],
       adresse: (school as { public_address: string | null }).public_address,
       telephone: (school as { public_phone: string | null }).public_phone,
       email: (school as { public_email: string | null }).public_email,
       logo: (school as { cover_photo_url: string | null }).cover_photo_url,
     },
     cycles,
-    tarifs: fees,
+    formation: selectedCycle ? { key: selectedCycle.key, label: selectedCycle.label, levels: selectedCycle.levels } : null,
+    formations: cycles.cycles.map((cycle) => ({ key: cycle.key, label: cycle.label, levels: cycle.levels })),
+    tarifs: selectedFees,
     services,
     classes,
     fournitures: className ? (published[className] ?? null) : null,
+    pieces_a_fournir: requiredDocuments.map(({ id, label, required }) => ({ id, label, required })),
   })
 }

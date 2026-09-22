@@ -41,6 +41,8 @@ export function TrouvetouAdminClient({
   const [modal, setModal] = useState<Modal>(null)
   const [selectedReservation, setSelectedReservation] = useState<any>(null)
   const [qualificationLoading, setQualificationLoading] = useState(false)
+  const [documentLoading, setDocumentLoading] = useState(false)
+  const [reservationDocuments, setReservationDocuments] = useState<any[]>([])
 
   const [published, setPublished] = useState(Boolean(school?.published_to_trouvetou))
   const [description, setDescription] = useState(school?.description_publique || "")
@@ -223,6 +225,29 @@ export function TrouvetouAdminClient({
     }
   }, [adTitle, adMessage, adImageUrl, adTargetUrl, adStartDate, adEndDate, adContactPhone, adCtaLabel, adDailyRate, adDurationDays, router])
 
+  const loadReservationDocuments = useCallback(async (reservationId: string) => {
+    setDocumentLoading(true)
+    try {
+      const res = await fetch(`/api/v1/admin/trouvetou/reservations/documents?reservation_id=${encodeURIComponent(reservationId)}`)
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Lecture des pièces impossible")
+      setReservationDocuments(data.documents || [])
+    } catch (error: any) { setReservationDocuments([]); toast.error(error.message || "Lecture des pièces impossible") }
+    finally { setDocumentLoading(false) }
+  }, [])
+
+  const updateDocumentStatus = useCallback(async (documentId: string, status: "missing" | "received" | "verified" | "rejected", rejectionReason = "") => {
+    setDocumentLoading(true)
+    try {
+      const res = await fetch("/api/v1/admin/trouvetou/reservations/documents", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ document_id: documentId, status, rejection_reason: rejectionReason }) })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Mise à jour impossible")
+      setReservationDocuments(prev => prev.map(item => item.id === documentId ? data.document : item))
+      toast.success(status === "received" ? "Pièce marquée comme reçue" : status === "verified" ? "Pièce vérifiée" : status === "rejected" ? "Pièce signalée à compléter" : "Pièce remise à fournir")
+    } catch (error: any) { toast.error(error.message || "Mise à jour impossible") }
+    finally { setDocumentLoading(false) }
+  }, [])
+
   const updateReservation = useCallback(async () => {
     if (!selectedReservation) return
     setQualificationLoading(true)
@@ -376,7 +401,7 @@ export function TrouvetouAdminClient({
                       <p className="truncate font-medium">{r.student_full_name}</p>
                       <p className="text-xs text-muted-foreground">{r.parent_full_name} • {r.parent_phone}</p>
                     </div>
-                    <Button size="sm" variant="outline" onClick={() => { setSelectedReservation(r); setModal("reservation") }}>
+                    <Button size="sm" variant="outline" onClick={() => { setSelectedReservation(r); setReservationDocuments([]); setModal("reservation"); loadReservationDocuments(r.id) }}>
                       <Eye className="mr-1 h-4 w-4" /> Détails
                     </Button>
                   </div>
@@ -576,7 +601,7 @@ export function TrouvetouAdminClient({
         </DialogContent>
       </Dialog>
 
-      <Dialog open={modal === "reservation"} onOpenChange={(open)=>setModal(open ? "reservation" : null)} label="Détails de la demande">
+      <Dialog open={modal === "reservation"} onOpenChange={(open)=>{ setModal(open ? "reservation" : null); if (open && selectedReservation) loadReservationDocuments(selectedReservation.id) }} label="Détails de la demande">
         <DialogContent>
           <DialogHeader><DialogTitle>Demande de pré-inscription</DialogTitle><DialogDescription>Informations reçues depuis Trouvetou.</DialogDescription></DialogHeader>
           {selectedReservation && <div className="space-y-4 py-4">
@@ -589,6 +614,7 @@ export function TrouvetouAdminClient({
             <Field label="Nom complet du parent"><Input value={selectedReservation.parent_full_name || ""} onChange={e=>setSelectedReservation((v:any)=>({...v,parent_full_name:e.target.value}))} /></Field>
             <Field label="Email parent"><Input type="email" value={selectedReservation.parent_email || ""} onChange={e=>setSelectedReservation((v:any)=>({...v,parent_email:e.target.value}))} /></Field>
             <div className="grid gap-3 sm:grid-cols-2"><InfoLine icon={<CheckCircle2 />} label="Statut" value={reservationLabel(selectedReservation.status)} /><InfoLine icon={<Info />} label="Reçue le" value={selectedReservation.created_at ? new Date(selectedReservation.created_at).toLocaleString("fr-FR") : "—"} /></div>
+            <div className="space-y-3 rounded-xl border bg-muted/20 p-4"><div className="flex items-center justify-between gap-3"><div><p className="font-medium">Pièces fournies physiquement</p><p className="text-xs text-muted-foreground">Aucun fichier n’est téléversé ni stocké dans Schooly.</p></div>{documentLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}</div>{reservationDocuments.length === 0 ? <p className="text-sm text-muted-foreground">Aucune pièce configurée pour cette préinscription.</p> : <div className="space-y-2">{reservationDocuments.map((doc:any) => <PhysicalDocumentRow key={doc.id} document={doc} disabled={documentLoading} onStatus={updateDocumentStatus} />)}</div>}{reservationDocuments.length > 0 ? <div className="flex flex-wrap gap-2 pt-1 text-xs text-muted-foreground"><span>{reservationDocuments.filter((d:any)=>d.status === "received" || d.status === "verified").length}/{reservationDocuments.length} reçue(s)</span><span>•</span><span>{reservationDocuments.filter((d:any)=>d.status === "verified").length} vérifiée(s)</span><span>•</span><span>{reservationDocuments.filter((d:any)=>d.status === "rejected").length} à compléter</span></div> : null}</div>
           </div>}
           <DialogFooter><Button variant="outline" onClick={()=>setModal(null)}>Fermer</Button>{selectedReservation && ["pending_payment","reserved"].includes(selectedReservation.status) && <><Button onClick={updateReservation} disabled={qualificationLoading}>{qualificationLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Enregistrer la qualification</Button><Button onClick={async()=>{ if(!selectedReservation) return; setQualificationLoading(true); try { const res=await fetch("/api/v1/admin/trouvetou/reservations/finalize",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({reservation_id:selectedReservation.id})}); const data=await res.json(); if(!res.ok) throw new Error(data.error||"Finalisation impossible"); toast.success("Inscription finalisée"); setModal(null); router.refresh() } catch(error:any){ toast.error(error.message||"Finalisation impossible") } finally { setQualificationLoading(false) } }} disabled={qualificationLoading || selectedReservation?.status !== "reserved"}>{qualificationLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Finaliser l'inscription</Button></>}</DialogFooter><DialogClose onClick={()=>setModal(null)} />
         </DialogContent>
@@ -633,4 +659,5 @@ function InfoLine({icon,label,value}:{icon:React.ReactNode,label:string,value:st
 function Field({label,hint,children}:{label:string,hint?:string,children:React.ReactNode}){return <div className="space-y-1.5"><Label>{label}</Label>{children}{hint&&<p className="text-xs text-muted-foreground">{hint}</p>}</div>}
 function EmptyState({text}:{text:string}){return <div className="py-12 text-center text-sm text-muted-foreground">{text}</div>}
 function reservationLabel(status:string){return status==="pending_payment"?"Attente paiement":status==="reserved"?"Réservée":status==="confirmed"?"Confirmée":status==="expired"?"Expirée":status}
+function PhysicalDocumentRow({document,disabled,onStatus}:{document:any,disabled:boolean,onStatus:(id:string,status:"missing"|"received"|"verified"|"rejected",reason?:string)=>void}){const label=document.status==="received"?"Reçue":document.status==="verified"?"Vérifiée":document.status==="rejected"?"À compléter":"À fournir";return <div className="rounded-lg border bg-background p-3"><div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><div className="flex items-center gap-2"><p className="text-sm font-medium">{document.document_label}</p>{document.required?<Badge variant="secondary">Obligatoire</Badge>:<Badge variant="outline">Facultative</Badge>}</div><p className="mt-1 text-xs text-muted-foreground">{label}{document.received_at ? " • reçue le " + new Date(document.received_at).toLocaleDateString("fr-FR") : ""}</p>{document.rejection_reason?<p className="mt-1 text-xs text-destructive">Motif : {document.rejection_reason}</p>:null}</div><div className="flex flex-wrap gap-1.5"><Button size="sm" variant={document.status==="received"?"default":"outline"} disabled={disabled} onClick={()=>onStatus(document.id,"received")}>Reçue</Button><Button size="sm" variant={document.status==="verified"?"default":"outline"} disabled={disabled || (document.status!=="received" && document.status!=="verified")} onClick={()=>onStatus(document.id,"verified")}>Vérifiée</Button>{document.status!=="rejected"?<Button size="sm" variant="outline" disabled={disabled} onClick={()=>{const reason=window.prompt("Motif / pièce à compléter :",document.rejection_reason||"");if(reason?.trim())onStatus(document.id,"rejected",reason)}}>À compléter</Button>:<Button size="sm" variant="outline" disabled={disabled} onClick={()=>onStatus(document.id,"missing")}>Remettre à fournir</Button>}</div></div></div>}
 function MediaSection({title,description,files,multiple,onUpload,onRemove}:{title:string,description:string,files:string[],multiple:boolean,onUpload:(e:React.ChangeEvent<HTMLInputElement>)=>void,onRemove:(index?:number)=>void}){return <div><div className="mb-2 flex items-start justify-between gap-3"><div><p className="font-medium">{title}</p><p className="text-xs text-muted-foreground">{description}</p></div><label className="inline-flex cursor-pointer items-center rounded-lg border border-border bg-background px-3 py-2 text-xs font-medium hover:bg-muted"><Upload className="mr-2 h-4 w-4" />Ajouter<input type="file" accept="image/jpeg,image/png,image/webp" multiple={multiple} className="sr-only" onChange={onUpload} /></label></div>{files.length===0?<div className="rounded-xl border border-dashed p-5 text-center text-xs text-muted-foreground">Aucune image</div>:<div className="grid grid-cols-2 gap-3 sm:grid-cols-4">{files.map((url,i)=><div key={url+i} className="group relative overflow-hidden rounded-xl border bg-muted"><img src={url} alt={title} className="aspect-square w-full object-cover" /><button type="button" onClick={()=>onRemove(i)} className="absolute right-1.5 top-1.5 rounded-full bg-black/70 p-1.5 text-white opacity-0 transition group-hover:opacity-100" aria-label="Supprimer"><Trash2 className="h-3.5 w-3.5" /></button></div>)}</div>}</div>}

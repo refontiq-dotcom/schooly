@@ -21,18 +21,21 @@ import type {
 } from "@/lib/fiches/types"
 
 type FicheJson = {
+  communes: unknown
   cycles_offered: unknown
   fees_structure: unknown
   optional_services: unknown
 }
 
 export type FicheState = {
+  communes: string[]
   cycles: CyclesOffered
   fees: FeesStructure
   services: OptionalServices
 }
 
 export type SaveFichePayload = {
+  communes: string[]
   cycles: CyclesOffered
   fees: FeesStructure
   services: OptionalServices
@@ -43,6 +46,48 @@ export type FicheLoadResult =
   | { ok: false; error: string }
 
 export type FicheSaveResult = { ok: boolean; error?: string }
+
+function syncExamFeeRows(cycles: CyclesOffered, fees: FeesStructure): FeesStructure {
+  const detected = cycles.cycles.flatMap((cycle) => cycle.levels).map((level) => {
+    const name = level.grade_level_name.trim()
+    const key = name.toLowerCase().replace(/\s+/g, " ")
+    if (key === "cm2") return { class_name: name, exam_name: "CEPE", diploma: "cep" as const }
+    if (key === "3e" || key === "3ème" || key === "3eme") return { class_name: name, exam_name: "BEPC", diploma: "bepc" as const }
+    if (key === "terminale" || key === "terminale technique") return { class_name: name, exam_name: "BAC", diploma: "bac" as const }
+    if (key === "cap" || key.startsWith("cap ")) return { class_name: name, exam_name: "CAP", diploma: "cap" as const }
+    if (key === "bt" || key.startsWith("bt ")) return { class_name: name, exam_name: "BT", diploma: "bt" as const }
+    if (key === "bts" || key.startsWith("bts ")) return { class_name: name, exam_name: "BTS", diploma: "bts" as const }
+    return null
+  }).filter((item): item is { class_name: string; exam_name: string; diploma: "cep" | "bepc" | "bac" | "cap" | "bt" | "bts" } => Boolean(item))
+
+  const merged = [...(fees.exam_fees ?? [])]
+  for (const item of detected) {
+    const row = merged.find((candidate) =>
+      candidate.class_name.trim().toLowerCase() === item.class_name.trim().toLowerCase() &&
+      candidate.exam_name.trim().toLowerCase() === item.exam_name.toLowerCase(),
+    )
+    if (row) {
+      row.amount_affecte = row.amount_affecte ?? row.amount ?? 0
+      row.amount_non_affecte = row.amount_non_affecte ?? row.amount ?? 0
+      continue
+    }
+    merged.push({ ...item, amount: 0, amount_affecte: 0, amount_non_affecte: 0, is_mandatory: true })
+  }
+  return { ...fees, exam_fees: merged }
+}
+
+function syncFeeProfiles(cycles: CyclesOffered, fees: FeesStructure): FeesStructure {
+  if (!fees.fee_profiles) return fees
+  const profiles = { ...fees.fee_profiles }
+  for (const cycle of cycles.cycles) {
+    const profile = profiles[cycle.key]
+    if (!profile) continue
+    const synced = syncExamFeeRows({ ...cycles, cycles: [cycle] }, profile)
+    const { fee_profiles: _ignored, ...cleanProfile } = synced
+    profiles[cycle.key] = cleanProfile
+  }
+  return { ...fees, fee_profiles: profiles }
+}
 
 function adminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -108,7 +153,7 @@ export async function getFicheState(): Promise<FicheLoadResult> {
     const admin = adminClient()
     const { data, error } = await admin
       .from("schools")
-      .select("name, cycles_offered, fees_structure, optional_services")
+      .select("name, communes, cycles_offered, fees_structure, optional_services")
       .eq("id", ctx.schoolId)
       .maybeSingle<FicheJson & { name: string | null }>()
 
@@ -120,8 +165,9 @@ export async function getFicheState(): Promise<FicheLoadResult> {
       ok: true,
       schoolName: data.name ?? ctx.schoolName,
       state: {
+        communes: Array.isArray(data.communes) ? data.communes.filter((value): value is string => typeof value === "string" && value.trim().length > 0).map((value) => value.trim()) : [],
         cycles: parseCyclesOffered(data.cycles_offered),
-        fees: parseFeesStructure(data.fees_structure),
+        fees: syncFeeProfiles(parseCyclesOffered(data.cycles_offered), syncExamFeeRows(parseCyclesOffered(data.cycles_offered), parseFeesStructure(data.fees_structure))),
         services: parseOptionalServices(data.optional_services),
       },
     }
@@ -141,8 +187,9 @@ export async function saveSchoolConfiguration(
     }
 
     // Normalisation défensive : les parseurs garantissent la conformité.
+    const communes = Array.from(new Set((payload.communes ?? []).map((value) => String(value).trim().replace(/\s+/g, " ")).filter(Boolean)))
     const cycles = parseCyclesOffered(payload.cycles)
-    const fees = parseFeesStructure(payload.fees)
+    const fees = syncFeeProfiles(cycles, syncExamFeeRows(cycles, parseFeesStructure(payload.fees)))
     const services = parseOptionalServices(payload.services)
 
     if (!cycles.cycles.length) {
@@ -162,6 +209,7 @@ export async function saveSchoolConfiguration(
     const { error } = await admin
       .from("schools")
       .update({
+        communes,
         cycles_offered: cycles,
         fees_structure: fees,
         optional_services: services,

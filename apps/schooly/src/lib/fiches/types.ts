@@ -32,14 +32,17 @@ export const SCHOOL_NATURES = [
 ] as const
 export type SchoolNature = (typeof SCHOOL_NATURES)[number]
 
-export const EDUCATION_CYCLES = ["general", "technique", "professionnel"] as const
+export const EDUCATION_CYCLES = ["primaire", "general", "technique", "professionnel", "islamique", "superieur"] as const
 export type EducationCycle = (typeof EDUCATION_CYCLES)[number]
 
 /** Libellés d'affichage des cycles (aucune image : badge + couleur). */
 export const CYCLE_LABELS: Record<EducationCycle, string> = {
+  primaire: "Enseignement Primaire",
   general: "Enseignement Général",
   technique: "Enseignement Technique",
   professionnel: "Enseignement Professionnel",
+  islamique: "Enseignement Islamique / Franco-arabe",
+  superieur: "Enseignement Supérieur",
 }
 
 /**
@@ -48,9 +51,12 @@ export const CYCLE_LABELS: Record<EducationCycle, string> = {
  * parce qu'un établissement étranger peut saisir une série hors nomenclature.
  */
 export const SERIES_BY_CYCLE: Record<EducationCycle, readonly string[]> = {
+  primaire: [],
+  islamique: [],
   general: ["A", "A1", "A2", "C", "D", "E"],
   technique: ["F1", "F2", "F3", "F4", "F5", "F6", "F7", "G1", "G2", "G3", "H"],
   professionnel: ["T1", "T2"],
+  superieur: [],
 }
 export type SeriesCode = string
 
@@ -145,10 +151,50 @@ export interface FeeInstallment {
   status: FeeStatus
 }
 
+/** Droit d'examen associé automatiquement à une classe diplômante. */
+export interface CustomFeeItem {
+  id: string
+  label: string
+  amount: number
+  is_mandatory: boolean
+  status: FeeStatus
+  applies_to: FeeAudience
+}
+
+export interface ExamFeeItem {
+  class_name: string
+  exam_name: string
+  diploma: DiplomaKind
+  amount: number
+  amount_affecte?: number
+  amount_non_affecte?: number
+  is_mandatory: boolean
+}
+
 /** Contenu de `schools.fees_structure`. */
+export interface FeeProfile {
+  registration_fees?: FeeItem[]
+  school_fees?: FeeItem[]
+  exam_fees?: ExamFeeItem[]
+  custom_fees?: CustomFeeItem[]
+  installments: FeeInstallment[]
+  currency: string
+  notes?: string
+}
+
 export interface FeesStructure {
+  /** Champs historiques conservés pour compatibilité. */
   registration_fee?: FeeItem
   academic_fee?: FeeItem
+  /** Tarifs distincts selon l'affectation. */
+  registration_fees?: FeeItem[]
+  school_fees?: FeeItem[]
+  /** Droits d'examen par classe diplômante. */
+  exam_fees?: ExamFeeItem[]
+  /** Tarification séparée par pôle d'enseignement. */
+  fee_profiles?: Partial<Record<EducationCycle, FeeProfile>>
+  /** Frais personnalisés ajoutés par le directeur. */
+  custom_fees?: CustomFeeItem[]
   installments: FeeInstallment[]
   /** Code devise ISO 4217 — « XOF » par défaut en Côte d'Ivoire. */
   currency: string

@@ -73,7 +73,9 @@ export function InformationsWizard({
       {step === 0 && (
         <StepIdentite
           nature={draft.cycles.nature}
-          onChange={(nature) => setDraft({ ...draft, cycles: { ...draft.cycles, nature } })}
+          communes={draft.communes}
+          onNatureChange={(nature) => setDraft({ ...draft, cycles: { ...draft.cycles, nature } })}
+          onCommunesChange={(communes) => setDraft({ ...draft, communes })}
         />
       )}
       {step === 1 && (
@@ -89,7 +91,7 @@ export function InformationsWizard({
         />
       )}
       {step === 3 && (
-        <StepFees fees={draft.fees} onChange={(fees) => setDraft({ ...draft, fees })} />
+        <StepFees fees={draft.fees} cycles={draft.cycles.cycles.map((cycle) => cycle.key)} onChange={(fees) => setDraft({ ...draft, fees })} />
       )}
 
       <Card>

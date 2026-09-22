@@ -3591,6 +3591,7 @@ export type Database = {
         Row: {
           admission_notes: string | null
           city: string | null
+          communes: string[]
           cover_photo_url: string | null
           created_at: string
           cycles_offered: Json
@@ -3604,6 +3605,7 @@ export type Database = {
           itineraire: string | null
           latitude: number | null
           longitude: number | null
+          multi_child_discount_rate: number | null
           name: string
           optional_services: Json
           photos_360: Json | null
@@ -3614,12 +3616,15 @@ export type Database = {
           public_website_url: string | null
           published_to_trouvetou: boolean
           school_type: Database["public"]["Enums"]["school_type"] | null
+          trouvetou_listing_id: string | null
+          trouvetou_synced_at: string | null
           updated_at: string
           video_url: string | null
         }
         Insert: {
           admission_notes?: string | null
           city?: string | null
+          communes?: string[]
           cover_photo_url?: string | null
           created_at?: string
           cycles_offered?: Json
@@ -3633,6 +3638,7 @@ export type Database = {
           itineraire?: string | null
           latitude?: number | null
           longitude?: number | null
+          multi_child_discount_rate?: number | null
           name: string
           optional_services?: Json
           photos_360?: Json | null
@@ -3643,12 +3649,15 @@ export type Database = {
           public_website_url?: string | null
           published_to_trouvetou?: boolean
           school_type?: Database["public"]["Enums"]["school_type"] | null
+          trouvetou_listing_id?: string | null
+          trouvetou_synced_at?: string | null
           updated_at?: string
           video_url?: string | null
         }
         Update: {
           admission_notes?: string | null
           city?: string | null
+          communes?: string[]
           cover_photo_url?: string | null
           created_at?: string
           cycles_offered?: Json
@@ -3662,6 +3671,7 @@ export type Database = {
           itineraire?: string | null
           latitude?: number | null
           longitude?: number | null
+          multi_child_discount_rate?: number | null
           name?: string
           optional_services?: Json
           photos_360?: Json | null
@@ -3672,6 +3682,8 @@ export type Database = {
           public_website_url?: string | null
           published_to_trouvetou?: boolean
           school_type?: Database["public"]["Enums"]["school_type"] | null
+          trouvetou_listing_id?: string | null
+          trouvetou_synced_at?: string | null
           updated_at?: string
           video_url?: string | null
         }

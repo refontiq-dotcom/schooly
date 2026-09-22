@@ -6,6 +6,7 @@ import { AcademicYearSelector } from "@/components/academic-year-selector"
 import { GlobalSearch } from "@/components/global-search"
 import { OnboardingWizard } from "@/components/onboarding-wizard"
 import { GeminiBackdrop } from "@/components/gemini"
+import { NotificationBell } from "@/components/notification-bell"
 
 export default async function DashboardLayout({
   children,
@@ -77,6 +78,7 @@ export default async function DashboardLayout({
           <header className="flex h-[72px] shrink-0 items-center gap-3 border-b border-border/70 bg-background/60 px-4 backdrop-blur-xl sm:gap-4 sm:px-7">
             <GlobalSearch />
             <AcademicYearSelector schoolId={schoolId} />
+            <NotificationBell />
             <div className="hidden rounded-full border border-border bg-card/70 px-3 py-1.5 text-xs font-medium text-muted-foreground sm:block">
               {schoolName}
             </div>
