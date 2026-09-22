@@ -79,7 +79,7 @@ end;
 $$;
 
 revoke all on function public.create_grade_change_notification(uuid,uuid,text,text,text,text,uuid) from public;
-grant execute on function public.create_grade_change_notification(uuid,uuid,text,text,text,text,uuid) to authenticated;
+revoke execute on function public.create_grade_change_notification(uuid,uuid,text,text,text,text,uuid) from authenticated;
 
 create or replace function public.get_notification_summary()
 returns table(unread_count bigint, latest_created_at timestamptz)
@@ -205,7 +205,7 @@ end;
 $$;
 
 revoke all on function public.notify_grade_change_request_created(uuid) from public;
-grant execute on function public.notify_grade_change_request_created(uuid) to authenticated;
+revoke execute on function public.notify_grade_change_request_created(uuid) from authenticated;
 
 -- Patch the existing request function: create the request, then fan out persistent notifications.
 create or replace function public.request_evaluation_grade_change(
