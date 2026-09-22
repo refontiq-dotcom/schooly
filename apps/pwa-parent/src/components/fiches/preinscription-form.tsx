@@ -101,7 +101,7 @@ export function PreinscriptionForm({ formations, formation, onFormationChange, s
               <input className="flex h-10 w-full rounded-md border bg-background px-3 text-sm" type="email" placeholder="Email (facultatif)" value={email} onChange={(e) => setEmail(e.target.value)} />
             </div>
 
-            <Button type="button" className="w-full" disabled={submitting || !level || !student || !birthdate || !parent || !phone}
+            {required.length > 0 ? (\n              <div className="space-y-2 rounded-lg border bg-muted/20 p-3">\n                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">5. Pièces à préparer</p>\n                <div className="space-y-1.5 text-sm">\n                  {required.map((item) => <div key={item.id} className="flex items-center justify-between gap-3"><span>{item.label}</span><span className="text-xs text-muted-foreground">{item.required ? "Obligatoire" : "Facultative"}</span></div>)}\n                </div>\n                <p className="text-xs text-muted-foreground">La liste est définie par l’établissement. Le dépôt des fichiers pourra être effectué dans le dossier d’inscription.</p>\n              </div>\n            ) : null}\n\n            <Button type="button" className="w-full" disabled={submitting || !level || !student || !birthdate || !parent || !phone}
               onClick={async () => {
                 setSubmitting(true)
                 setError("")
