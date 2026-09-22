@@ -21,18 +21,21 @@ import type {
 } from "@/lib/fiches/types"
 
 type FicheJson = {
+  communes: unknown
   cycles_offered: unknown
   fees_structure: unknown
   optional_services: unknown
 }
 
 export type FicheState = {
+  communes: string[]
   cycles: CyclesOffered
   fees: FeesStructure
   services: OptionalServices
 }
 
 export type SaveFichePayload = {
+  communes: string[]
   cycles: CyclesOffered
   fees: FeesStructure
   services: OptionalServices
@@ -150,7 +153,7 @@ export async function getFicheState(): Promise<FicheLoadResult> {
     const admin = adminClient()
     const { data, error } = await admin
       .from("schools")
-      .select("name, cycles_offered, fees_structure, optional_services")
+      .select("name, communes, cycles_offered, fees_structure, optional_services")
       .eq("id", ctx.schoolId)
       .maybeSingle<FicheJson & { name: string | null }>()
 
@@ -162,6 +165,7 @@ export async function getFicheState(): Promise<FicheLoadResult> {
       ok: true,
       schoolName: data.name ?? ctx.schoolName,
       state: {
+        communes: Array.isArray(data.communes) ? data.communes.filter((value): value is string => typeof value === "string" && value.trim().length > 0).map((value) => value.trim()) : [],
         cycles: parseCyclesOffered(data.cycles_offered),
         fees: syncFeeProfiles(parseCyclesOffered(data.cycles_offered), syncExamFeeRows(parseCyclesOffered(data.cycles_offered), parseFeesStructure(data.fees_structure))),
         services: parseOptionalServices(data.optional_services),
@@ -183,6 +187,7 @@ export async function saveSchoolConfiguration(
     }
 
     // Normalisation défensive : les parseurs garantissent la conformité.
+    const communes = Array.from(new Set((payload.communes ?? []).map((value) => String(value).trim().replace(/\s+/g, " ")).filter(Boolean)))
     const cycles = parseCyclesOffered(payload.cycles)
     const fees = syncFeeProfiles(cycles, syncExamFeeRows(cycles, parseFeesStructure(payload.fees)))
     const services = parseOptionalServices(payload.services)
@@ -204,6 +209,7 @@ export async function saveSchoolConfiguration(
     const { error } = await admin
       .from("schools")
       .update({
+        communes,
         cycles_offered: cycles,
         fees_structure: fees,
         optional_services: services,
