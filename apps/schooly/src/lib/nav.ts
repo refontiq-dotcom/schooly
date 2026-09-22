@@ -68,6 +68,7 @@ export const NAV_BY_ROLE: Record<string, NavItem[]> = {
     { label: "Mes cours", href: "/dashboard/pedagogie", icon: BookOpen },
     { label: "Appel", href: "/dashboard/pedagogie/attendance", icon: Users },
     { label: "Notes", href: "/dashboard/pedagogie/grades", icon: GraduationCap },
+    { label: "Fournitures", href: "/dashboard/pedagogie/fournitures", icon: School },
   ],
   surveillance: [
     { label: "Vie scolaire", href: "/dashboard/pedagogie/vie-scolaire", icon: ShieldCheck },
