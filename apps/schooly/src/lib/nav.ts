@@ -36,6 +36,7 @@ export const NAV_BY_ROLE: Record<string, NavItem[]> = {
     { label: "Relances", href: "/dashboard/direction/finance/reminders", icon: Bell },
     { label: "Facturation", href: "/dashboard/billing", icon: CreditCard },
     { label: "Rapports", href: "/dashboard/direction/reports", icon: BookOpen },
+    { label: "Journal des notes", href: "/dashboard/direction/grade-audit", icon: ShieldCheck },
     { label: "Services", href: "/dashboard/services/transport", icon: Bus },
     { label: "Paramètres", href: "/dashboard/direction/settings", icon: Settings },
     { label: "Trouvetou", href: "/dashboard/admin/trouvetou", icon: Megaphone },
