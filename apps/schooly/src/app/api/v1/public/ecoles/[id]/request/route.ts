@@ -43,7 +43,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const selectedCycle = cycles?.cycles.find((cycle) => cycle.key === formation)
     if (!selectedCycle) return NextResponse.json({ error: "Formation invalide pour cet établissement." }, { status: 400 })
 
-    const { data: level } = await supabase.from("grade_levels").select("id, name").eq("id", levelId).eq("school_id", schoolId).is("deleted_at", null).maybeSingle()
+    const { data: levelById } = await supabase.from("grade_levels").select("id, name").eq("id", levelId).eq("school_id", schoolId).is("deleted_at", null).maybeSingle()
+    const { data: levelByName } = !levelById ? await supabase.from("grade_levels").select("id, name").eq("name", levelId).eq("school_id", schoolId).is("deleted_at", null).maybeSingle() : { data: null }
+    const level = levelById ?? levelByName
     if (!level) return NextResponse.json({ error: "Niveau scolaire invalide pour cet établissement." }, { status: 400 })
     const selectedLevel = selectedCycle.levels.find((item) => item.grade_level_name.trim().toLowerCase() === String(level.name).trim().toLowerCase())
     if (!selectedLevel) return NextResponse.json({ error: "Ce niveau ne correspond pas à la formation choisie." }, { status: 400 })
