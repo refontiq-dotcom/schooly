@@ -4,7 +4,7 @@ create table if not exists public.preinscription_documents (
   id uuid primary key default gen_random_uuid(),
   school_id uuid not null references public.schools(id) on delete cascade,
   reservation_id uuid not null references public.trouvetou_reservations(id) on delete cascade,
-  required_document_id uuid not null references public.required_documents(id) on delete restrict,
+  required_document_id uuid references public.required_documents(id) on delete set null,
   document_label text not null check (trim(document_label) <> ''),
   required boolean not null default true,
   status text not null default 'missing' check (status in ('missing','received','verified','rejected')),
