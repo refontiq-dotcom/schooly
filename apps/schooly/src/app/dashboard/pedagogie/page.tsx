@@ -61,8 +61,15 @@ export default function PedagogieDashboard() {
     
     const loadAllData = async () => {
       setLoadingData(true)
-      
-      if (user.role === "professeur") {\n        const pending = await listPendingGradeChangeRequests()\n        setPendingGradeChanges(pending.data?.length ?? 0)\n      } else {\n        setPendingGradeChanges(0)\n      }\n\n      const sessionsRes = await getCourseSessions()
+
+      if (user.role === "professeur") {
+        const pending = await listPendingGradeChangeRequests()
+        setPendingGradeChanges(pending.data?.length ?? 0)
+      } else {
+        setPendingGradeChanges(0)
+      }
+
+      const sessionsRes = await getCourseSessions()
       if (sessionsRes.data) setSessions(sessionsRes.data)
 
       const homeworksRes = await getHomeworks()

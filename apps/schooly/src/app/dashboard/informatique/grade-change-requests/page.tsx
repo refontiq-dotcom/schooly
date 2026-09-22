@@ -78,11 +78,11 @@ export default async function GradeChangeRequestsPage() {
                 <p>Professeur : {r.teacher_name ?? "Professeur habilité"}</p>
                 <p className="text-muted-foreground">Motif de la demande : {r.reason}</p>
                 <p className="mt-1 text-xs text-muted-foreground">En attente de confirmation pédagogique · {new Date(r.requested_at).toLocaleString("fr-FR")}</p>
-              </div>
                 <details className="mt-3 rounded border bg-muted/20 p-3">
                   <summary className="cursor-pointer font-medium">Historique complet de la demande</summary>
                   <RequestHistory requestId={r.id} />
                 </details>
+              </div>
             ))}
           </div>
         )}
