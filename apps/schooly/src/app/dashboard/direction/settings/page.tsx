@@ -7,6 +7,8 @@ import { EditSchoolSettingsModal, EditDirectorProfileModal } from "./settings-mo
 import { IntelligentGuidance } from "@/components/intelligent-guidance"
 import { getFicheState } from "../informations/actions"
 import { InformationsWizard } from "../informations/informations-wizard"
+import { getRequiredDocuments } from "./required-documents-actions"
+import { RequiredDocuments } from "./required-documents"
 
 export default async function SettingsPage({
   searchParams,
@@ -47,6 +49,7 @@ export default async function SettingsPage({
     : "Non renseigné"
 
   const fiche = activeTab === "fiches" ? await getFicheState() : null
+  const requiredDocuments = activeTab === "fiches" ? await getRequiredDocuments() : null
 
   return (
     <div className="p-4 sm:p-6">
@@ -168,6 +171,15 @@ export default async function SettingsPage({
                         <p className="mt-1 text-sm text-muted-foreground">Préparez les informations à recueillir auprès des familles et les champs nécessaires à la préinscription.</p>
                         <Badge variant="secondary" className="mt-3">Configuration dédiée</Badge>
                       </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Fiche de renseignement</CardTitle>
+                      <CardDescription>Définissez les pièces que la famille devra préparer pour le dossier d’inscription.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {requiredDocuments?.ok ? <RequiredDocuments initialDocuments={requiredDocuments.documents} /> : <p className="text-sm text-muted-foreground">{requiredDocuments?.error ?? "Configuration indisponible."}</p>}
                     </CardContent>
                   </Card>
                   <InformationsWizard state={fiche.state} />
