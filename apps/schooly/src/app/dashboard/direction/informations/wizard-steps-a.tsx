@@ -1,13 +1,12 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { GraduationCap, Plus, Trash2 } from "lucide-react"
+import { GraduationCap, Plus } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { allowedCyclesFor } from "@/lib/fiches/normalize"
 import { CYCLE_LABELS, EDUCATION_CYCLES, SCHOOL_NATURES, SERIES_BY_CYCLE } from "@/lib/fiches/types"
 import type { CyclesOffered, EducationCycle, OfferedCycle, SchoolNature } from "@/lib/fiches/types"
@@ -216,7 +215,6 @@ export function StepOffre({ cycles, onChange }: { cycles: CyclesOffered; onChang
                 </div>
               </div>
 
-              {rawCycle.levels.length === 0 && onChange({ ...cycles, cycles: cycles.cycles.map((c) => c.key === cycle.key ? cycle : c) })}
             </CardContent>
           </Card>
         )
