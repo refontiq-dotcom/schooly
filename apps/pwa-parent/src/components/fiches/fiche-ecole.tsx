@@ -15,7 +15,7 @@ import { BadgeCycle, BadgeSerie, ServiceIcon } from "@/components/fiches/badges"
 type FicheResponse = {
   ecole: { id: string; nom: string; ville: string | null; adresse: string | null; telephone: string | null; email: string | null; logo: string | null }
   cycles: { cycles: { key: string; label: string; levels: { grade_level_name: string; series: string[]; diploma: string }[] }[] }
-  tarifs: { currency: string; registration_fee?: { amount: number }; academic_fee?: { amount: number }; installments: { label: string; amount: number; due_date: string | null }[]; notes?: string }
+  tarifs: { currency: string; registration_fee?: { amount: number }; academic_fee?: { amount: number }; registration_fees?: { amount: number; status: string }[]; school_fees?: { amount: number; status: string }[]; exam_fees?: { class_name: string; exam_name: string; amount: number }[]; installments: { label: string; amount: number; due_date: string | null }[]; notes?: string }
   services: { transport: { enabled: boolean; vehicle_icon: string; zones: { name: string; price: number }[] }; cantine: { enabled: boolean; meal_icon: string; regimes: { name: string; price: number }[] }; tenues: { enabled: boolean; items: { name: string }[] } }
   classes: string[]
   fournitures: { manuals: { subject: string; title: string; editor: string; icon: string; required_for_inscription: boolean }[]; stationery: { name: string; quantity: string; icon: string }[]; equipment: { name: string; quantity: string; icon: string; required_for_inscription: boolean }[] } | null
@@ -55,6 +55,7 @@ export function FicheEcole({ schoolId, apiBase }: { schoolId: string; apiBase: s
   return (
     <div className="mx-auto max-w-2xl space-y-4 p-4 sm:p-6">
       <Card><CardContent className="flex items-center gap-3 pt-4">
+        {data.ecole.logo ? <img src={data.ecole.logo} alt="" className="size-16 rounded-lg border object-contain" /> : null}
         <div><h1 className="text-xl font-semibold">{data.ecole.nom}</h1>
         <p className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
           {data.ecole.ville ? (<span className="flex items-center gap-1"><MapPin className="size-3.5" />{data.ecole.ville}</span>) : null}
@@ -81,8 +82,9 @@ export function FicheEcole({ schoolId, apiBase }: { schoolId: string; apiBase: s
       </CardContent></Card>
       <Card><CardHeader><CardTitle className="text-base">Tarifs ({data.tarifs.currency})</CardTitle></CardHeader>
       <CardContent className="space-y-2 text-sm">
-        {data.tarifs.registration_fee ? (<p>Droits d&apos;inscription : <strong>{fcfa(data.tarifs.registration_fee.amount)}</strong></p>) : null}
-        {data.tarifs.academic_fee ? (<p>Frais academiques : <strong>{fcfa(data.tarifs.academic_fee.amount)}</strong></p>) : null}
+        {data.tarifs.registration_fees?.length ? data.tarifs.registration_fees.map((f) => <p key={`ins-${f.status}`}>Frais d'inscription — {f.status === "affecte" ? "élève affecté" : "élève non affecté"} : <strong>{fcfa(f.amount)}</strong></p>) : data.tarifs.registration_fee ? (<p>Frais d'inscription : <strong>{fcfa(data.tarifs.registration_fee.amount)}</strong></p>) : null}
+        {data.tarifs.school_fees?.length ? data.tarifs.school_fees.map((f) => <p key={`sco-${f.status}`}>Frais de scolarité — {f.status === "affecte" ? "élève affecté" : "élève non affecté"} : <strong>{fcfa(f.amount)}</strong></p>) : data.tarifs.academic_fee ? (<p>Frais de scolarité : <strong>{fcfa(data.tarifs.academic_fee.amount)}</strong></p>) : null}
+        {data.tarifs.exam_fees?.length ? <div className="border-t pt-2"><p className="font-medium">Droits d'examen</p>{data.tarifs.exam_fees.map((f) => <p key={f.class_name + f.exam_name}>{f.class_name} — {f.exam_name} : <strong>{fcfa(f.amount)}</strong></p>)}</div> : null}
         {data.tarifs.installments.map((t, i) => (<p key={i}>{t.label} : <strong>{fcfa(t.amount)}</strong>{t.due_date ? ` — ${t.due_date}` : ""}</p>))}
         {data.tarifs.notes ? <p className="text-muted-foreground">{data.tarifs.notes}</p> : null}
       </CardContent></Card>
