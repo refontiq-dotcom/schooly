@@ -23,6 +23,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const { id } = await params
   const { searchParams } = new URL(request.url)
   const className = searchParams.get("classe")
+  const formation = searchParams.get("formation")
   const sb = supa()
 
   const { data: school, error } = await sb
@@ -37,6 +38,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const cycles = parseCyclesOffered((school as { cycles_offered: unknown }).cycles_offered)
   const fees = parseFeesStructure((school as { fees_structure: unknown }).fees_structure)
   const services = parseOptionalServices((school as { optional_services: unknown }).optional_services)
+  const selectedCycle = formation ? cycles.cycles.find((cycle) => cycle.key === formation) ?? null : null
+  const selectedFees = formation && fees.fee_profiles?.[formation as keyof typeof fees.fee_profiles] ? fees.fee_profiles[formation as keyof typeof fees.fee_profiles] : fees
 
   const { data: rows } = await sb
     .from("school_supplies")
@@ -63,7 +66,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       logo: (school as { cover_photo_url: string | null }).cover_photo_url,
     },
     cycles,
-    tarifs: fees,
+    formation: selectedCycle ? { key: selectedCycle.key, label: selectedCycle.label, levels: selectedCycle.levels } : null,
+    formations: cycles.cycles.map((cycle) => ({ key: cycle.key, label: cycle.label, levels: cycle.levels })),
+    tarifs: selectedFees,
     services,
     classes,
     fournitures: className ? (published[className] ?? null) : null,
