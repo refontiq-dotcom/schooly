@@ -8,6 +8,7 @@ import { useEffect, useState } from "react"
 import { Loader2, MapPin, Phone, Mail } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { FicheModeAButton } from "@/components/fiches/fiche-mode-a-button"
+import { PreinscriptionForm } from "@/components/fiches/preinscription-form"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select } from "@/components/ui/select"
 import { BadgeCycle, BadgeSerie, ServiceIcon } from "@/components/fiches/badges"
@@ -109,6 +110,7 @@ export function FicheEcole({ schoolId, apiBase }: { schoolId: string; apiBase: s
         {data.services.tenues.enabled ? (<p className="flex items-center gap-2"><ServiceIcon name="shirt" />Tenues : {data.services.tenues.items.map((t) => t.name).join(" · ")}</p>) : null}
         {!data.services.transport.enabled && !data.services.cantine.enabled && !data.services.tenues.enabled ? (<p className="text-muted-foreground">Aucun service optionnel declare.</p>) : null}
       </CardContent></Card>
+      <PreinscriptionForm formations={data.formations} formation={formation} onFormationChange={selectFormation} schoolId={schoolId} />
       <Card><CardHeader><CardTitle className="text-base">Fournitures par classe</CardTitle></CardHeader>
       <CardContent className="space-y-3">
         <label className="block space-y-1.5"><span className="text-xs text-muted-foreground">Classe de votre enfant</span><Select value={classe} onChange={(e) => selectClasse(e.target.value)}><option value="">Choisir une classe…</option>{(activeLevels.length ? activeLevels.map((x) => x.grade_level_name) : data.classes).map((c) => (<option key={c} value={c}>{c}</option>))}</Select></label>
