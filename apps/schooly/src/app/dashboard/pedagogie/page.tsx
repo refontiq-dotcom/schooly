@@ -30,6 +30,7 @@ import { CreateHomeworkModal } from "./homework-modal"
 import { CreateDecisionModal } from "./decision-modal"
 import { useSupabaseUser } from "@/hooks/use-supabase-user"
 import { IntelligentGuidance } from "@/components/intelligent-guidance"
+import { listPendingGradeChangeRequests } from "./grade-correction-actions"
 
 // Les types de lignes (CourseSessionRow, HomeworkRow, AcademicDecisionRow)
 // sont importés de ./actions : source unique, fidèle au schéma (champs
@@ -50,6 +51,7 @@ export default function PedagogieDashboard() {
   const [enrollments, setEnrollments] = useState<Array<{ id: string; label: string }>>([])
   const [loadingData, setLoadingData] = useState(true)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [pendingGradeChanges, setPendingGradeChanges] = useState(0)
 
   const currentYear = academicYears.find(y => y.status === "en_cours")
   const plannedYear = academicYears.find(y => y.status === "planifiee")
