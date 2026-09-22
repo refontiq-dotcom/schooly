@@ -8,11 +8,12 @@ import { Button } from "@/components/ui/button"
 type Level = { grade_level_name: string; series: string[]; diploma: string }
 type Formation = { key: string; label: string; levels: Level[] }
 
-export function PreinscriptionForm({ formations, formation, onFormationChange, schoolId }: {
+export function PreinscriptionForm({ formations, formation, onFormationChange, schoolId, onCreated }: {
   formations: Formation[]
   formation: string
   onFormationChange: (key: string) => void
   schoolId: string
+  onCreated?: (result: { reservation_id: string; formation: { key: string; label: string }; level: { id: string; label: string } }) => void
 }) {
   const [level, setLevel] = useState("")
   const [series, setSeries] = useState("")
@@ -21,6 +22,9 @@ export function PreinscriptionForm({ formations, formation, onFormationChange, s
   const [parent, setParent] = useState("")
   const [phone, setPhone] = useState("")
   const [email, setEmail] = useState("")
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState("")
+  const [success, setSuccess] = useState("")
   const selected = formations.find((item) => item.key === formation)
   // Les données de chaque pôle sont déjà isolées par l’API publique. On ne garde
   // donc jamais un niveau/série d’un autre pôle dans l’état du formulaire.
@@ -97,13 +101,31 @@ export function PreinscriptionForm({ formations, formation, onFormationChange, s
               <input className="flex h-10 w-full rounded-md border bg-background px-3 text-sm" type="email" placeholder="Email (facultatif)" value={email} onChange={(e) => setEmail(e.target.value)} />
             </div>
 
-            <Button type="button" className="w-full" disabled={!level || !student || !birthdate || !parent || !phone}
-              onClick={() => {
-                const payload = { school_id: schoolId, formation, level, series, student_full_name: student, student_birthdate: birthdate, parent_full_name: parent, parent_phone: phone, parent_email: email }
-                window.dispatchEvent(new CustomEvent("schooly:preinscription-ready", { detail: payload }))
+            <Button type="button" className="w-full" disabled={submitting || !level || !student || !birthdate || !parent || !phone}
+              onClick={async () => {
+                setSubmitting(true)
+                setError("")
+                setSuccess("")
+                try {
+                  const response = await fetch(`/api/v1/public/ecoles/${schoolId}/request`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ formation, level_id: selectedLevel?.grade_level_name, student_full_name: student, student_birthdate: birthdate, parent_full_name: parent, parent_phone: phone, parent_email: email, series }),
+                  })
+                  const result = await response.json()
+                  if (!response.ok) throw new Error(result.error || "Création de la préinscription impossible.")
+                  setSuccess(`Préinscription créée. Référence : ${result.reservation_id}`)
+                  onCreated?.(result)
+                } catch (err) {
+                  setError(err instanceof Error ? err.message : "Une erreur est survenue.")
+                } finally {
+                  setSubmitting(false)
+                }
               }}>
-              Continuer avec ce parcours
+              {submitting ? "Création de la préinscription…" : "Continuer avec ce parcours"}
             </Button>
+            {error ? <p className="text-sm text-destructive">{error}</p> : null}
+            {success ? <p className="text-sm text-green-700">{success}</p> : null}
           </>
         ) : null}
       </CardContent>
