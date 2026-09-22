@@ -65,7 +65,7 @@ export async function GET(request: Request) {
     "school_payment_methods", "school_supplies", "student_fee_items",
     "student_movement_activation_audit", "student_movement_activations", "student_movement_requests",
     "student_qr_codes", "students", "subjects", "syscohada_export_log", "syscohada_settings",
-    "transport_subscriptions", "trouvetou_ads", "trouvetou_reservations", "year_rollover_logs",
+    "transport_subscriptions", "preinscription_documents", "trouvetou_ads", "trouvetou_reservations", "year_rollover_logs",
   ].sort()
 
   const data: Record<string, unknown[]> = {}
