@@ -49,8 +49,8 @@ export function NotificationBell() {
   }, [])
 
   useEffect(() => {
-    let channel: ReturnType<ReturnType<typeof createClient>["channel"]> | null = null
     let mounted = true
+    let cleanup: (() => void) | undefined
 
     const start = async () => {
       const supabase = createClient()
@@ -58,7 +58,7 @@ export function NotificationBell() {
       if (!user || !mounted) return
 
       await load()
-      channel = supabase
+      const channel = supabase
         .channel(`schooly-notifications-${user.id}`)
         .on(
           "postgres_changes",
@@ -68,15 +68,16 @@ export function NotificationBell() {
           },
         )
         .subscribe()
+
+      cleanup = () => {
+        void supabase.removeChannel(channel)
+      }
     }
 
     void start()
     return () => {
       mounted = false
-      if (channel) {
-        const supabase = createClient()
-        void supabase.removeChannel(channel)
-      }
+      cleanup?.()
     }
   }, [load])
 
