@@ -28,17 +28,30 @@ function uniqueBy<T>(items:T[],key:(x:T)=>string){const m=new Map<string,T>();fo
 export async function publishClassSupplyFromProposals(classId:string):Promise<Result>{
  const ctx=await directionContext();if(!ctx.ok)return ctx;const a=adminClient();const y=await year(a,ctx.schoolId);if(!y)return{ok:false,error:"Aucune année scolaire en cours."}
  const {data:cls}=await a.from("classes").select("id,name,grade_level_id,grade_levels(name,level,cycle)").eq("id",classId).eq("school_id",ctx.schoolId).is("deleted_at",null).maybeSingle();if(!cls)return{ok:false,error:"Classe introuvable."}
- const {data:assignments,error:assignmentsError}=await a.from("class_subject_assignments").select("id,subject_id,teacher_id").eq("school_id",ctx.schoolId).eq("class_id",classId).is("deleted_at",null)\n if(assignmentsError)return{ok:false,error:assignmentsError.message}\n if(!assignments?.length)return{ok:false,error:"Aucune affectation pédagogique active pour cette classe."}\n const assignmentIds=assignments.map((x:any)=>String(x.id))\n const {data:ps,error}=await a.from("school_supply_proposals").select("id,assignment_id,configurations,status").eq("school_id",ctx.schoolId).eq("academic_year_id",y.id).eq("class_id",classId).is("deleted_at",null).in("assignment_id",assignmentIds)\n if(error)return{ok:false,error:error.message}\n const byAssignment=new Map((ps??[]).map((p:any)=>[String(p.assignment_id),p]))\n const missing=assignments.filter((x:any)=>byAssignment.get(String(x.id))?.status!=="approved")\n if(missing.length)return{ok:false,error:"Toutes les affectations actives doivent être validées avant publication."}\n const approved=assignments.map((x:any)=>byAssignment.get(String(x.id))).filter(Boolean)\n const configs=approved.map((p:any)=>parseClassSupplies(p.configurations,String((cls as any).name)))\n const merged:ClassSuppliesConfiguration={status:"published",class_label:String((cls as any).name),level:Number((cls as any).grade_levels?.level??0),cycle:String((cls as any).grade_levels?.cycle??""),year:String(y.label),manuals:uniqueBy(configs.flatMap(c=>c.manuals),m=>m.subject+"|"+m.title+"|"+m.editor),stationery:uniqueBy(configs.flatMap(c=>c.stationery),s=>s.category+"|"+s.name+"|"+s.quantity),equipment:uniqueBy(configs.flatMap(c=>c.equipment),e=>e.name+"|"+e.quantity+"|"+(e.color_hint??""))}
+ const {data:assignments,error:assignmentsError}=await a.from("pedagogical_assignments")
+   .select("id,scope,status").eq("school_id",ctx.schoolId).eq("academic_year_id",y.id).eq("class_id",classId).eq("status","active").is("deleted_at",null)
+ if(assignmentsError)return{ok:false,error:assignmentsError.message}
+ if(!assignments?.length)return{ok:false,error:"Aucune affectation pédagogique universelle active pour cette classe."}
+ const ids=(assignments as any[]).map(x=>String(x.id))
+ const {data:ps,error}=await a.from("school_supply_proposals").select("id,pedagogical_assignment_id,configurations,status")
+   .eq("school_id",ctx.schoolId).eq("academic_year_id",y.id).is("deleted_at",null).in("pedagogical_assignment_id",ids)
+ if(error)return{ok:false,error:error.message}
+ const byAssignment=new Map((ps??[]).map((p:any)=>[String(p.pedagogical_assignment_id),p]))
+ const missing=(assignments as any[]).filter(x=>byAssignment.get(String(x.id))?.status!=="approved")
+ if(missing.length)return{ok:false,error:"Toutes les affectations pédagogiques applicables doivent être validées avant publication."}
+ const configs=(assignments as any[]).map(x=>byAssignment.get(String(x.id))).filter(Boolean).map((p:any)=>parseClassSupplies(p.configurations,String((cls as any).name)))
+ const merged:ClassSuppliesConfiguration={
+   status:"published",class_label:String((cls as any).name),level:Number((cls as any).grade_levels?.level??0),
+   cycle:String((cls as any).grade_levels?.cycle??""),year:String(y.label),
+   manuals:uniqueBy(configs.flatMap(c=>c.manuals),m=>m.subject+"|"+m.title+"|"+m.editor),
+   stationery:uniqueBy(configs.flatMap(c=>c.stationery),s=>s.category+"|"+s.name+"|"+s.quantity),
+   equipment:uniqueBy(configs.flatMap(c=>c.equipment),e=>e.name+"|"+e.quantity+"|"+(e.color_hint??""))
+ }
  const payload={grade_level_id:(cls as any).grade_level_id,configurations:merged,status:"published",published_at:new Date().toISOString(),deleted_at:null}
  const {data:existing}=await a.from("school_supplies").select("id").eq("school_id",ctx.schoolId).eq("class_name",String((cls as any).name)).eq("academic_year_id",y.id).maybeSingle()
- let writeError:null|string=null
- if(existing?.id){
-   const {error}=await a.from("school_supplies").update(payload).eq("id",existing.id).eq("school_id",ctx.schoolId)
-   writeError=error?.message??null
- } else {
-   const {error}=await a.from("school_supplies").insert({school_id:ctx.schoolId,class_name:String((cls as any).name),academic_year_id:y.id,...payload})
-   writeError=error?.message??null
- }
+ let writeError:string|null=null
+ if(existing?.id){const {error}=await a.from("school_supplies").update(payload).eq("id",existing.id).eq("school_id",ctx.schoolId);writeError=error?.message??null}
+ else {const {error}=await a.from("school_supplies").insert({school_id:ctx.schoolId,class_name:String((cls as any).name),academic_year_id:y.id,...payload});writeError=error?.message??null}
  if(writeError)return{ok:false,error:writeError}
  revalidatePath("/dashboard/direction/informations");return{ok:true}
 }
