@@ -68,8 +68,8 @@ export function StepFees({ fees, onChange, cycles }: { fees: FeesStructure; onCh
     onChange({ ...fees, fee_profiles: { ...(fees.fee_profiles ?? {}), [activeCycle]: profile } })
   }
 
-  const registrationFees = activeFees.registration_fees?.length ? activeFees.registration_fees : activeFees.registration_fee ? [activeFees.registration_fee] : []
-  const schoolFees = activeFees.school_fees?.length ? activeFees.school_fees : activeFees.academic_fee ? [activeFees.academic_fee] : []
+  const registrationFees = activeFees.registration_fees ?? []
+  const schoolFees = activeFees.school_fees ?? []
 
   function addInstallment() {
     const label = instLabel.trim() || "Tranche " + (activeFees.installments.length + 1)
@@ -144,7 +144,7 @@ export function StepFees({ fees, onChange, cycles }: { fees: FeesStructure; onCh
             <Input placeholder="Nom du frais (ex. frais de dossier)" value={customLabel} onChange={(e) => setCustomLabel(e.target.value)} />
             <Input type="number" placeholder="Montant" value={customAmount} onChange={(e) => setCustomAmount(e.target.value)} />
             <Select value={customStatus} onValueChange={(v) => setCustomStatus(v as "affecte" | "non_affecte")}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="affecte">Élève affecté</SelectItem>
                 <SelectItem value="non_affecte">Élève non affecté</SelectItem>
