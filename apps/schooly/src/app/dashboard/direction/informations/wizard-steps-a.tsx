@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { allowedCyclesFor } from "@/lib/fiches/normalize"
 import { CYCLE_LABELS, EDUCATION_CYCLES, SCHOOL_NATURES, SERIES_BY_CYCLE } from "@/lib/fiches/types"
 import type { CyclesOffered, EducationCycle, OfferedCycle, SchoolNature } from "@/lib/fiches/types"
@@ -63,7 +64,17 @@ function emptyCycle(key: EducationCycle): OfferedCycle {
   }
 }
 
-export function StepIdentite({ nature, onChange }: { nature: SchoolNature; onChange: (next: SchoolNature) => void }) {
+export function StepIdentite({ nature, communes, onNatureChange, onCommunesChange }: { nature: SchoolNature; communes: string[]; onNatureChange: (next: SchoolNature) => void; onCommunesChange: (next: string[]) => void }) {
+  const [communeInput, setCommuneInput] = useState("")
+  function addCommune() {
+    const value = communeInput.trim().replace(/\s+/g, " ")
+    if (!value || communes.some((c) => c.toLocaleLowerCase("fr") === value.toLocaleLowerCase("fr"))) return
+    onCommunesChange([...communes, value])
+    setCommuneInput("")
+  }
+  function removeCommune(value: string) {
+    onCommunesChange(communes.filter((c) => c !== value))
+  }
   const allowed = allowedCyclesFor(nature)
   return (
     <Card>
@@ -71,11 +82,35 @@ export function StepIdentite({ nature, onChange }: { nature: SchoolNature; onCha
       <CardContent className="space-y-4">
         <div className="space-y-2">
           <Label>Quel type de formation proposez-vous ?</Label>
-          <Select value={nature} onValueChange={(v) => onChange(v as SchoolNature)}>
+          <Select value={nature} onValueChange={(v) => onNatureChange(v as SchoolNature)}>
             <SelectTrigger className="max-w-sm"><SelectValue placeholder="Choisir" /></SelectTrigger>
             <SelectContent>{SCHOOL_NATURES.map((n) => <SelectItem key={n} value={n}>{NATURE_LABELS[n]}</SelectItem>)}</SelectContent>
           </Select>
           <p className="text-xs text-muted-foreground">Ce choix permet à Schooly de proposer automatiquement les classes et formations adaptées.</p>
+        </div>
+        <div className="space-y-2">
+          <Label>Commune(s) d’implantation</Label>
+          <div className="flex flex-wrap gap-1.5">
+            {communes.map((commune) => (
+              <Badge key={commune} variant="secondary" className="cursor-pointer" onClick={() => removeCommune(commune)} title="Retirer cette commune">
+                {commune} ×
+              </Badge>
+            ))}
+            {!communes.length ? <p className="text-xs text-muted-foreground">Ajoutez au moins la commune où se trouve l’établissement.</p> : null}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Input
+              className="max-w-sm"
+              placeholder="Ex. Cocody"
+              value={communeInput}
+              onChange={(e) => setCommuneInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addCommune() } }}
+            />
+            <Button type="button" variant="outline" size="sm" onClick={addCommune}>
+              <Plus className="size-4" /> Ajouter la commune
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">Plusieurs communes peuvent être ajoutées si l’établissement dispose de plusieurs implantations.</p>
         </div>
         {allowed.length > 0 && (
           <div className="space-y-1">
