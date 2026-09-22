@@ -76,7 +76,7 @@ export async function getTeacherSupplyProposals(): Promise<Result<TeacherSupplyP
   const year = await currentYearId(admin, ctx.schoolId)
   if (!year) return { ok:true,data:[] }
   const assignments = await getTeacherSupplyAssignments()
-  if (!assignments.ok) return assignments
+  if (!assignments.ok) return { ok: false, error: assignments.error }
   const proposals = await admin.from("school_supply_proposals").select("id,class_id,subject_id,status,revision,review_note,configurations").eq("school_id",ctx.schoolId).eq("academic_year_id",year.id).eq("teacher_id",ctx.userId).is("deleted_at",null)
   if (proposals.error) return { ok:false,error:proposals.error.message }
   const byKey = new Map((proposals.data ?? []).map((p:any)=>[String(p.class_id)+":"+String(p.subject_id),p]))
