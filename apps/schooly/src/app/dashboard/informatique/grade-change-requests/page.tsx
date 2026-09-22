@@ -1,10 +1,11 @@
+import { RequestHistory } from "@/app/dashboard/informatique/grade-change-requests/request-history"
 import { redirect } from "next/navigation"
 import { createClient } from "@/utils/supabase/server"
 import { requireSchoolRole } from "@/utils/supabase/require-role"
 import { ActionForm } from "@/components/action-form"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { getGradesForIT, listPendingGradeChangeRequests, requestGradeChange } from "@/app/dashboard/pedagogie/grade-correction-actions"
+import { getGradesForIT, listPendingGradeChangeRequests, requestGradeChange, getGradeChangeRequestHistory } from "@/app/dashboard/pedagogie/grade-correction-actions"
 
 export default async function GradeChangeRequestsPage() {
   const db = await createClient()
@@ -73,9 +74,15 @@ export default async function GradeChangeRequestsPage() {
             {requests.map(r => (
               <div key={r.id} className="rounded border p-3 text-sm">
                 <p className="font-medium">Révision {r.old_revision} · {r.old_value === null ? "ABS" : r.old_value} → {r.new_value === null ? "ABS" : r.new_value}</p>
-                <p className="text-muted-foreground">{r.reason}</p>
+                <p>Demandeur : {r.requester_name ?? r.requested_by}</p>
+                <p>Professeur : {r.teacher_name ?? "Professeur habilité"}</p>
+                <p className="text-muted-foreground">Motif de la demande : {r.reason}</p>
                 <p className="mt-1 text-xs text-muted-foreground">En attente de confirmation pédagogique · {new Date(r.requested_at).toLocaleString("fr-FR")}</p>
               </div>
+                <details className="mt-3 rounded border bg-muted/20 p-3">
+                  <summary className="cursor-pointer font-medium">Historique complet de la demande</summary>
+                  <RequestHistory requestId={r.id} />
+                </details>
             ))}
           </div>
         )}
