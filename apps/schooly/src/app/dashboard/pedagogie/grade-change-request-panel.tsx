@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { ActionForm } from "@/components/action-form"
 import { Button } from "@/components/ui/button"
 import type { GradeEntryRow } from "./actions"
@@ -14,7 +14,7 @@ export function GradeChangeRequestPanel({ grades }: { grades: GradeEntryRow[] })
   const [requests, setRequests] = useState<GradeChangeRequest[]>([])
   const [message, setMessage] = useState("")
 
-  async function load() {
+  const load = useCallback(async () => {
     const result = await listPendingGradeChangeRequests()
     if (result.error) setMessage(result.error)
     else setRequests(result.data ?? [])
