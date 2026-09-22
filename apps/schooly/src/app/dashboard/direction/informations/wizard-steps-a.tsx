@@ -96,6 +96,7 @@ export function StepOffre({ cycles, onChange }: { cycles: CyclesOffered; onChang
   const allowed = allowedCyclesFor(cycles.nature)
   const activeKeys = useMemo(() => new Set(cycles.cycles.map((c) => c.key)), [cycles.cycles])
   const [customName, setCustomName] = useState<Record<string, string>>({})
+  const [customSeries, setCustomSeries] = useState<Record<string, string>>({})
 
   function toggleCycle(key: EducationCycle) {
     const exists = cycles.cycles.some((c) => c.key === key)
@@ -194,21 +195,31 @@ export function StepOffre({ cycles, onChange }: { cycles: CyclesOffered; onChang
                 })}
               </div>
 
-              {(cycle.key === "general" || cycle.key === "technique" || cycle.key === "professionnel") && (
+              {(cycle.key === "general" || cycle.key === "technique" || cycle.key === "professionnel" || cycle.key === "superieur") && (
                 <div className="space-y-2">
-                  <Label>{cycle.key === "professionnel" ? "Filières professionnelles" : "Filières / séries"}</Label>
+                  <Label>{cycle.key === "superieur" ? "Filières / parcours" : cycle.key === "professionnel" ? "Filières professionnelles" : "Filières / séries"}</Label>
                   <div className="flex flex-wrap gap-1.5">
                     {SERIES_BY_CYCLE[cycle.key].map((serie) => {
                       const enabled = cycle.series.includes(serie)
-                      return (
-                        <Badge key={serie} variant={enabled ? "default" : "outline"} className="cursor-pointer" onClick={() => {
-                          const series = enabled ? cycle.series.filter((s) => s !== serie) : [...cycle.series, serie]
-                          onChange({ ...cycles, cycles: cycles.cycles.map((c) => c.key === cycle.key ? { ...c, series } : c) })
-                        }}>{serie}</Badge>
-                      )
+                      return <Badge key={serie} variant={enabled ? "default" : "outline"} className="cursor-pointer" onClick={() => {
+                        const series = enabled ? cycle.series.filter((s) => s !== serie) : [...cycle.series, serie]
+                        onChange({ ...cycles, cycles: cycles.map((item) => item.key === cycle.key ? { ...item, series } : item) })
+                      }}>{serie}</Badge>
                     })}
+                    {cycle.series.filter((serie) => !SERIES_BY_CYCLE[cycle.key].includes(serie)).map((serie) => (
+                      <Badge key={serie} variant="default" className="cursor-pointer" onClick={() => onChange({ ...cycles, cycles: cycles.map((item) => item.key === cycle.key ? { ...item, series: item.series.filter((s) => s !== serie) } : item) })}>{serie} ×</Badge>
+                    ))}
                   </div>
-                  <p className="text-xs text-muted-foreground">Schooly utilise ces filières uniquement lorsque le niveau le nécessite. Vous n'avez pas une filière ? Ajoutez-la ci-dessous.</p>
+                  <div className="flex flex-wrap gap-2">
+                    <Input className="max-w-sm" placeholder={cycle.key === "superieur" ? "Ex. Informatique, Gestion, Génie civil..." : "Ex. spécialité / filière"} value={customSeries[cycle.key] ?? ""} onChange={(e) => setCustomSeries((state) => ({ ...state, [cycle.key]: e.target.value }))} />
+                    <Button variant="outline" size="sm" onClick={() => {
+                      const value = (customSeries[cycle.key] ?? "").trim()
+                      if (!value || cycle.series.some((s) => s.toLowerCase() === value.toLowerCase())) return
+                      onChange({ ...cycles, cycles: cycles.map((item) => item.key === cycle.key ? { ...item, series: [...item.series, value] } : item) })
+                      setCustomSeries((state) => ({ ...state, [cycle.key]: "" }))
+                    }}><Plus className="size-4" /> Ajouter une filière</Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Les étudiants/élèves pourront être rattachés à cette filière ou ce parcours lors de l'inscription.</p>
                 </div>
               )}
 
