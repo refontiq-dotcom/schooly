@@ -47,17 +47,28 @@ export type FicheSaveResult = { ok: boolean; error?: string }
 function syncExamFeeRows(cycles: CyclesOffered, fees: FeesStructure): FeesStructure {
   const detected = cycles.cycles.flatMap((cycle) => cycle.levels).map((level) => {
     const name = level.grade_level_name.trim()
-    const key = name.toLowerCase()
+    const key = name.toLowerCase().replace(/\s+/g, " ")
     if (key === "cm2") return { class_name: name, exam_name: "CEPE", diploma: "cep" as const }
-    if (key === "3e") return { class_name: name, exam_name: "BEPC", diploma: "bepc" as const }
+    if (key === "3e" || key === "3ème" || key === "3eme") return { class_name: name, exam_name: "BEPC", diploma: "bepc" as const }
     if (key === "terminale" || key === "terminale technique") return { class_name: name, exam_name: "BAC", diploma: "bac" as const }
+    if (key === "cap" || key.startsWith("cap ")) return { class_name: name, exam_name: "CAP", diploma: "cap" as const }
+    if (key === "bt" || key.startsWith("bt ")) return { class_name: name, exam_name: "BT", diploma: "bt" as const }
+    if (key === "bts" || key.startsWith("bts ")) return { class_name: name, exam_name: "BTS", diploma: "bts" as const }
     return null
-  }).filter((item): item is { class_name: string; exam_name: string; diploma: "cep"|"bepc"|"bac" } => Boolean(item))
-  const existing = fees.exam_fees ?? []
-  const merged = [...existing]
+  }).filter((item): item is { class_name: string; exam_name: string; diploma: "cep" | "bepc" | "bac" | "cap" | "bt" | "bts" } => Boolean(item))
+
+  const merged = [...(fees.exam_fees ?? [])]
   for (const item of detected) {
-    if (merged.some((row) => row.class_name === item.class_name && row.exam_name === item.exam_name)) continue
-    merged.push({ ...item, amount: 0, is_mandatory: true })
+    const row = merged.find((candidate) =>
+      candidate.class_name.trim().toLowerCase() === item.class_name.trim().toLowerCase() &&
+      candidate.exam_name.trim().toLowerCase() === item.exam_name.toLowerCase(),
+    )
+    if (row) {
+      row.amount_affecte = row.amount_affecte ?? row.amount ?? 0
+      row.amount_non_affecte = row.amount_non_affecte ?? row.amount ?? 0
+      continue
+    }
+    merged.push({ ...item, amount: 0, amount_affecte: 0, amount_non_affecte: 0, is_mandatory: true })
   }
   return { ...fees, exam_fees: merged }
 }
