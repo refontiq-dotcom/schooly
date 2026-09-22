@@ -164,6 +164,8 @@ export interface ExamFeeItem {
   exam_name: string
   diploma: DiplomaKind
   amount: number
+  amount_affecte?: number
+  amount_non_affecte?: number
   is_mandatory: boolean
 }
 
