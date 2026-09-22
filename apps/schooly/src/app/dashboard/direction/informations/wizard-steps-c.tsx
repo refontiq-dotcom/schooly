@@ -6,10 +6,11 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { totalInstallments } from "@/lib/fiches/normalize"
-import type { ExamFeeItem, FeeItem, FeesStructure } from "@/lib/fiches/types"
+import type { CustomFeeItem, ExamFeeItem, FeeItem, FeesStructure } from "@/lib/fiches/types"
 import { fcfa } from "./wizard-steps-a"
 
 function emptyFee(label: string, status: "affecte" | "non_affecte"): FeeItem {
@@ -55,6 +56,9 @@ export function StepFees({ fees, onChange }: { fees: FeesStructure; onChange: (n
   const [examClass, setExamClass] = useState("")
   const [examName, setExamName] = useState("")
   const [examAmount, setExamAmount] = useState("")
+  const [customLabel, setCustomLabel] = useState("")
+  const [customAmount, setCustomAmount] = useState("")
+  const [customStatus, setCustomStatus] = useState<"affecte" | "non_affecte">("non_affecte")
 
   const registrationFees = fees.registration_fees?.length ? fees.registration_fees : fees.registration_fee ? [fees.registration_fee] : []
   const schoolFees = fees.school_fees?.length ? fees.school_fees : fees.academic_fee ? [fees.academic_fee] : []
@@ -63,6 +67,21 @@ export function StepFees({ fees, onChange }: { fees: FeesStructure; onChange: (n
     const label = instLabel.trim() || "Tranche " + (fees.installments.length + 1)
     onChange({ ...fees, installments: [...fees.installments, { label, position: fees.installments.length + 1, amount: Number(instAmount) || 0, due_date: null, status: "non_affecte" }] })
     setInstLabel(""); setInstAmount("")
+  }
+
+  function addCustomFee() {
+    const label = customLabel.trim()
+    if (!label) return
+    const item: CustomFeeItem = {
+      id: crypto.randomUUID(),
+      label,
+      amount: Number(customAmount) || 0,
+      is_mandatory: true,
+      status: customStatus,
+      applies_to: "all",
+    }
+    onChange({ ...fees, custom_fees: [...(fees.custom_fees ?? []), item] })
+    setCustomLabel(""); setCustomAmount("")
   }
 
   function addExamFee() {
@@ -84,6 +103,35 @@ export function StepFees({ fees, onChange }: { fees: FeesStructure; onChange: (n
     <div className="space-y-4">
       <FeePair title="Frais d'inscription" fees={registrationFees} onChange={(registration_fees) => onChange({ ...fees, registration_fees })} />
       <FeePair title="Frais de scolarité" fees={schoolFees} onChange={(school_fees) => onChange({ ...fees, school_fees })} />
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Autres frais</CardTitle>
+          <p className="text-sm text-muted-foreground">Un frais particulier de votre établissement n'est pas dans la liste ? Ajoutez simplement son nom et son montant.</p>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {(fees.custom_fees ?? []).map((item, i) => (
+            <div key={item.id} className="flex flex-wrap items-center gap-2 rounded-lg border p-3">
+              <span className="min-w-48 text-sm font-medium">{item.label}</span>
+              <span className="text-sm text-muted-foreground">{item.status === "affecte" ? "Élève affecté" : "Élève non affecté"}</span>
+              <span className="text-sm font-medium">{fcfa(item.amount)}</span>
+              <Button variant="ghost" size="icon" onClick={() => onChange({ ...fees, custom_fees: (fees.custom_fees ?? []).filter((_, x) => x !== i) })}><Trash2 className="size-4" /></Button>
+            </div>
+          ))}
+          <div className="grid gap-2 md:grid-cols-4">
+            <Input placeholder="Nom du frais (ex. frais de dossier)" value={customLabel} onChange={(e) => setCustomLabel(e.target.value)} />
+            <Input type="number" placeholder="Montant" value={customAmount} onChange={(e) => setCustomAmount(e.target.value)} />
+            <Select value={customStatus} onValueChange={(v) => setCustomStatus(v as "affecte" | "non_affecte")}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="affecte">Élève affecté</SelectItem>
+                <SelectItem value="non_affecte">Élève non affecté</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button variant="outline" size="sm" onClick={addCustomFee}><Plus className="size-4" /> Ajouter</Button>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
