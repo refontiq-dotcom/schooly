@@ -93,11 +93,11 @@ export async function saveTeacherSupplyProposal(assignmentId:string, configurati
   const admin=adminClient()
   const year=await currentYearId(admin,ctx.schoolId)
   if(!year)return {ok:false,error:"Aucune année scolaire en cours."}
-  const {data:assignment}=await admin.from("class_subject_assignments").select("id,class_id,subject_id,classes(name),subjects(name)").eq("id",assignmentId).eq("school_id",ctx.schoolId).eq("teacher_id",ctx.userId).eq("assignment_id",assignmentId).is("deleted_at",null).maybeSingle()
+  const {data:assignment}=await admin.from("class_subject_assignments").select("id,class_id,subject_id,classes(name),subjects(name)").eq("id",assignmentId).eq("school_id",ctx.schoolId).eq("teacher_id",ctx.userId).is("deleted_at",null).maybeSingle()
   if(!assignment)return {ok:false,error:"Cette affectation pédagogique est introuvable."}
   const className=String((assignment as any).classes?.name ?? "")
   const parsed=parseClassSupplies(configurations,className)
-  const {data:existing}=await admin.from("school_supply_proposals").select("id,revision,status").eq("school_id",ctx.schoolId).eq("academic_year_id",year.id).eq("class_id",(assignment as any).class_id).eq("subject_id",(assignment as any).subject_id).eq("teacher_id",ctx.userId).is("deleted_at",null).maybeSingle()
+  const {data:existing}=await admin.from("school_supply_proposals").select("id,revision,status").eq("school_id",ctx.schoolId).eq("academic_year_id",year.id).eq("class_id",(assignment as any).class_id).eq("subject_id",(assignment as any).subject_id).eq("teacher_id",ctx.userId).eq("assignment_id",assignmentId).is("deleted_at",null).maybeSingle()
   const nextStatus=existing?.status === "approved" ? "submitted" : (existing?.status === "submitted" ? "submitted" : "draft")
   const payload={school_id:ctx.schoolId,academic_year_id:year.id,assignment_id:assignmentId,class_id:(assignment as any).class_id,subject_id:(assignment as any).subject_id,teacher_id:ctx.userId,configurations:parsed,status:nextStatus,revision:Number(existing?.revision ?? 0)+1,review_note:null}
   const {error}=await admin.from("school_supply_proposals").upsert(payload,{onConflict:"school_id,academic_year_id,class_id,subject_id,teacher_id"})
