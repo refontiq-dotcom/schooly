@@ -1,7 +1,7 @@
 // Fixtures de test partagées par les écrans services. Les valeurs par
 // défaut forment un jeu cohérent : un interne de 6e B logé chambre 101
 // du Pavillon Nord, abonné au plan mensuel de cantine.
-import type { CanteenMenu, DormRoom, Dormitory, EnrollmentOption, ServiceSub } from "./types"
+import type { BusRoute, CanteenMenu, DormRoom, Dormitory, EnrollmentOption, ServiceSub, TransportSub } from "./types"
 
 export function makeRoom(overrides: Partial<DormRoom> = {}): DormRoom {
   return { id: "r1", room_number: "201", capacity: 4, ...overrides }
@@ -47,6 +47,33 @@ export function makeMenu(overrides: Partial<CanteenMenu> = {}): CanteenMenu {
     date: "2026-01-14",
     meal_type: "lunch",
     description: "Riz gras au poulet",
+    ...overrides,
+  }
+}
+
+export function makeBusRoute(overrides: Partial<BusRoute> = {}): BusRoute {
+  return {
+    id: "r1",
+    name: "Ligne Nord – Abobo",
+    driver_name: null,
+    driver_phone: null,
+    vehicle_plate: null,
+    capacity: null,
+    monthly_fee_cfa: 15_000,
+    is_active: true,
+    bus_stops: [],
+    ...overrides,
+  }
+}
+
+export function makeTransportSub(overrides: Partial<TransportSub> = {}): TransportSub {
+  return {
+    id: "t1",
+    status: "active",
+    start_date: "2026-01-15",
+    enrollments: makeEnrollment(),
+    bus_routes: { id: "r1", name: "Ligne Nord – Abobo" },
+    bus_stops: null,
     ...overrides,
   }
 }

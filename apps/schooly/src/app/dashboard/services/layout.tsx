@@ -19,7 +19,7 @@ export default function ServicesLayout({ children }: { children: React.ReactNode
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Services complémentaires</h1>
         <p className="text-muted-foreground mt-1">
-          Gestion du transport scolaire, de la cantine et de l'internat.
+          Gestion du transport scolaire, de la cantine et de l&apos;internat.
         </p>
       </div>
 

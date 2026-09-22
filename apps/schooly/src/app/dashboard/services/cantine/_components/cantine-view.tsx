@@ -1,5 +1,5 @@
-import { Card, CardContent } from "@/components/ui/card"
 import { CalendarDays, Users, UtensilsCrossed } from "lucide-react"
+import { ServiceStatCard } from "../../_components/service-stat-card"
 import { CanteenSubscriptionsSection } from "./canteen-subscriptions-section"
 import { MenusSection } from "./menus-section"
 import type { CanteenMenu, EnrollmentOption, ServiceSub } from "../../_lib/types"
@@ -34,33 +34,9 @@ export function CantineView({
     <div className="space-y-6">
       {/* Stats */}
       <div className="grid gap-4 sm:grid-cols-3">
-        <Card>
-          <CardContent className="pt-6 flex items-center justify-between">
-            <div>
-              <p className="text-3xl font-bold">{activeCount}</p>
-              <p className="text-sm text-muted-foreground">Abonnés actifs</p>
-            </div>
-            <Users className="h-8 w-8 text-primary" />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6 flex items-center justify-between">
-            <div>
-              <p className="text-3xl font-bold">{menus.length}</p>
-              <p className="text-sm text-muted-foreground">Menus cette semaine</p>
-            </div>
-            <CalendarDays className="h-8 w-8 text-orange-500" />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6 flex items-center justify-between">
-            <div>
-              <p className="text-3xl font-bold">{collected.toLocaleString("fr-FR")}</p>
-              <p className="text-sm text-muted-foreground">FCFA encaissés</p>
-            </div>
-            <UtensilsCrossed className="h-8 w-8 text-green-500" />
-          </CardContent>
-        </Card>
+        <ServiceStatCard value={activeCount} label="Abonnés actifs" icon={Users} iconClassName="text-primary" />
+        <ServiceStatCard value={menus.length} label="Menus cette semaine" icon={CalendarDays} iconClassName="text-orange-500" />
+        <ServiceStatCard value={collected.toLocaleString("fr-FR")} label="FCFA encaissés" icon={UtensilsCrossed} iconClassName="text-green-500" />
       </div>
 
       <MenusSection

@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { StatusBadge } from "../../_components/status-badge"
+import { ServiceStatCard } from "../../_components/service-stat-card"
 import { fmtCFA } from "../../_lib/format"
 import { asActionResult, isActionOk, type Dormitory, type EnrollmentOption, type ServiceSub } from "../../_lib/types"
 import { DormitoriesSection } from "./dormitories-section"
@@ -45,33 +46,9 @@ export function InternatView({
     <div className="space-y-6">
       {/* Stats */}
       <div className="grid gap-4 sm:grid-cols-3">
-        <Card>
-          <CardContent className="pt-6 flex items-center justify-between">
-            <div>
-              <p className="text-3xl font-bold">{dormitories.length}</p>
-              <p className="text-sm text-muted-foreground">Dortoirs</p>
-            </div>
-            <Building2 className="h-8 w-8 text-primary" />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6 flex items-center justify-between">
-            <div>
-              <p className="text-3xl font-bold">{roomCount}</p>
-              <p className="text-sm text-muted-foreground">Chambres</p>
-            </div>
-            <BedDouble className="h-8 w-8 text-orange-500" />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6 flex items-center justify-between">
-            <div>
-              <p className="text-3xl font-bold">{activeCount}</p>
-              <p className="text-sm text-muted-foreground">Internes actifs</p>
-            </div>
-            <Users className="h-8 w-8 text-green-500" />
-          </CardContent>
-        </Card>
+        <ServiceStatCard value={dormitories.length} label="Dortoirs" icon={Building2} iconClassName="text-primary" />
+        <ServiceStatCard value={roomCount} label="Chambres" icon={BedDouble} iconClassName="text-orange-500" />
+        <ServiceStatCard value={activeCount} label="Internes actifs" icon={Users} iconClassName="text-green-500" />
       </div>
 
       <DormitoriesSection

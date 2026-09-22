@@ -49,6 +49,35 @@ export type CanteenMenu = {
   description: string
 }
 
+/* ── Transport ─────────────────────────────────────────────────────────── */
+
+export type BusStop = {
+  id: string
+  name: string
+  pickup_time?: string | null
+}
+
+export type BusRoute = {
+  id: string
+  name: string
+  driver_name?: string | null
+  driver_phone?: string | null
+  vehicle_plate?: string | null
+  capacity?: number | null
+  monthly_fee_cfa: number
+  is_active: boolean
+  bus_stops?: BusStop[] | null
+}
+
+export type TransportSub = {
+  id: string
+  status: string
+  start_date: string
+  enrollments?: ServiceEnrollmentRef | null
+  bus_routes?: { id: string; name: string } | null
+  bus_stops?: { id: string; name: string } | null
+}
+
 /** Résultat normalisé des server actions services (voir actions.ts). */
 export type ActionResult = { ok?: boolean; error?: string }
 
