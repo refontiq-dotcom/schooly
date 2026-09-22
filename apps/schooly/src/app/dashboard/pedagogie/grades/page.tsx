@@ -12,6 +12,7 @@ import { useSupabaseUser } from "@/hooks/use-supabase-user"
 import { createGradeEntry, getGradeEntries, getAcademicYearsForSchool, getEnrollmentsForSchool, getSubjectsForSchool, getClassesForSchool, type GradeEntryRow, type EnrollmentListRow } from "../actions"
 import { getEvaluationConfiguration, getEvaluationAssessments, createEvaluationAssessment, createEvaluationRule, createEvaluationPeriod, closeEvaluationPeriod, getPeriodResults, getAnnualPreview, validateAnnualDecision, generateReportCards, publishReportCards, type PeriodResult, type AnnualPreviewResult } from "../evaluation-actions"
 import { GradeCorrectionPanel } from "../grade-correction-panel"
+import { GradeChangeRequestPanel } from "../grade-change-request-panel"
 import type { EvaluationAssessment, EvaluationPeriod, EvaluationRule } from "../evaluation-types"
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
