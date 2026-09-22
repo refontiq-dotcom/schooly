@@ -15,7 +15,7 @@ export type GradeChangeRequest = {
   id: string; grade_id: string; requested_by: string; requested_at: string
   old_revision: number; old_value: number | null; old_status: string; old_comment: string | null
   new_value: number | null; new_status: string; new_comment: string | null
-  reason: string; status: string
+  reason: string; status: string; requester_name?: string | null; teacher_id?: string | null; teacher_name?: string | null
 }
 
 export async function correctGradeEntry(form: FormData): Promise<{ error?: string }> {
@@ -117,4 +117,14 @@ export async function decideGradeChange(form: FormData): Promise<{ error?: strin
   revalidatePath("/dashboard/pedagogie/grades")
   revalidatePath("/dashboard/informatique/grade-change-requests")
   return {}
+}
+
+export type GradeChangeRequestHistory = { id: string; request_id: string; event_type: string; actor_id: string | null; actor_name_snapshot: string | null; actor_role: string | null; status_before: string | null; status_after: string; decision_reason: string | null; metadata: Record<string, unknown>; created_at: string }
+
+export async function getGradeChangeRequestHistory(requestId: string): Promise<{ error?: string; data?: GradeChangeRequestHistory[] }> {
+  const db = await createClient()
+  const guard = await requireSchoolRole(db, { allowedRoles: [...TEACHING_ROLES, "informatique", "direction", "super_admin"] })
+  if (!guard.ok) return { error: denial(guard.reason, null).error }
+  const { data, error } = await db.from("grade_change_request_history").select("id,request_id,event_type,actor_id,actor_name_snapshot,actor_role,status_before,status_after,decision_reason,metadata,created_at").eq("request_id", requestId).order("created_at", { ascending: true })
+  return error ? { error: error.message } : { data: data as GradeChangeRequestHistory[] }
 }
