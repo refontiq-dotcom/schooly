@@ -33,6 +33,7 @@ export function FicheEcole({ schoolId, apiBase }: { schoolId: string; apiBase: s
   const [formation, setFormation] = useState("")
   const [classe, setClasse] = useState("")
   const [loadingF, setLoadingF] = useState(false)
+  const [loadingTarifs, setLoadingTarifs] = useState(false)
   const [error, setError] = useState("")
 
   useEffect(() => {
@@ -42,9 +43,20 @@ export function FicheEcole({ schoolId, apiBase }: { schoolId: string; apiBase: s
       .catch(() => setError("Fiche introuvable ou ecole non publiee."))
   }, [apiBase, schoolId])
 
-  function selectFormation(next: string) {
+  async function selectFormation(next: string) {
     setFormation(next)
     setClasse("")
+    setLoadingTarifs(true)
+    try {
+      const r = await fetch(`${apiBase}/api/v1/public/ecoles/${schoolId}/fiche?formation=${encodeURIComponent(next)}`)
+      if (!r.ok) throw new Error("tarifs indisponibles")
+      const j: FicheResponse = await r.json()
+      setData((current) => current ? { ...current, formation: j.formation, tarifs: j.tarifs } : current)
+    } catch {
+      // Le parcours reste utilisable avec les tarifs déjà chargés.
+    } finally {
+      setLoadingTarifs(false)
+    }
   }
 
   async function selectClasse(next: string) {
