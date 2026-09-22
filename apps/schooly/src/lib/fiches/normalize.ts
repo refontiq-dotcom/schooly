@@ -27,6 +27,7 @@ import {
   type ClassSuppliesConfiguration,
   type CyclesOffered,
   type EducationCycle,
+  type CustomFeeItem,
   type ExamFeeItem,
   type FeeInstallment,
   type ExamFeeItem,
@@ -258,6 +259,24 @@ function parseFeeItems(value: unknown): FeeItem[] {
   return asArray(value).map(parseFeeItem).filter((item): item is FeeItem => Boolean(item))
 }
 
+function parseCustomFees(value: unknown): CustomFeeItem[] {
+  const out: CustomFeeItem[] = []
+  for (const rawItem of asArray(value)) {
+    if (!isRecord(rawItem)) continue
+    const label = str(rawItem.label)
+    if (!label) continue
+    out.push({
+      id: str(rawItem.id) || crypto.randomUUID(),
+      label,
+      amount: money(rawItem.amount),
+      is_mandatory: bool(rawItem.is_mandatory, true),
+      status: str(rawItem.status) === "affecte" ? "affecte" : "non_affecte",
+      applies_to: str(rawItem.applies_to) === "nouveaux" ? "nouveaux" : str(rawItem.applies_to) === "anciens" ? "anciens" : "all",
+    })
+  }
+  return out
+}
+
 function parseExamFees(value: unknown): ExamFeeItem[] {
   const out: ExamFeeItem[] = []
   for (const rawItem of asArray(value)) {
@@ -311,6 +330,7 @@ export function parseFeesStructure(value: unknown): FeesStructure {
     registration_fees: parseFeeItems(raw.registration_fees),
     school_fees: parseFeeItems(raw.school_fees),
     exam_fees: parseExamFees(raw.exam_fees),
+    custom_fees: parseCustomFees(raw.custom_fees),
     installments: installments.map((item, index) => ({ ...item, position: index + 1 })),
     currency: str(raw.currency) || DEFAULT_CURRENCY,
     ...(notes ? { notes } : {}),
