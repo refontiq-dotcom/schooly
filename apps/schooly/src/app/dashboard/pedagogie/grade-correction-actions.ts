@@ -20,7 +20,7 @@ export type GradeChangeRequest = {
 
 export async function correctGradeEntry(form: FormData): Promise<{ error?: string }> {
   const db = await createClient()
-  const guard = await requireSchoolRole(db, { allowedRoles: TEACHING_ROLES })
+  const guard = await requireSchoolRole(db, { allowedRoles: ["professeur"] })
   if (!guard.ok) return { error: denial(guard.reason, null).error }
   const text = (key: string) => String(form.get(key) ?? "").trim()
   const revision = Number(text("revision")), status = text("absenceStatus"), reason = text("reason")
