@@ -73,7 +73,9 @@ export function InformationsWizard({
       {step === 0 && (
         <StepIdentite
           nature={draft.cycles.nature}
-          onChange={(nature) => setDraft({ ...draft, cycles: { ...draft.cycles, nature } })}
+          communes={draft.communes}
+          onNatureChange={(nature) => setDraft({ ...draft, cycles: { ...draft.cycles, nature } })}
+          onCommunesChange={(communes) => setDraft({ ...draft, communes })}
         />
       )}
       {step === 1 && (
