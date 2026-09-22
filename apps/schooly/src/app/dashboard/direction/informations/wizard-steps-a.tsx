@@ -30,6 +30,7 @@ const DEFAULT_LEVELS: Record<EducationCycle, string[]> = {
   general: ["6e", "5e", "4e", "3e", "2nde", "1ère", "Terminale"],
   technique: ["2nde Technique", "1ère Technique", "Terminale Technique"],
   professionnel: ["CAP", "BT", "BTS"],
+  superieur: ["Licence 1", "Licence 2", "Licence 3", "Master 1", "Master 2"],
 }
 
 const DIPLOMA_BY_LEVEL: Record<string, string> = {
@@ -40,6 +41,8 @@ const DIPLOMA_BY_LEVEL: Record<string, string> = {
   "bts": "bts",
   "bt": "bt",
   "cap": "cap",
+  "licence 3": "licence",
+  "master 2": "master",
 }
 
 const makeLevel = (name: string, cycle: EducationCycle, index: number) => ({
@@ -48,7 +51,7 @@ const makeLevel = (name: string, cycle: EducationCycle, index: number) => ({
   cycle,
   series: [] as string[],
   diploma: DIPLOMA_BY_LEVEL[name.toLowerCase()] ?? "aucun",
-  requires_filiere_choice: /1ère|terminale|bts/i.test(name),
+  requires_filiere_choice: /1ère|terminale|bts|licence|master/i.test(name),
 })
 
 function emptyCycle(key: EducationCycle): OfferedCycle {
@@ -191,9 +194,9 @@ export function StepOffre({ cycles, onChange }: { cycles: CyclesOffered; onChang
                 })}
               </div>
 
-              {cycle.key !== "professionnel" && (
+              {(cycle.key === "general" || cycle.key === "technique" || cycle.key === "professionnel") && (
                 <div className="space-y-2">
-                  <Label>Filières / séries</Label>
+                  <Label>{cycle.key === "professionnel" ? "Filières professionnelles" : "Filières / séries"}</Label>
                   <div className="flex flex-wrap gap-1.5">
                     {SERIES_BY_CYCLE[cycle.key].map((serie) => {
                       const enabled = cycle.series.includes(serie)
@@ -205,7 +208,7 @@ export function StepOffre({ cycles, onChange }: { cycles: CyclesOffered; onChang
                       )
                     })}
                   </div>
-                  <p className="text-xs text-muted-foreground">Schooly utilise ces séries uniquement lorsque le niveau le nécessite. Vous n'avez pas une filière ? Ajoutez-la ci-dessous.</p>
+                  <p className="text-xs text-muted-foreground">Schooly utilise ces filières uniquement lorsque le niveau le nécessite. Vous n'avez pas une filière ? Ajoutez-la ci-dessous.</p>
                 </div>
               )}
 
