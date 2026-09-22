@@ -487,7 +487,7 @@ export function parseOptionalServices(value: unknown): OptionalServices {
   return {
     transport: parseTransport(raw.transport),
     cantine: parseCantine(raw.cantine),
-    tenues: parseTenues(raw.tenues),,
+    tenues: parseTenues(raw.tenues),
     fee_profiles: Object.keys(fee_profiles).length ? fee_profiles : undefined
   }
 }
