@@ -365,3 +365,16 @@ begin
     null;
   end;
 end $$;
+
+
+-- Full request actor snapshots and immutable lifecycle history.
+alter table public.grade_change_requests add column if not exists requester_name_snapshot text, add column if not exists teacher_id uuid references public.users(id) on delete set null, add column if not exists teacher_name_snapshot text;
+create index if not exists grade_change_requests_teacher_idx on public.grade_change_requests(teacher_id);
+alter table public.grade_corrections add column if not exists confirmer_id uuid references public.users(id) on delete set null, add column if not exists confirmer_name_snapshot text, add column if not exists requester_name_snapshot text, add column if not exists decision text, add column if not exists decision_reason text;
+create table if not exists public.grade_change_request_history (id uuid primary key default gen_random_uuid(),request_id uuid not null references public.grade_change_requests(id) on delete cascade,school_id uuid not null references public.schools(id) on delete cascade,event_type text not null check(event_type in ('created','approved','rejected','cancelled')),actor_id uuid references public.users(id) on delete set null,actor_name_snapshot text,actor_role text,status_before text,status_after text not null,decision_reason text,metadata jsonb not null default '{}'::jsonb,created_at timestamptz not null default clock_timestamp());
+create index if not exists grade_change_request_history_request_idx on public.grade_change_request_history(request_id,created_at);
+alter table public.grade_change_request_history enable row level security;
+revoke all on public.grade_change_request_history from anon;
+grant select on public.grade_change_request_history to authenticated;
+drop policy if exists grade_change_request_history_select on public.grade_change_request_history;
+create policy grade_change_request_history_select on public.grade_change_request_history for select to authenticated using (exists(select 1 from public.grade_change_requests r where r.id=request_id and r.school_id=grade_change_request_history.school_id));
