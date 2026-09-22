@@ -12,7 +12,7 @@ import { CYCLE_LABELS, EDUCATION_CYCLES, SCHOOL_NATURES, SERIES_BY_CYCLE } from 
 import type { CyclesOffered, EducationCycle, OfferedCycle, SchoolNature } from "@/lib/fiches/types"
 
 export function fcfa(amount: number): string {
-  return \`\${new Intl.NumberFormat("fr-FR").format(amount)} F\`
+  return `${new Intl.NumberFormat("fr-FR").format(amount)} F`
 }
 
 const NATURE_LABELS: Record<SchoolNature, string> = {
