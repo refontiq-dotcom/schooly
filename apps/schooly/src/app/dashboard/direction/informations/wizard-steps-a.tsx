@@ -101,16 +101,17 @@ export function StepIdentite({ nature, communes, onNatureChange, onCommunesChang
           <div className="flex flex-wrap gap-2">
             <Input
               className="max-w-sm"
-              placeholder="Ex. Cocody"
+              placeholder="Ex. Cocody ou une autre commune"
               value={communeInput}
               onChange={(e) => setCommuneInput(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addCommune() } }}
+              aria-label="Saisir une commune"
             />
-            <Button type="button" variant="outline" size="sm" onClick={addCommune}>
-              <Plus className="size-4" /> Ajouter la commune
+            <Button type="button" variant="outline" size="sm" onClick={addCommune} disabled={!communeInput.trim()}>
+              <Plus className="size-4" /> Ajouter
             </Button>
           </div>
-          <p className="text-xs text-muted-foreground">Plusieurs communes peuvent être ajoutées si l’établissement dispose de plusieurs implantations.</p>
+          <p className="text-xs text-muted-foreground">Vous pouvez choisir une commune proposée ou saisir directement une commune qui n’est pas encore dans la liste. Chaque commune ajoutée est enregistrée avec l’établissement.</p>
         </div>
         {allowed.length > 0 && (
           <div className="space-y-1">
