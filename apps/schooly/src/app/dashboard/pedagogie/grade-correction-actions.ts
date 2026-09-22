@@ -97,7 +97,15 @@ export async function listPendingGradeChangeRequests(): Promise<{ error?: string
   const guard = await requireSchoolRole(db, { allowedRoles: [...TEACHING_ROLES, "informatique", "direction", "super_admin"] })
   if (!guard.ok) return { error: denial(guard.reason, null).error }
   const { data, error } = await (db as any).rpc("list_pending_grade_change_requests", { p_school_id: guard.context.schoolId })
-  return error ? { error: error.message } : { data: (data ?? []) as GradeChangeRequest[] }
+  if (error) return { error: error.message }
+  const rows = (data ?? []) as GradeChangeRequest[]
+  const ids = rows.map(r => r.requested_by).filter(Boolean)
+  const teacherIds = rows.map(r => r.teacher_id).filter(Boolean) as string[]
+  const allIds = [...new Set([...ids, ...teacherIds])]
+  if (!allIds.length) return { data: rows }
+  const { data: users } = await db.from("users").select("id,full_name").in("id", allIds)
+  const names = new Map((users ?? []).map((u: any) => [u.id, u.full_name]))
+  return { data: rows.map(r => ({ ...r, requester_name: r.requester_name ?? names.get(r.requested_by) ?? null, teacher_name: r.teacher_name ?? (r.teacher_id ? names.get(r.teacher_id) ?? null : null) })) }
 }
 
 export async function decideGradeChange(form: FormData): Promise<{ error?: string }> {
