@@ -91,13 +91,14 @@ export async function saveRequiredDocuments(documents: RequiredDocument[]): Prom
     const { data: existing, error: existingError } = await admin.from("required_documents").select("id").eq("school_id", schoolId).is("deleted_at", null).is("applicable_to_level_id", null)
     if (existingError) return { ok: false, error: "Lecture impossible." }
 
-    const existingIds = new Set((existing ?? []).map((row) => String(row.id)))
+    const existingRows = existing ?? []
     const keptIds = new Set<string>()
 
     for (const item of normalized) {
-      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(item.id) && existingIds.has(item.id)) {
-        keptIds.add(item.id)
-        const { error } = await admin.from("required_documents").update({ nom: item.label, obligatoire: item.required, applicable_to_level_id: item.applicableToLevelId ?? null }).eq("id", item.id).eq("school_id", schoolId)
+      const existingRow = existingRows.find((row) => String(row.id) === item.id || false)
+      if (existingRow) {
+        keptIds.add(String(existingRow.id))
+        const { error } = await admin.from("required_documents").update({ nom: item.label, obligatoire: item.required, applicable_to_level_id: item.applicableToLevelId ?? null }).eq("id", existingRow.id).eq("school_id", schoolId)
         if (error) return { ok: false, error: "Enregistrement impossible." }
       } else {
         const { data, error } = await admin.from("required_documents").insert({ school_id: schoolId, nom: item.label, obligatoire: item.required, applicable_to_level_id: item.applicableToLevelId ?? null }).select("id").single()
@@ -106,6 +107,7 @@ export async function saveRequiredDocuments(documents: RequiredDocument[]): Prom
       }
     }
 
+    const existingIds = new Set(existingRows.map((row) => String(row.id)))
     const toDelete = [...existingIds].filter((id) => !keptIds.has(id))
     if (toDelete.length) {
       const { error } = await admin.from("required_documents").update({ deleted_at: new Date().toISOString() }).eq("school_id", schoolId).in("id", toDelete)
