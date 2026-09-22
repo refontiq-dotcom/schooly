@@ -56,8 +56,13 @@ export async function requestGradeChange(form: FormData): Promise<{ error?: stri
   const raw = text("newValue")
   const value = status === "excused" ? null : raw === "" ? NaN : Number(raw)
   const reason = text("reason")
-  if (!text("gradeId") || !["graded", "excused"].includes(status) || !reason || reason.length > 2000 ||
-    (status === "excused" && raw !== "") || (status === "graded" && (!Number.isFinite(value) || value < 0))) {
+  // Guard de saisie : « excused » exige une valeur vide ; « graded » exige un
+  // nombre fini et positif. Le narrowing explicite sur `value` est requis :
+  // TS ne déduit pas `value !== null` depuis le test sur `status`.
+  const hasValidValue =
+    (status === "excused" && raw === "") ||
+    (status === "graded" && value !== null && Number.isFinite(value) && value >= 0)
+  if (!text("gradeId") || !hasValidValue || !reason || reason.length > 2000) {
     return { error: "Note, statut et motif valides requis." }
   }
   const { error } = await (db as any).rpc("request_evaluation_grade_change", {
