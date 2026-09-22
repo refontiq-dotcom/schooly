@@ -145,16 +145,17 @@ export async function saveSchoolConfiguration(
     const fees = parseFeesStructure(payload.fees)
     const services = parseOptionalServices(payload.services)
 
-    if (!cycles.cycles.length) {
+    const requiresCycles = cycles.nature !== "primaire"
+    if (requiresCycles && !cycles.cycles.length) {
       return {
         ok: false,
-        error: "Sélectionnez au moins un cycle d'enseignement.",
+        error: "Sélectionnez au moins un cycle d'enseignement dans l’onglet Offre.",
       }
     }
-    if (!cycles.cycles.some((c) => c.levels.length)) {
+    if (requiresCycles && !cycles.cycles.some((c) => c.levels.length)) {
       return {
         ok: false,
-        error: "Ajoutez au moins un niveau dans l'un des cycles activés.",
+        error: "Ajoutez au moins un niveau dans l’onglet Offre.",
       }
     }
 

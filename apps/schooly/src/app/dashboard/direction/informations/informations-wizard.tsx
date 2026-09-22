@@ -30,13 +30,22 @@ export function InformationsWizard({
   const [tab, setTab] = useState("identite")
   const [draft, setDraft] = useState<FicheState>(state.state)
   const [pending, startTransition] = useTransition()
+  const [feedback, setFeedback] = useState<{ ok: boolean; text: string } | null>(null)
   const ficheTab = tab !== "fournitures"
 
   function save() {
+    setFeedback(null)
     startTransition(async () => {
       const res = await saveSchoolConfiguration(draft)
-      if (res.ok) toast.success("Fiche établissement enregistrée.")
-      else toast.error(res.error ?? "Enregistrement impossible.")
+      if (res.ok) {
+        const text = "Fiche établissement enregistrée."
+        toast.success(text)
+        setFeedback({ ok: true, text })
+      } else {
+        const text = res.error ?? "Enregistrement impossible."
+        toast.error(text)
+        setFeedback({ ok: false, text })
+      }
     })
   }
 
@@ -93,8 +102,13 @@ export function InformationsWizard({
 
       {ficheTab && (
         <Card>
-          <CardContent className="flex flex-wrap items-center justify-end gap-2 pt-4">
-            <Button variant="secondary" disabled={pending} onClick={save}>
+          <CardContent className="flex flex-wrap items-center justify-end gap-3 pt-4">
+            {feedback && (
+              <p className={feedback.ok ? "mr-auto text-sm text-muted-foreground" : "mr-auto text-sm text-destructive"}>
+                {feedback.text}
+              </p>
+            )}
+            <Button type="button" disabled={pending} onClick={save}>
               {pending ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
               Enregistrer
             </Button>
