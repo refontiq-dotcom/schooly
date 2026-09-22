@@ -22,16 +22,27 @@ export function PreinscriptionForm({ formations, formation, onFormationChange, s
   const [phone, setPhone] = useState("")
   const [email, setEmail] = useState("")
   const selected = formations.find((item) => item.key === formation)
+  // Les données de chaque pôle sont déjà isolées par l’API publique. On ne garde
+  // donc jamais un niveau/série d’un autre pôle dans l’état du formulaire.
+  const filteredLevels = useMemo(() => selected?.levels ?? [], [selected])
   const selectedLevel = selected?.levels.find((item) => item.grade_level_name === level)
   const isGeneral = formation === "general"
   const isTechnique = formation === "technique"
   const isProfessional = formation === "professionnel"
   const isHigher = formation === "superieur"
-  const seriesOptions = useMemo(() => selectedLevel?.series ?? [], [selectedLevel])
+  const seriesOptions = useMemo(() => {
+    if (!selectedLevel) return []
+    return Array.from(new Set(selectedLevel.series.filter(Boolean))).sort((a, b) => a.localeCompare(b, "fr"))
+  }, [selectedLevel])
 
   function changeFormation(key: string) {
     onFormationChange(key)
     setLevel("")
+    setSeries("")
+  }
+
+  function changeLevel(nextLevel: string) {
+    setLevel(nextLevel)
     setSeries("")
   }
 
@@ -57,9 +68,9 @@ export function PreinscriptionForm({ formations, formation, onFormationChange, s
           <>
             <div className="space-y-2">
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">2. Parcours scolaire</p>
-              <Select value={level} onChange={(e) => { setLevel(e.target.value); setSeries("") }}>
+              <Select value={level} onChange={(e) => changeLevel(e.target.value)}>
                 <option value="">Choisir {isHigher ? "le niveau" : isProfessional ? "le diplôme / niveau" : "la classe"}…</option>
-                {selected.levels.map((item) => <option key={item.grade_level_name} value={item.grade_level_name}>{item.grade_level_name}{item.diploma !== "aucun" ? ` — ${item.diploma}` : ""}</option>)}
+                {filteredLevels.map((item) => <option key={item.grade_level_name} value={item.grade_level_name}>{item.grade_level_name}{item.diploma !== "aucun" ? ` — ${item.diploma}` : ""}</option>)}
               </Select>
               {seriesOptions.length > 0 ? (
                 <Select value={series} onChange={(e) => setSeries(e.target.value)}>
