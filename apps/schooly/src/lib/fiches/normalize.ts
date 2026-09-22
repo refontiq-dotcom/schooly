@@ -269,6 +269,8 @@ function parseCustomFees(value: unknown): CustomFeeItem[] {
       id: str(rawItem.id) || crypto.randomUUID(),
       label,
       amount: money(rawItem.amount),
+      amount_affecte: money(rawItem.amount_affecte),
+      amount_non_affecte: money(rawItem.amount_non_affecte),
       is_mandatory: bool(rawItem.is_mandatory, true),
       status: str(rawItem.status) === "affecte" ? "affecte" : "non_affecte",
       applies_to: str(rawItem.applies_to) === "nouveaux" ? "nouveaux" : str(rawItem.applies_to) === "anciens" ? "anciens" : "all",
