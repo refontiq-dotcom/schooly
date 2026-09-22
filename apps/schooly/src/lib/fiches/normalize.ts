@@ -28,7 +28,6 @@ import {
   type CyclesOffered,
   type EducationCycle,
   type CustomFeeItem,
-  type ExamFeeItem,
   type FeeInstallment,
   type ExamFeeItem,
   type FeeItem,
@@ -156,7 +155,7 @@ const NATURE_CYCLES: Record<SchoolNature, readonly EducationCycle[]> = {
   lycee: ["general", "technique"],
   professionnel: ["technique", "professionnel"],
   islamique: ["islamique", "general"],
-  superieur: ["general", "technique", "professionnel"],
+  superieur: ["superieur"],
 }
 
 /** Nature d'établissement, « lycee » par défaut (cas le plus complet). */
@@ -269,8 +268,6 @@ function parseCustomFees(value: unknown): CustomFeeItem[] {
       id: str(rawItem.id) || crypto.randomUUID(),
       label,
       amount: money(rawItem.amount),
-      amount_affecte: money(rawItem.amount_affecte),
-      amount_non_affecte: money(rawItem.amount_non_affecte),
       is_mandatory: bool(rawItem.is_mandatory, true),
       status: str(rawItem.status) === "affecte" ? "affecte" : "non_affecte",
       applies_to: str(rawItem.applies_to) === "nouveaux" ? "nouveaux" : str(rawItem.applies_to) === "anciens" ? "anciens" : "all",
@@ -291,6 +288,8 @@ function parseExamFees(value: unknown): ExamFeeItem[] {
       exam_name: examName,
       diploma: str(rawItem.diploma) || "aucun",
       amount: money(rawItem.amount),
+      amount_affecte: money(rawItem.amount_affecte),
+      amount_non_affecte: money(rawItem.amount_non_affecte),
       is_mandatory: bool(rawItem.is_mandatory, true),
     })
   }
