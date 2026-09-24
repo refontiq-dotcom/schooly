@@ -3,5 +3,11 @@
   "buildCommand": "npm run build",
   "installCommand": "cd ../.. && npm install",
   "outputDirectory": ".next",
-  "regions": ["cdg1"]
+  "regions": ["cdg1"],
+  "crons": [
+    {
+      "path": "/api/cron/control-center-metrics",
+      "schedule": "0 * * * *"
+    }
+  ]
 }
