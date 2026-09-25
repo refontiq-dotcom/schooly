@@ -6,6 +6,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createClient } from "@supabase/supabase-js";
+import { normalizeHttpUrl, normalizeHttpUrlList } from "./safe-url.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(here, "..", "..", "..");
@@ -87,16 +88,16 @@ for (const school of schools) {
     longitude: school.longitude,
     description_publique: school.description_publique,
     itineraire: school.itineraire,
-    cover_photo: school.cover_photo_url,
-    gallery: Array.isArray(school.gallery_photos) ? school.gallery_photos : [],
-    photos_360: Array.isArray(school.photos_360) ? school.photos_360 : [],
-    video_url: school.video_url,
+    cover_photo: normalizeHttpUrl(school.cover_photo_url),
+    gallery: normalizeHttpUrlList(school.gallery_photos),
+    photos_360: normalizeHttpUrlList(school.photos_360),
+    video_url: normalizeHttpUrl(school.video_url),
     grille_tarifaire_publique: school.grille_tarifaire_publique || [],
     contact: {
       address: school.public_address,
       phone: school.public_phone,
       email: school.public_email,
-      website: school.public_website_url,
+      website: normalizeHttpUrl(school.public_website_url),
     },
     highlights: Array.isArray(school.public_highlights) ? school.public_highlights : [],
     admission_notes: school.admission_notes,
