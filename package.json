@@ -27,6 +27,7 @@
     "db:stop": "cd packages/db && supabase stop",
     "db:reset": "cd packages/db && supabase db reset",
     "db:types": "cd packages/db && supabase gen types typescript --local > src/database.types.ts",
+    "db:bench": "psql \"${DATABASE_URL:-postgresql://postgres:postgres@127.0.0.1:54322/postgres}\" -f packages/db/scripts/bench_dashboard.sql",
     "billing:sync": "node packages/billing/scripts/sync-config.mjs",
     "billing:metrics": "node packages/billing/scripts/push-metrics.mjs",
     "trouvetou:sync": "node packages/billing/scripts/sync-trouvetou.mjs"
