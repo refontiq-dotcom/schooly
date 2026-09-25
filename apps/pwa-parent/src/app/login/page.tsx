@@ -2,33 +2,49 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { createClient } from "@/utils/supabase/browser"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { GraduationCap, Loader2 } from "lucide-react"
+import { parentPhoneSignIn, claimParentAccount, type PhoneAuthResult } from "./actions"
+
+type Mode = "signin" | "claim"
 
 export default function LoginPage() {
   const router = useRouter()
-  const [email, setEmail] = useState("")
+  const [mode, setMode] = useState<Mode>("signin")
+  const [phone, setPhone] = useState("")
+  const [fullName, setFullName] = useState("")
   const [password, setPassword] = useState("")
+  const [confirm, setConfirm] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const show = (r: PhoneAuthResult) => {
+    if (r.ok) return true
+    setError(r.message)
+    setLoading(false)
+    return false
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    setLoading(true)
     setError(null)
 
-    const supabase = createClient()
-    const { error: authError } = await supabase.auth.signInWithPassword({ email, password })
-
-    if (authError) {
-      setError("Email ou mot de passe incorrect.")
-      setLoading(false)
+    if (mode === "claim" && password !== confirm) {
+      setError("Les deux mots de passe ne correspondent pas.")
       return
     }
+
+    setLoading(true)
+    const result =
+      mode === "signin"
+        ? await parentPhoneSignIn(phone, password)
+        : await claimParentAccount(phone, password, fullName)
+
+    // claimParentAccount redirige lui-même après création + connexion.
+    if (!show(result)) return
 
     router.replace("/dashboard")
     router.refresh()
@@ -42,34 +58,71 @@ export default function LoginPage() {
             <GraduationCap className="h-6 w-6 text-primary" />
           </div>
           <CardTitle className="text-xl">Schooly — Espace Parent</CardTitle>
-          <CardDescription>Connectez-vous pour suivre la scolarité de vos enfants</CardDescription>
+          <CardDescription>
+            {mode === "signin"
+              ? "Connectez-vous avec le téléphone enregistré par l'école"
+              : "Créez votre compte avec votre téléphone d'inscription"}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="phone">Téléphone</Label>
               <Input
-                id="email"
-                type="email"
-                autoComplete="email"
-                placeholder="parent@exemple.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                id="phone"
+                type="tel"
+                autoComplete="tel"
+                inputMode="tel"
+                placeholder="07 00 00 00 00"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
                 required
               />
             </div>
+
+            {mode === "claim" && (
+              <div className="space-y-2">
+                <Label htmlFor="fullName">Votre nom complet</Label>
+                <Input
+                  id="fullName"
+                  autoComplete="name"
+                  placeholder="Ex : Marie Kone"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  required
+                />
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="password">Mot de passe</Label>
               <Input
                 id="password"
                 type="password"
-                autoComplete="current-password"
+                autoComplete={mode === "signin" ? "current-password" : "new-password"}
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                minLength={mode === "claim" ? 8 : undefined}
               />
             </div>
+
+            {mode === "claim" && (
+              <div className="space-y-2">
+                <Label htmlFor="confirm">Confirmer le mot de passe</Label>
+                <Input
+                  id="confirm"
+                  type="password"
+                  autoComplete="new-password"
+                  placeholder="••••••••"
+                  value={confirm}
+                  onChange={(e) => setConfirm(e.target.value)}
+                  required
+                  minLength={8}
+                />
+              </div>
+            )}
 
             {error && (
               <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>
@@ -77,11 +130,33 @@ export default function LoginPage() {
 
             <Button type="submit" className="w-full" disabled={loading}>
               {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-              Se connecter
+              {mode === "signin" ? "Se connecter" : "Créer mon compte"}
             </Button>
           </form>
-          <p className="mt-4 text-center text-xs text-muted-foreground">
-            L&apos;email utilisé doit correspondre à celui enregistré par l&apos;école.
+
+          <p className="mt-4 text-center text-sm">
+            {mode === "signin" ? (
+              <button
+                type="button"
+                className="text-primary underline underline-offset-2"
+                onClick={() => { setMode("claim"); setError(null) }}
+              >
+                Premier accès ? Créer mon compte
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="text-primary underline underline-offset-2"
+                onClick={() => { setMode("signin"); setError(null) }}
+              >
+                J&apos;ai déjà un compte — me connecter
+              </button>
+            )}
+          </p>
+          <p className="mt-2 text-center text-xs text-muted-foreground">
+            {mode === "signin"
+              ? "Votre téléphone doit figurer sur une inscription enregistrée par l'école."
+              : "Votre numéro doit figurer sur une inscription. Aucun compte n'est créé sans elle."}
           </p>
         </CardContent>
       </Card>

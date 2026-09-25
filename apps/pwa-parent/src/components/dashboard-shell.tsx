@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react"
 import { usePathname } from "next/navigation"
 import {
   BarChart3,
@@ -35,6 +35,47 @@ const navItems = [
 const settingsItems = ["Profil", "Sécurité", "Notifications"]
 const currencyOptions = ["FCFA", "EUR", "USD"]
 const languageOptions = ["FR", "EN"]
+const PREFERENCE_EVENT = "schooly-dashboard-preference-change"
+
+type PreferenceKey =
+  | "schooly-dashboard-theme"
+  | "schooly-dashboard-currency"
+  | "schooly-dashboard-language"
+
+function subscribePreference(onStoreChange: () => void) {
+  if (typeof window === "undefined") return () => undefined
+  const onStorage = (event: StorageEvent) => {
+    if (event.key === null || event.key?.startsWith("schooly-dashboard-")) onStoreChange()
+  }
+  window.addEventListener("storage", onStorage)
+  window.addEventListener(PREFERENCE_EVENT, onStoreChange)
+  return () => {
+    window.removeEventListener("storage", onStorage)
+    window.removeEventListener(PREFERENCE_EVENT, onStoreChange)
+  }
+}
+
+function readPreference(key: PreferenceKey, fallback: string) {
+  if (typeof window === "undefined") return fallback
+  return window.localStorage.getItem(key) ?? fallback
+}
+
+function writePreference(key: PreferenceKey, value: string) {
+  try {
+    window.localStorage.setItem(key, value)
+    window.dispatchEvent(new Event(PREFERENCE_EVENT))
+  } catch {
+    // Le shell reste utilisable si le stockage est indisponible.
+  }
+}
+
+function usePreference(key: PreferenceKey, fallback: string) {
+  return useSyncExternalStore(
+    useCallback((onStoreChange) => subscribePreference(onStoreChange), []),
+    useCallback(() => readPreference(key, fallback), [key, fallback]),
+    () => fallback,
+  )
+}
 
 function DashboardDropdown({
   label,
@@ -94,37 +135,21 @@ function DashboardDropdown({
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
-  const [dark, setDark] = useState(true)
+  const theme = usePreference("schooly-dashboard-theme", "dark")
+  const dark = theme === "dark"
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
-  const [mounted, setMounted] = useState(false)
   const [openDropdown, setOpenDropdown] = useState<"currency" | "language" | null>(null)
-  const [currency, setCurrency] = useState("FCFA")
-  const [language, setLanguage] = useState("FR")
+  const currency = usePreference("schooly-dashboard-currency", "FCFA")
+  const language = usePreference("schooly-dashboard-language", "FR")
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [activeSetting, setActiveSetting] = useState<string | null>(null)
   const [navigationDirection, setNavigationDirection] = useState<"forward" | "backward" | null>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    const saved = window.localStorage.getItem("schooly-dashboard-theme")
-    setDark(saved ? saved === "dark" : true)
-    setCurrency(window.localStorage.getItem("schooly-dashboard-currency") || "FCFA")
-    setLanguage(window.localStorage.getItem("schooly-dashboard-language") || "FR")
-    setMounted(true)
-  }, [])
-
-  useEffect(() => {
-    if (!mounted) return
     document.documentElement.dataset.dashboardTheme = dark ? "dark" : "light"
-    window.localStorage.setItem("schooly-dashboard-theme", dark ? "dark" : "light")
-  }, [dark, mounted])
-
-  useEffect(() => {
-    if (!mounted) return
-    window.localStorage.setItem("schooly-dashboard-currency", currency)
-    window.localStorage.setItem("schooly-dashboard-language", language)
-  }, [currency, language, mounted])
+  }, [dark])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -139,10 +164,13 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   }, [])
 
   useEffect(() => {
-    setMobileOpen(false)
-    setOpenDropdown(null)
-    setSettingsOpen(false)
-    setNavigationDirection(null)
+    const timeout = window.setTimeout(() => {
+      setMobileOpen(false)
+      setOpenDropdown(null)
+      setSettingsOpen(false)
+      setNavigationDirection(null)
+    }, 0)
+    return () => window.clearTimeout(timeout)
   }, [pathname])
 
   useEffect(() => {
@@ -267,7 +295,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         <div className="dashboard-sidebar-bottom">
           <Link href="/dashboard/moratorium" className={`dashboard-support-card ${collapsed ? "is-hidden" : ""}`}>
             <span className="dashboard-support-icon"><Headphones size={14} /></span>
-            <span><strong>Besoin d'aide ?</strong><small>Contacter Schooly</small></span>
+            <span><strong>Besoin d&apos;aide ?</strong><small>Contacter Schooly</small></span>
           </Link>
           <form action={signOut}>
             <button className="dashboard-logout" type="submit" title="Déconnexion">
@@ -301,7 +329,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                 open={openDropdown === "currency"}
                 onToggle={() => setOpenDropdown((current) => current === "currency" ? null : "currency")}
                 onSelect={(value) => {
-                  setCurrency(value)
+                  writePreference("schooly-dashboard-currency", value)
                   setOpenDropdown(null)
                 }}
               />
@@ -312,7 +340,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                 open={openDropdown === "language"}
                 onToggle={() => setOpenDropdown((current) => current === "language" ? null : "language")}
                 onSelect={(value) => {
-                  setLanguage(value)
+                  writePreference("schooly-dashboard-language", value)
                   setOpenDropdown(null)
                 }}
               />
@@ -323,7 +351,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             <button
               type="button"
               className="dashboard-icon-button"
-              onClick={() => setDark((value) => !value)}
+              onClick={() => writePreference("schooly-dashboard-theme", dark ? "light" : "dark")}
               aria-label={dark ? "Passer au thème clair" : "Passer au thème sombre"}
               aria-pressed={!dark}
             >
