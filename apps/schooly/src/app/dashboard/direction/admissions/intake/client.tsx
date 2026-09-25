@@ -57,7 +57,13 @@ export default function IntakeClient({
     if (result.data) setBatches(result.data as Batch[])
   }
 
-  useEffect(() => { refresh() }, [schoolId])
+  useEffect(() => {
+    let active = true
+    void getAdmissionImportBatches(schoolId).then((result) => {
+      if (active && result.data) setBatches(result.data as Batch[])
+    })
+    return () => { active = false }
+  }, [schoolId])
 
   async function handleImport(formData: FormData) {
     formData.set("schoolId", schoolId)
@@ -148,7 +154,7 @@ export default function IntakeClient({
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><WandSparkles className="h-5 w-5" />Affectation intelligente</CardTitle>
           <CardDescription>
-            L'algorithme respecte d'abord la capacité et les options obligatoires, puis cherche une répartition équilibrée des profils avant de distribuer en serpentin.
+            L&apos;algorithme respecte d&apos;abord la capacité et les options obligatoires, puis cherche une répartition équilibrée des profils avant de distribuer en serpentin.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-3">
@@ -175,7 +181,7 @@ export default function IntakeClient({
                 </div>
               </div>
               <Button disabled={batch.valid_rows === 0} className="min-h-11 gap-2" onClick={() => openAssignment(batch)}>
-                <WandSparkles className="h-4 w-4" />Préparer l'affectation
+                <WandSparkles className="h-4 w-4" />Préparer l&apos;affectation
               </Button>
             </CardContent>
           </Card>
@@ -210,7 +216,7 @@ export default function IntakeClient({
       <Dialog open={assignmentOpen} onOpenChange={setAssignmentOpen} className="max-w-5xl">
         <DialogClose onClick={() => setAssignmentOpen(false)} />
         <DialogHeader>
-          <DialogTitle>Prévisualiser l'affectation</DialogTitle>
+          <DialogTitle>Prévisualiser l&apos;affectation</DialogTitle>
           <DialogDescription>Choisissez le niveau, laissez Schooly répartir les élèves, puis déplacez les lignes par glisser-déposer avant validation.</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
@@ -251,7 +257,7 @@ export default function IntakeClient({
                 ))}
               </div>
               <div className="rounded-xl border bg-muted/30 p-3 text-xs text-muted-foreground">
-                Le glisser-déposer modifie l'ordre de répartition. Les contraintes de capacité et d'options restent bloquantes lors de la validation.
+                Le glisser-déposer modifie l&apos;ordre de répartition. Les contraintes de capacité et d&apos;options restent bloquantes lors de la validation.
               </div>
             </>
           )}

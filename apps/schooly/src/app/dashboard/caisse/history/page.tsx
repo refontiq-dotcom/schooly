@@ -1,14 +1,22 @@
 import { createClient } from "@/utils/supabase/server"
 import { createClient as createAdminClient } from "@supabase/supabase-js"
 import { redirect } from "next/navigation"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { getPayments } from "@/app/dashboard/finance/actions"
 import { CancelPaymentButton } from "@/app/dashboard/direction/finance/cancel-payment-button"
+import { ListPaginationLinks } from "@/components/list-pagination-links"
 import { totalOf } from "../_lib/helpers"
 import { normalizePayments } from "../_lib/types"
 
-export default async function CaisseHistoryPage() {
+/** Historique paginé en base : 50 encaissements par page, piloté par ?page=N. */
+const HISTORY_PAGE_SIZE = 50
+
+type PageProps = {
+  searchParams: Promise<{ page?: string }>
+}
+
+export default async function CaisseHistoryPage({ searchParams }: PageProps) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect("/login")
@@ -28,12 +36,20 @@ export default async function CaisseHistoryPage() {
 
   if (!roleData?.school_id) redirect("/login")
 
-  const { data: rawPayments } = await getPayments(roleData.school_id)
+  const params = await searchParams
+  const parsedPage = Number(params.page)
+  const requestedPage =
+    Number.isFinite(parsedPage) && parsedPage >= 1 ? Math.floor(parsedPage) : 1
+
+  // P1-C : pagination en base (.range + count exact), pilotée par ?page=N.
+  const { data: rawPayments, page, totalPages, total } = await getPayments(
+    roleData.school_id,
+    { page: requestedPage, pageSize: HISTORY_PAGE_SIZE }
+  )
 
   // Même garde de frontière que la page Caisse : aucun `any` sur les montants.
   const payments = normalizePayments(rawPayments)
-
-  const total = totalOf(payments)
+  const pageTotal = totalOf(payments)
   const canCancel = ["direction", "compta"].includes(roleData.role_code)
 
   return (
@@ -42,7 +58,7 @@ export default async function CaisseHistoryPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Historique des encaissements</h1>
           <p className="text-muted-foreground text-sm mt-1">
-            Total : {total.toLocaleString("fr-FR")} FCFA · {payments.length} transaction(s)
+            Total : {pageTotal.toLocaleString("fr-FR")} FCFA · {payments.length} transaction(s) sur cette page · {total.toLocaleString("fr-FR")} encaissement(s) au total
           </p>
         </div>
       </div>
@@ -104,6 +120,14 @@ export default async function CaisseHistoryPage() {
           </div>
         </CardContent>
       </Card>
+
+      <ListPaginationLinks
+        page={page}
+        totalPages={totalPages}
+        total={total}
+        singularLabel="encaissement"
+        pluralLabel="encaissements"
+      />
     </div>
   )
 }

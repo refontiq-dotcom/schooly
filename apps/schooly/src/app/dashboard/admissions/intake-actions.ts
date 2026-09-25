@@ -277,7 +277,7 @@ export async function previewAdmissionAssignment(
   for (const e of occupied ?? []) counts.set(e.class_id, (counts.get(e.class_id) ?? 0) + 1)
 
   const ordered = [...rows].sort((a, b) => {
-    const score = (x: any) => Number(x.academic_score ?? 0)
+    const score = (x: { academic_score?: unknown }) => Number(x.academic_score ?? 0)
     return score(b) - score(a) || String(a.last_name).localeCompare(String(b.last_name), "fr") || String(a.first_name).localeCompare(String(b.first_name), "fr")
   })
 

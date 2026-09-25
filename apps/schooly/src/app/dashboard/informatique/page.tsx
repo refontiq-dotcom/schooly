@@ -20,7 +20,7 @@ export default async function InformatiqueDashboard() {
         <h1 className="text-3xl font-semibold tracking-tight">Espace informatique</h1>
         <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
           Schooly prépare automatiquement les opérations. Votre rôle est de contrôler la configuration,
-          vérifier les résultats et valider ce qui doit l'être.
+          vérifier les résultats et valider ce qui doit l&apos;être.
         </p>
       </div>
 
@@ -28,8 +28,8 @@ export default async function InformatiqueDashboard() {
         <CardContent className="p-5">
           <p className="font-medium">Principe de travail</p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Pas besoin de tout refaire manuellement : configurez une fois l'établissement, puis laissez
-            Schooly préparer les structures, rapports et documents. Intervenez seulement lorsqu'une confirmation est nécessaire.
+            Pas besoin de tout refaire manuellement : configurez une fois l&apos;établissement, puis laissez
+            Schooly préparer les structures, rapports et documents. Intervenez seulement lorsqu&apos;une confirmation est nécessaire.
           </p>
         </CardContent>
       </Card>
@@ -45,7 +45,7 @@ export default async function InformatiqueDashboard() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base"><Settings className="h-4 w-4" />Paramètres établissement</CardTitle>
-            <CardDescription>Identité et configuration générale de l'établissement.</CardDescription>
+            <CardDescription>Identité et configuration générale de l&apos;établissement.</CardDescription>
           </CardHeader>
           <CardContent><Button asChild variant="outline"><Link href="/dashboard/direction/settings">Configurer <ArrowRight className="ml-2 h-4 w-4" /></Link></Button></CardContent>
         </Card>

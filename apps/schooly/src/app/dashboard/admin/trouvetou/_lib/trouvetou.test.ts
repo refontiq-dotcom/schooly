@@ -82,6 +82,39 @@ describe("normalisation trouvetou", () => {
     expect(normalizeSchool(null)).toBeNull()
   })
 
+  it("filtre les URL non HTTP(S) avant le rendu", () => {
+    const school = normalizeSchool({
+      id: "s1",
+      name: "Les Palmiers",
+      cover_photo_url: "javascript:alert(1)",
+      gallery_photos: [
+        "https://cdn.example.com/g1.jpg",
+        "data:image/png;base64,AAAA",
+        "/g2.jpg",
+      ],
+      photos_360: ["http://cdn.example.com/360.jpg"],
+      video_url: "javascript:alert(2)",
+      public_website_url: "data:text/html,bad",
+    })
+
+    expect(school?.cover_photo_url).toBeNull()
+    expect(school?.gallery_photos).toEqual(["https://cdn.example.com/g1.jpg"])
+    expect(school?.photos_360).toEqual(["http://cdn.example.com/360.jpg"])
+    expect(school?.video_url).toBeNull()
+    expect(school?.public_website_url).toBeNull()
+
+    const [ad] = normalizeAds([
+      {
+        id: "a1",
+        title: "Rentrée",
+        image_url: "javascript:alert(3)",
+        target_url: "https://example.org/rentree",
+      },
+    ])
+    expect(ad?.image_url).toBeNull()
+    expect(ad?.target_url).toBe("https://example.org/rentree")
+  })
+
   it("normalizeReservations/normalizeAds écartent les lignes sans id", () => {
     const reservations = normalizeReservations([
       { id: "r1", student_full_name: "Awa", status: "reserved" },

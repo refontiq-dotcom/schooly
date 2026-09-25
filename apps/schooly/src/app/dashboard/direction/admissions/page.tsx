@@ -2,8 +2,11 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { createClient } from "@/utils/supabase/browser"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Skeleton } from "@/components/ui/skeleton"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -23,6 +26,8 @@ import { IntelligentGuidance } from "@/components/intelligent-guidance"
 import {
   CounterEnrollmentModal,
   type CounterPrefill,
+  type GradeLevel,
+  type SchoolClass,
 } from "./counter-enrollment-modal"
 import { ListPagination } from "@/components/list-pagination"
 import { usePagination } from "@/hooks/use-pagination"
@@ -98,20 +103,26 @@ const ENROLLMENT_TYPE_LABELS: Record<string, string> = {
   reinscription: "Réinscription",
 }
 
-const STATE_ORIENTATION_LABELS: Record<string, string> = {
-  oriente_etat: "Orienté(e) État",
-  non_oriente: "Non orienté(e)",
+/** Recherche insensible à la casse sur les champs visibles d'une ligne. */
+function matchesSearch(
+  needle: string,
+  ...fields: Array<string | null | undefined>
+): boolean {
+  if (!needle) return true
+  return fields.some((field) => (field ?? "").toLowerCase().includes(needle))
 }
 
 export default function AdmissionsPage() {
+  const router = useRouter()
   const [schoolId, setSchoolId] = useState<string>("")
   const [preEnrollments, setPreEnrollments] = useState<PreEnrollment[]>([])
   const [students, setStudents] = useState<Student[]>([])
   const [guardians, setGuardians] = useState<Guardian[]>([])
   const [enrollments, setEnrollments] = useState<Enrollment[]>([])
-  const [gradeLevels, setGradeLevels] = useState<any[]>([])
-  const [classes, setClasses] = useState<any[]>([])
+  const [gradeLevels, setGradeLevels] = useState<GradeLevel[]>([])
+  const [classes, setClasses] = useState<SchoolClass[]>([])
   const [tab, setTab] = useState("pre-enrollments")
+  const [search, setSearch] = useState("")
   const [loading, setLoading] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
   const [modalPrefill, setModalPrefill] = useState<CounterPrefill | null>(null)
@@ -184,18 +195,77 @@ export default function AdmissionsPage() {
     p => p.status === "pending" && new Date(p.expires_at) >= new Date()
   )
 
-    const {
+  // U2 : recherche locale commune aux 4 onglets — le filtrage précède la
+  // pagination (usePagination re-clampe la page quand la liste rétrécit).
+  const needle = search.trim().toLowerCase()
+  const filteredPreEnrollments = preEnrollments.filter((p) =>
+    matchesSearch(needle, p.last_name, p.first_name, p.code, p.guardian_name, p.guardian_phone)
+  )
+  const filteredStudents = students.filter((s) =>
+    matchesSearch(needle, s.last_name, s.first_name)
+  )
+  const filteredGuardians = guardians.filter((g) =>
+    matchesSearch(needle, g.full_name, g.phone)
+  )
+  const filteredEnrollments = enrollments.filter((e) =>
+    matchesSearch(
+      needle,
+      e.matricule,
+      e.students?.last_name,
+      e.students?.first_name,
+      e.guardians?.full_name,
+      e.grade_levels?.name
+    )
+  )
+
+  const {
     pageItems: visibleStudents,
     page: studentPage,
     totalPages: studentTotalPages,
     total: studentTotal,
-    canGoPrev: studentCanGoPrev,
-    canGoNext: studentCanGoNext,
     goToPage: goToStudentPage,
-  } = usePagination(students)
+  } = usePagination(filteredStudents)
+
+  const {
+    pageItems: visiblePreEnrollments,
+    page: preEnrollmentPage,
+    totalPages: preEnrollmentTotalPages,
+    total: preEnrollmentTotal,
+    goToPage: goToPreEnrollmentPage,
+  } = usePagination(filteredPreEnrollments)
+
+  const {
+    pageItems: visibleGuardians,
+    page: guardianPage,
+    totalPages: guardianTotalPages,
+    total: guardianTotal,
+    goToPage: goToGuardianPage,
+  } = usePagination(filteredGuardians)
+
+  const {
+    pageItems: visibleEnrollments,
+    page: enrollmentPage,
+    totalPages: enrollmentTotalPages,
+    total: enrollmentTotal,
+    goToPage: goToEnrollmentPage,
+  } = usePagination(filteredEnrollments)
 
   if (loading) {
-    return <div className="p-6 text-center text-muted-foreground">Chargement...</div>
+    return (
+      <div className="space-y-6" aria-busy="true">
+        <div className="space-y-2">
+          <Skeleton className="h-8 w-64" />
+          <Skeleton className="h-4 w-96 max-w-full" />
+        </div>
+        <Skeleton className="h-11 w-full" />
+        <div className="space-y-3">
+          {Array.from({ length: 4 }, (_, i) => (
+            <Skeleton key={i} className="h-24 w-full" />
+          ))}
+        </div>
+        <span className="sr-only">Chargement des admissions…</span>
+      </div>
+    )
   }
 
   return (
@@ -226,10 +296,28 @@ export default function AdmissionsPage() {
           </Button>
         </div>
       </div>
+
+      {/* U2 : recherche locale commune aux 4 onglets. */}
+      <div className="flex items-center gap-2">
+        <Input
+          type="search"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Rechercher : nom, matricule, téléphone, code…"
+          aria-label="Rechercher dans les admissions"
+          className="max-w-sm"
+        />
+        {search && (
+          <Button type="button" variant="ghost" size="sm" onClick={() => setSearch("")}>
+            Effacer
+          </Button>
+        )}
+      </div>
+
       <IntelligentGuidance items={[
         ...(pendingPreEnrollments.length > 0 ? [{ id: "validate-pre", title: `${pendingPreEnrollments.length} pré-inscription(s) attendent une décision`, description: "Validez ou traitez les dossiers en attente avant qu’ils n’expirent.", severity: "action" as const, actionLabel: "Voir les pré-inscriptions", onAction: () => setTab("pre-enrollments") }] : []),
-        ...(gradeLevels.length === 0 ? [{ id: "levels", title: "La structure académique doit être préparée avant les nouvelles inscriptions", description: "Créez au moins un niveau et une classe pour pouvoir orienter correctement les élèves.", severity: "critical" as const, actionLabel: "Ouvrir la structure", onAction: () => { window.location.href = "/dashboard/academic-structure" } }] : []),
-        ...(classes.length === 0 && gradeLevels.length > 0 ? [{ id: "classes", title: "Aucune classe disponible pour l’affectation", description: "Les niveaux existent, mais aucune classe n’est encore prête à accueillir un élève.", severity: "critical" as const, actionLabel: "Créer une classe", onAction: () => { window.location.href = "/dashboard/academic-structure" } }] : []),
+        ...(gradeLevels.length === 0 ? [{ id: "levels", title: "La structure académique doit être préparée avant les nouvelles inscriptions", description: "Créez au moins un niveau et une classe pour pouvoir orienter correctement les élèves.", severity: "critical" as const, actionLabel: "Ouvrir la structure", onAction: () => { router.push("/dashboard/academic-structure") } }] : []),
+        ...(classes.length === 0 && gradeLevels.length > 0 ? [{ id: "classes", title: "Aucune classe disponible pour l’affectation", description: "Les niveaux existent, mais aucune classe n’est encore prête à accueillir un élève.", severity: "critical" as const, actionLabel: "Créer une classe", onAction: () => { router.push("/dashboard/academic-structure") } }] : []),
         { id: "counter", title: "Besoin d’inscrire immédiatement un élève ?", description: "Schooly peut ouvrir directement le parcours d’inscription au guichet.", severity: "info" as const, actionLabel: "Inscrire au guichet", onAction: () => openCounter() },
       ]} contextKey="admissions" />
 
@@ -252,17 +340,19 @@ export default function AdmissionsPage() {
         <TabsContent value="pre-enrollments" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Pré-inscriptions en attente</CardTitle>
+              <CardTitle>Pré-inscriptions</CardTitle>
               <CardDescription>
                 Validez les pré-inscriptions pour générer le matricule de l’élève.
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {preEnrollments.length === 0 && (
-                  <p className="text-sm text-muted-foreground text-center py-4">Aucune pré-inscription.</p>
+                {filteredPreEnrollments.length === 0 && (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    {needle ? "Aucun résultat pour cette recherche." : "Aucune pré-inscription."}
+                  </p>
                 )}
-                {preEnrollments.map(pre => {
+                {visiblePreEnrollments.map(pre => {
                   const isExpired = pre.status === "pending" && new Date(pre.expires_at) < new Date()
                   const badgeStatus = isExpired ? "expired" : pre.status
                   return (
@@ -333,6 +423,16 @@ export default function AdmissionsPage() {
                   </div>
                   )
                 })}
+                {filteredPreEnrollments.length > 0 && (
+                  <ListPagination
+                    page={preEnrollmentPage}
+                    totalPages={preEnrollmentTotalPages}
+                    total={preEnrollmentTotal}
+                    singularLabel="pré-inscription"
+                    pluralLabel="pré-inscriptions"
+                    onPageChange={goToPreEnrollmentPage}
+                  />
+                )}
               </div>
             </CardContent>
           </Card>
@@ -345,12 +445,14 @@ export default function AdmissionsPage() {
               <CardDescription>Liste des élèves de l’établissement.</CardDescription>
             </CardHeader>
                         <CardContent>
-              {students.length === 0 ? (
-                <div className="p-8 text-center text-sm text-muted-foreground">Aucun élève.</div>
+              {filteredStudents.length === 0 ? (
+                <div className="p-8 text-center text-sm text-muted-foreground">
+                  {needle ? "Aucun résultat pour cette recherche." : "Aucun élève."}
+                </div>
               ) : (
                 <>
                   <div className="space-y-2">
-                    {visibleStudents.map((s: any) => (
+                    {visibleStudents.map((s: Student) => (
                       <div key={s.id} className="p-3 rounded-lg border text-sm">
                         <p className="font-medium">{s.last_name} {s.first_name}</p>
                         <p className="text-xs text-muted-foreground">
@@ -388,11 +490,13 @@ export default function AdmissionsPage() {
               <CardDescription>Liste des tuteurs rattachés aux élèves.</CardDescription>
             </CardHeader>
             <CardContent>
-              {guardians.length === 0 ? (
-                <div className="p-8 text-center text-sm text-muted-foreground">Aucun tuteur.</div>
+              {filteredGuardians.length === 0 ? (
+                <div className="p-8 text-center text-sm text-muted-foreground">
+                  {needle ? "Aucun résultat pour cette recherche." : "Aucun tuteur."}
+                </div>
               ) : (
                 <div className="space-y-2">
-                  {guardians.map((g: any) => (
+                  {visibleGuardians.map((g: Guardian) => (
                     <div key={g.id} className="p-3 rounded-lg border text-sm">
                       <p className="font-medium">{g.full_name}</p>
                       <p className="text-xs text-muted-foreground">{g.phone}</p>
@@ -409,6 +513,14 @@ export default function AdmissionsPage() {
                       )}
                     </div>
                   ))}
+                  <ListPagination
+                    page={guardianPage}
+                    totalPages={guardianTotalPages}
+                    total={guardianTotal}
+                    singularLabel="tuteur"
+                    pluralLabel="tuteurs"
+                    onPageChange={goToGuardianPage}
+                  />
                 </div>
               )}
             </CardContent>
@@ -422,11 +534,13 @@ export default function AdmissionsPage() {
               <CardDescription>Historique des inscriptions.</CardDescription>
             </CardHeader>
             <CardContent>
-              {enrollments.length === 0 ? (
-                <div className="p-8 text-center text-sm text-muted-foreground">Aucune inscription.</div>
+              {filteredEnrollments.length === 0 ? (
+                <div className="p-8 text-center text-sm text-muted-foreground">
+                  {needle ? "Aucun résultat pour cette recherche." : "Aucune inscription."}
+                </div>
               ) : (
                 <div className="space-y-2">
-                  {enrollments.map((e: any) => (
+                  {visibleEnrollments.map((e: Enrollment) => (
                     <div key={e.id} className="p-3 rounded-lg border text-sm flex items-center justify-between gap-3">
                       <div>
                         <p className="font-medium font-mono">{e.matricule || "Sans matricule"}</p>
@@ -457,6 +571,14 @@ export default function AdmissionsPage() {
                       </div>
                     </div>
                   ))}
+                  <ListPagination
+                    page={enrollmentPage}
+                    totalPages={enrollmentTotalPages}
+                    total={enrollmentTotal}
+                    singularLabel="inscription"
+                    pluralLabel="inscriptions"
+                    onPageChange={goToEnrollmentPage}
+                  />
                 </div>
               )}
             </CardContent>

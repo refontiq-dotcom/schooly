@@ -208,7 +208,7 @@ export default function AttendancePage() {
                   {attendance.map(record => ({
                     name: `${record.enrollments?.students?.first_name} ${record.enrollments?.students?.last_name}`,
                     status: record.status,
-                    enrollmentId: (record.enrollments as any)?.id ?? "",
+                    enrollmentId: record.enrollments?.id ?? "",
                   } as { name: string; status: string; enrollmentId: string })) ? (
                     attendance.map(record => (
                       <div
@@ -254,7 +254,7 @@ export default function AttendancePage() {
                         <Input id="attendanceEnrollmentId" name="enrollmentId" list="studentList" placeholder="ID élève" />
                         <datalist id="studentList">
                           {attendance.map(a => (
-                            <option key={a.id} value={(a.enrollments as any)?.id ?? ""} label={`${(a.enrollments as any)?.students?.first_name} ${(a.enrollments as any)?.students?.last_name}`} />
+                            <option key={a.id} value={a.enrollments?.id ?? ""} label={`${a.enrollments?.students?.first_name} ${a.enrollments?.students?.last_name}`} />
                           ))}
                         </datalist>
                       </div>

@@ -5,10 +5,10 @@ import { createRoot, type Root } from "react-dom/client"
 import { afterEach, beforeEach, expect, it, vi } from "vitest"
 
 const mocks = vi.hoisted(() => ({
-  preEnrollments: vi.fn(async (): Promise<{ data: any[] }> => ({ data: [] })),
-  students: vi.fn(async (): Promise<{ data: any[] }>  => ({ data: [] })),
-  guardians: vi.fn(async (): Promise<{ data: any[] }>  => ({ data: [] })),
-  enrollments: vi.fn(async (): Promise<{ data: any[] }> => ({ data: [] })),
+  preEnrollments: vi.fn(async (): Promise<{ data: unknown[] }> => ({ data: [] })),
+  students: vi.fn(async (): Promise<{ data: unknown[] }>  => ({ data: [] })),
+  guardians: vi.fn(async (): Promise<{ data: unknown[] }>  => ({ data: [] })),
+  enrollments: vi.fn(async (): Promise<{ data: unknown[] }> => ({ data: [] })),
 }))
 
 vi.mock("@/app/dashboard/admissions/actions", () => ({
@@ -52,6 +52,12 @@ vi.mock("next/link", () => ({
   default: ({ href, children }: { href: string; children?: React.ReactNode }) => (
     <a href={href}>{children}</a>
   ),
+}))
+
+// `useRouter` (navigation des actions de guidance, B5) : stub minimal hors
+// runtime Next — la page n'appelle que `push`.
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn() }),
 }))
 
 vi.mock("@/components/intelligent-guidance", () => ({

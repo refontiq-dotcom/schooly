@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { ActionForm } from "@/components/action-form"
-import { useState, useEffect, useCallback } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { useSupabaseUser } from "@/hooks/use-supabase-user"
 import {
   createClassSubjectAssignment,
@@ -220,7 +220,21 @@ export default function MatrixPage() {
   }, [])
 
   useEffect(() => {
-    if (user) void reload()
+    if (!user) return
+    let active = true
+    void Promise.all([
+      getClassSubjectAssignments(),
+      getClasses(),
+      getSubjects(),
+      getTeachersForSchool(),
+    ]).then(([a, c, s, t]) => {
+      if (!active) return
+      if (a.data) setAssignments(a.data)
+      if (c.data) setClasses(c.data)
+      if (s.data) setSubjects(s.data)
+      if (t.data) setTeachers(t.data)
+    })
+    return () => { active = false }
   }, [user, reload])
 
   return (

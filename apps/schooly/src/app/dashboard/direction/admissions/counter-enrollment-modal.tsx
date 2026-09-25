@@ -29,8 +29,8 @@ import { PAYMENT_LABELS, type PaymentMethod } from "@/app/dashboard/admissions/e
 import { toast } from "sonner"
 import { Banknote, Loader2, Wallet } from "lucide-react"
 
-type GradeLevel = { id: string; name: string }
-type SchoolClass = { id: string; name: string; grade_level_id?: string }
+export type GradeLevel = { id: string; name: string }
+export type SchoolClass = { id: string; name: string; grade_level_id?: string }
 
 export type CounterPrefill = {
   preEnrollmentId?: string
@@ -78,26 +78,45 @@ export function CounterEnrollmentModal({
   const [collectPayment, setCollectPayment] = useState(true)
   const [success, setSuccess] = useState<SuccessState | null>(null)
 
-  useEffect(() => {
-    if (!open) return
-    setSuccess(null)
-    setGradeLevelId(prefill?.gradeLevelId ?? "")
-    setClassId(prefill?.classId ?? "")
-    setCollectPayment(true)
-    const mapped = prefill?.paymentMethod
-    setPaymentMethod(
-      mapped === "mobile_money" || mapped === "check" || mapped === "transfer" ? mapped : "cash"
-    )
-  }, [open, prefill])
+  // Réinitialisation à l'ouverture : ajustement pendant le rendu (pattern
+  // « adjust state during render ») plutôt qu'un effet — la règle
+  // react-hooks/set-state-in-effect interdit tout setState synchrone d'effet.
+  const [prevOpen, setPrevOpen] = useState(open)
+  const [prevPrefill, setPrevPrefill] = useState(prefill)
+  if (open !== prevOpen || prefill !== prevPrefill) {
+    setPrevOpen(open)
+    setPrevPrefill(prefill)
+    if (open) {
+      setSuccess(null)
+      setGradeLevelId(prefill?.gradeLevelId ?? "")
+      setClassId(prefill?.classId ?? "")
+      setCollectPayment(true)
+      const mapped = prefill?.paymentMethod
+      setPaymentMethod(
+        mapped === "mobile_money" || mapped === "check" || mapped === "transfer" ? mapped : "cash"
+      )
+    }
+  }
 
-  useEffect(() => {
-    if (!open || !gradeLevelId) {
+  // Devis : la clé de devis (niveau courant, null si fermé/sans niveau) est
+  // ajustée au rendu — le marquage « devis en cours » suit chaque changement
+  // de niveau, et la clôture efface le montant suggéré. Seules les réponses
+  // asynchrones restent dans l'effet ci-dessous.
+  const quoteKey = open ? gradeLevelId : null
+  const [prevQuoteKey, setPrevQuoteKey] = useState(quoteKey)
+  if (quoteKey !== prevQuoteKey) {
+    setPrevQuoteKey(quoteKey)
+    if (quoteKey) {
+      setQuoting(true)
+    } else {
       setSuggestedAmount(null)
       setYearLabel(null)
-      return
     }
+  }
+
+  useEffect(() => {
+    if (!open || !gradeLevelId) return
     let cancelled = false
-    setQuoting(true)
     getEnrollmentQuote(gradeLevelId)
       .then((res) => {
         if (cancelled) return

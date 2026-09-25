@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -31,39 +31,35 @@ type DisciplineIncident = {
   status: string
 }
 
+const MOCK_INCIDENTS: DisciplineIncident[] = [
+  {
+    id: "1",
+    type: "retard",
+    severity: "mineur",
+    description: "Retard de 15 minutes en cours de mathématiques",
+    student_name: "Jean Dupont",
+    class_name: "6ème A",
+    reported_at: "2026-01-01T08:00:00.000Z",
+    reported_by: "Mme. Martin",
+    status: "open",
+  },
+  {
+    id: "2",
+    type: "non-respect",
+    severity: "modéré",
+    description: "Non-respect des consignes de silence en salle de classe",
+    student_name: "Marie Laurent",
+    class_name: "5ème B",
+    reported_at: "2026-01-01T05:00:00.000Z",
+    reported_by: "M. Dubois",
+    status: "open",
+  },
+]
+
 export default function DisciplinePage() {
   const user = useSupabaseUser()
-  const [incidents, setIncidents] = useState<DisciplineIncident[]>([])
+  const [incidents] = useState<DisciplineIncident[]>(MOCK_INCIDENTS)
   const [showForm, setShowForm] = useState(false)
-
-  useEffect(() => {
-    // Simulate loading incidents - would come from API
-    const mockIncidents: DisciplineIncident[] = [
-      {
-        id: "1",
-        type: "retard",
-        severity: "mineur",
-        description: "Retard de 15 minutes en cours de mathématiques",
-        student_name: "Jean Dupont",
-        class_name: "6ème A",
-        reported_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-        reported_by: "Mme. Martin",
-        status: "open",
-      },
-      {
-        id: "2",
-        type: "non-respect",
-        severity: "modéré",
-        description: "Non-respect des consignes de silence en salle de classe",
-        student_name: "Marie Laurent",
-        class_name: "5ème B",
-        reported_at: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
-        reported_by: "M. Dubois",
-        status: "open",
-      },
-    ]
-    setIncidents(mockIncidents)
-  }, [])
 
   const getSeverityColor = (severity: string) => {
     switch (severity) {
@@ -170,7 +166,7 @@ export default function DisciplinePage() {
                 <Input id="className" name="className" placeholder="Ex: 6ème A" required />
               </div>
               <div className="space-y-1">
-                <Label htmlFor="incidentType">Type d'incident</Label>
+                <Label htmlFor="incidentType">Type d&apos;incident</Label>
                 <Select id="incidentType" name="type" required>
                   <option value="retard">Retard</option>
                   <option value="non-respect">Non-respect des règles</option>
@@ -208,7 +204,7 @@ export default function DisciplinePage() {
                 />
               </div>
               <Button type="submit" className="lg:col-span-3">
-                <Plus className="h-4 w-4 mr-2" />Signaler l'incident
+                <Plus className="h-4 w-4 mr-2" />Signaler l&apos;incident
               </Button>
             </ActionForm>
           </CardContent>

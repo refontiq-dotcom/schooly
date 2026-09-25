@@ -1,32 +1,12 @@
-export const PAYMENT_METHODS = ["cash", "mobile_money", "check", "transfer"] as const
-export type PaymentMethod = (typeof PAYMENT_METHODS)[number]
-
-export const PAYMENT_LABELS: Record<PaymentMethod, string> = {
-  cash: "Especes",
-  mobile_money: "Mobile Money",
-  check: "Cheque",
-  transfer: "Virement bancaire",
-}
-
-const SCHOOL_PAYMENT_TYPE_MAP: Record<string, PaymentMethod> = {
-  especes: "cash",
-  esperes: "cash",
-  cash: "cash",
-  mobile_money: "mobile_money",
-  virement_bancaire: "transfer",
-  transfer: "transfer",
-  cheque: "check",
-  check: "check",
-}
-
-export function mapSchoolPaymentType(type: string | null | undefined): PaymentMethod | null {
-  if (!type) return null
-  return SCHOOL_PAYMENT_TYPE_MAP[type] ?? null
-}
-
-export function isPaymentMethod(value: string): value is PaymentMethod {
-  return (PAYMENT_METHODS as readonly string[]).includes(value)
-}
+// Source unique déplacée dans lib/payment-methods.ts (partagée avec les
+// schémas zod) — ré-exportée ici pour la compat des imports existants.
+export {
+  PAYMENT_METHODS,
+  type PaymentMethod,
+  PAYMENT_LABELS,
+  isPaymentMethod,
+  mapSchoolPaymentType,
+} from "@/lib/payment-methods"
 
 export function parseIdList(raw: string | null): string[] {
   if (!raw) return []

@@ -1,4 +1,4 @@
-import { getStaff, setStaffRoleActiveFormAction } from "./actions"
+import { getStaff, setStaffRoleActiveFormAction, type StaffMember } from "./actions"
 import { AddStaffModal } from "./staff-modals"
 import { IntelligentGuidance } from "@/components/intelligent-guidance"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -22,20 +22,15 @@ export const dynamic = "force-dynamic"
 
 export default async function StaffPage() {
   const result = await getStaff()
-  const staff = Array.isArray(result.data) ? result.data as any[] : []
+  const staff: StaffMember[] = Array.isArray(result.data) ? result.data : []
 
-  const groups = staff.reduce<Record<string, any[]>>((acc, item) => {
+  const groups = staff.reduce<Record<string, StaffMember[]>>((acc, item) => {
     const key = item.role_code
-    ;(acc[key] ??= []).push(item)
-    return acc
+    return { ...acc, [key]: [...(acc[key] ?? []), item] }
   }, {})
 
   const activeNonDirection = staff.filter((s) => s.is_active && s.role_code !== "direction")
-  const staleActivations = staff.filter((s) => {
-    if (s.users?.is_activated) return false
-    const daysSinceInvite = (Date.now() - new Date(s.created_at).getTime()) / 86_400_000
-    return daysSinceInvite >= 3
-  })
+  const staleActivations = staff.filter((s) => s.activation_stale)
   const hasSecretariat = staff.some((s) => s.is_active && s.role_code === "secretariat")
   const hasCompta = staff.some((s) => s.is_active && (s.role_code === "compta" || s.role_code === "caisse"))
 
@@ -53,7 +48,7 @@ export default async function StaffPage() {
           <p className="text-sm text-muted-foreground">Administration du personnel</p>
           <h1 className="text-3xl font-semibold tracking-tight">Personnel & rôles</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Chaque membre reçoit uniquement l'espace de travail correspondant à sa fonction.
+            Chaque membre reçoit uniquement l&apos;espace de travail correspondant à sa fonction.
           </p>
         </div>
         <AddStaffModal />
@@ -70,8 +65,8 @@ export default async function StaffPage() {
           <div>
             <p className="font-medium">Centre de pilotage du personnel</p>
             <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-              Ici, le Directeur définit qui travaille dans l'établissement. Le rôle choisi détermine automatiquement
-              l'espace de travail et les accès. Les affectations pédagogiques se règlent ensuite dans la structure académique.
+              Ici, le Directeur définit qui travaille dans l&apos;établissement. Le rôle choisi détermine automatiquement
+              l&apos;espace de travail et les accès. Les affectations pédagogiques se règlent ensuite dans la structure académique.
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-2 rounded-lg border bg-background px-3 py-2 text-sm">
@@ -96,7 +91,7 @@ export default async function StaffPage() {
       <Card>
         <CardHeader>
           <CardTitle>Rôles et accès</CardTitle>
-          <CardDescription>Le Directeur n'a pas à configurer chaque permission une par une : Schooly applique le socle d'accès adapté à chaque fonction.</CardDescription>
+          <CardDescription>Le Directeur n&apos;a pas à configurer chaque permission une par une : Schooly applique le socle d&apos;accès adapté à chaque fonction.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {([
@@ -127,7 +122,7 @@ export default async function StaffPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Équipe de l'établissement</CardTitle>
+          <CardTitle>Équipe de l&apos;établissement</CardTitle>
           <CardDescription>Les rôles actifs déterminent le dashboard et les actions accessibles.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">

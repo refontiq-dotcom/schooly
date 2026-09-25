@@ -3,6 +3,8 @@ import React, { act } from "react"
 import { createRoot, type Root } from "react-dom/client"
 import { afterEach, describe, expect, it, vi } from "vitest"
 
+Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true, React })
+
 // Convention repo : les icônes lucide sont mockées (double copie de React).
 vi.mock("lucide-react", () => {
   const Icon = () => null
@@ -113,6 +115,16 @@ describe("TrouvetouAdminClient", () => {
       school: { ...SCHOOL, published_to_trouvetou: true },
     })
     expect(container.textContent).toContain("Publié")
+    act(() => root.unmount())
+  })
+
+  it("expose la photo de couverture avec une alternative textuelle", () => {
+    const { container, root } = renderClient()
+    const cover = Array.from(container.querySelectorAll("img")).find(
+      (image) => image.alt === "Photo principale de l'établissement",
+    )
+    expect(cover).toBeDefined()
+    expect(cover?.getAttribute("src")).toBe(SCHOOL.cover_photo_url)
     act(() => root.unmount())
   })
 

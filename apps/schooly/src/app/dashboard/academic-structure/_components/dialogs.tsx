@@ -13,6 +13,8 @@ import {
 import { Loader2, Pencil, Plus, Trash2 } from "lucide-react"
 import { ActionForm } from "@/components/action-form"
 
+type ActionResult = { error?: string; data?: unknown }
+
 /**
  * Enveloppe un Server Action de création pour recharger la liste concernée
  * après un succès : l'état local de cette page cliente ne se rafraîchit pas
@@ -20,7 +22,7 @@ import { ActionForm } from "@/components/action-form"
  * restaient donc figées jusqu'à un rechargement manuel.
  */
 export function withReload(
-  action: (formData: FormData) => Promise<{ error?: string; data?: any } | void>,
+  action: (formData: FormData) => Promise<ActionResult | void>,
   reload: () => Promise<void>,
 ) {
   return async (formData: FormData) => {
@@ -106,7 +108,7 @@ export function EditDialog({
   children,
 }: {
   title: string
-  action: (formData: FormData) => Promise<{ error?: string; data?: any } | void>
+  action: (formData: FormData) => Promise<ActionResult | void>
   onDone: () => Promise<void>
   children: React.ReactNode
 }) {
@@ -156,7 +158,7 @@ export function CreateDialog({
 }: {
   title: string
   description: string
-  action: (formData: FormData) => Promise<{ error?: string; data?: any } | void>
+  action: (formData: FormData) => Promise<ActionResult | void>
   triggerLabel: string
   children: React.ReactNode
   open?: boolean

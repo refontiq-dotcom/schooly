@@ -36,13 +36,18 @@ async function getSchoolId(supabase: SupabaseUserClient): Promise<SchoolRoleResu
 }
 
  /**
- * Contrat minimal du client service_role consommé par les contrôles
- * d'appartenance ci-dessous. `from` est volontairement lâche : typer
- * précisément la chaîne `.from().select().eq()` fait diverger les instanciations
- * de `SupabaseClient` selon le site d'appel (même justification que
- * utils/supabase/require-role.ts, qui documente ce choix).
+ * Type du service_role capté à sa création puis passé aux contrôles
+ * d'appartenance. Conserver le type inféré ici évite les génériques `unknown`
+ * de `ReturnType<typeof createAdminClient` (dernière surcharge résolue).
  */
-type AdminClient = { from: (table: string) => any }
+function academicAdminClient() {
+  return createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SECRET_KEY!
+  )
+}
+
+type AdminClient = ReturnType<typeof academicAdminClient>
 
 /**
  * Vrai si la ligne référencée appartient bien à l'école de la session.
