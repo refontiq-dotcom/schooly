@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { TROUVETOU_ADMIN_ROLES } from "@/utils/supabase/roles"
 import { createClient } from "@/utils/supabase/server"
 import { createClient as createAdminClient, type SupabaseClient } from "@supabase/supabase-js"
+import { fetchWithRetry } from "@/lib/trouvetou/fetch-with-retry"
 
 type SyncLevel = {
   id: string
@@ -74,15 +75,23 @@ async function syncSchoolToTrouvetou(admin: SupabaseClient, schoolId: string, pu
   }
 
   const { endpoint, apiKey } = getTrouvetouConfig()
-  const response = await fetch(endpoint, {
+  const { response, attempts, lastError } = await fetchWithRetry(endpoint, {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-trouvetou-api-key": apiKey },
     body: JSON.stringify({ school: schoolPayload, levels: niveaux }),
     cache: "no-store",
   })
+
+  if (!response) {
+    throw new Error(
+      `Trouvetou injoignable après ${attempts} tentative(s) : ${lastError?.message ?? "erreur inconnue"}.`
+    )
+  }
+
   const body = await response.json().catch(() => ({}))
   if (!response.ok || body?.ok !== true) {
-    throw new Error(body?.error || ("Trouvetou a refusé la synchronisation (" + response.status + ")"))
+    const suffix = attempts > 1 ? ` (après ${attempts} tentatives)` : ""
+    throw new Error((body?.error || ("Trouvetou a refusé la synchronisation (" + response.status + ")")) + suffix)
   }
   return { levels: niveaux.length, result: body?.result ?? null }
 }
