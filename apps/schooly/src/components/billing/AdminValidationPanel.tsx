@@ -134,7 +134,12 @@ export function AdminValidationPanel({
         </div>
         <select
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as any)}
+          onChange={(e) => {
+            const next = e.target.value
+            if (next === "all" || next === "pending" || next === "validated" || next === "rejected") {
+              setStatusFilter(next)
+            }
+          }}
           className="rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-slate-500"
         >
           <option value="all">Tous les statuts</option>

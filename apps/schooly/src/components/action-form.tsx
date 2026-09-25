@@ -3,6 +3,15 @@
 import { useActionState, useState } from "react"
 
 type FormState = { error?: string }
+export type ActionFormData = unknown
+
+type Props = {
+  action: (formData: FormData) => Promise<{ error?: string; data?: ActionFormData } | void>
+  children: React.ReactNode
+  className?: string
+  onSuccess?: (data?: ActionFormData) => void
+  onError?: (error: string) => void
+}
 
 export function ActionForm({
   action,
@@ -10,13 +19,7 @@ export function ActionForm({
   className,
   onSuccess,
   onError,
-}: {
-  action: (formData: FormData) => Promise<{ error?: string; data?: any } | void>
-  children: React.ReactNode
-  className?: string
-  onSuccess?: (data?: any) => void
-  onError?: (error: string) => void
-}) {
+}: Props) {
   const [state, setState] = useState<FormState>({})
 
   async function handleSubmit(formData: FormData) {

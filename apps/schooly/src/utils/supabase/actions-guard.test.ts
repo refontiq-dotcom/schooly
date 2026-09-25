@@ -34,8 +34,22 @@ const SECURITY_MODULES: Array<{
     file: "dashboard/pedagogie/actions.ts",
     guards: /requireSchoolRole\(|teachingGuard\(/,
   },
-  { file: "dashboard/admissions/actions.ts", guards: /requireSchoolRole\(/ },
-  { file: "dashboard/finance/actions.ts", guards: /requireSchoolRole\(/ },
+  // A1 : les anciens monolithes sont des façades. La garantie porte désormais
+  // sur chaque implémentation serveur spécialisée, pas sur le fichier de réexport.
+  { file: "dashboard/admissions/pre-enrollments.ts", guards: /requireSchoolRole\(/ },
+  { file: "dashboard/admissions/counter-enrollments.ts", guards: /requireSchoolRole\(/ },
+  { file: "dashboard/admissions/people.ts", guards: /requireSchoolRole\(/ },
+  { file: "dashboard/admissions/enrollments.ts", guards: /requireSchoolRole\(/ },
+  { file: "dashboard/admissions/financial-profiles.ts", guards: /requireSchoolRole\(/ },
+  { file: "dashboard/admissions/directory.ts", guards: /requireSchoolRole\(/ },
+  { file: "dashboard/finance/fee-schedules.ts", guards: /requireSchoolRole\(/ },
+  { file: "dashboard/finance/payments.ts", guards: /requireSchoolRole\(/ },
+  { file: "dashboard/finance/cash.ts", guards: /requireSchoolRole\(/ },
+  { file: "dashboard/finance/receipts.ts", guards: /requireSchoolRole\(/ },
+  { file: "dashboard/finance/accounting.ts", guards: /requireSchoolRole\(/ },
+  { file: "dashboard/finance/balances.ts", guards: /requireSchoolRole\(/ },
+  { file: "dashboard/finance/discounts.ts", guards: /requireSchoolRole\(/ },
+  { file: "dashboard/finance/reminders.ts", guards: /requireSchoolRole\(/ },
   { file: "dashboard/finance/moratoriums/actions.ts", guards: /requireSchoolRole\(/ },
   {
     file: "dashboard/direction/onboarding-actions.ts",
@@ -64,13 +78,15 @@ const SECURITY_MODULES: Array<{
  * chaque entrée doit être justifiée — une exception non listée fait échouer
  * le test, une exception obsolète doit être retirée.
  */
-const PUBLIC_ACTIONS: ReadonlyArray<{ action: string; because: string }> = [
+const PUBLIC_ACTIONS: ReadonlyArray<{ action: string; module: string; because: string }> = [
   {
     action: "createPreEnrollment",
+    module: "dashboard/admissions/pre-enrollments.ts",
     because: "tunnel public /enroll/[schoolId] — le parent n'a pas de compte",
   },
   {
     action: "verifyReceipt",
+    module: "dashboard/finance/receipts.ts",
     because: "tunnel public /verify/[code] — secret = code non énumérable",
   },
 ]
@@ -99,7 +115,10 @@ describe("Server Actions : chaque action passe par une garde d'autorisation", ()
       const unguarded = actions.filter(
         (a) =>
           !module.guards.test(a.body) &&
-          !PUBLIC_ACTIONS.some((p) => p.action === a.name)
+          !PUBLIC_ACTIONS.some(
+            (publicAction) =>
+              publicAction.action === a.name && publicAction.module === module.file
+          )
       )
       expect(unguarded.map((a) => a.name)).toEqual([])
 
@@ -110,14 +129,10 @@ describe("Server Actions : chaque action passe par une garde d'autorisation", ()
   )
 
   it("les exceptions publiques existent toujours dans leur module", () => {
-    const admissions = readFileSync(join(SRC, "dashboard/admissions/actions.ts"), "utf-8")
-    const finance = readFileSync(join(SRC, "dashboard/finance/actions.ts"), "utf-8")
-    expect(admissions).toContain(
-      `export async function ${PUBLIC_ACTIONS[0].action}`
-    )
-    expect(finance).toContain(
-      `export async function ${PUBLIC_ACTIONS[1].action}`
-    )
+    for (const entry of PUBLIC_ACTIONS) {
+      const source = readFileSync(join(SRC, entry.module), "utf-8")
+      expect(source).toContain(`export async function ${entry.action}`)
+    }
   })
 
   it("la liste des exceptions publiques est justifiée (pas d'exception orpheline)", () => {

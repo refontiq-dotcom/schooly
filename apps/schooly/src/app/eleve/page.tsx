@@ -140,7 +140,7 @@ export default async function ElevePortalPage() {
       .is("deleted_at", null)
       .order("due_date", { ascending: true })
       .limit(20)
-    homeworks = (hws ?? []) as any
+    homeworks = (hws ?? []) as unknown as typeof homeworks
   }
 
   // ————— Notes + moyenne pondérée /20 —————

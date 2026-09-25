@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react"
 import { ArrowRight, BrainCircuit, ChevronDown, CircleAlert, Lightbulb, ShieldAlert, Info, X } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -19,23 +19,55 @@ const SNOOZE_DAYS = 7
 
 type DismissedEntry = { hash: string; until: number }
 
+const DISMISSED_EVENT = "schooly:guidance-change"
+const EMPTY_DISMISSED_RAW = ""
+
 function storageKey(contextKey: string) {
   return `schooly:guidance:${contextKey}`
 }
 
-function loadDismissed(contextKey: string): Record<string, DismissedEntry> {
-  if (typeof window === "undefined") return {}
+function parseDismissed(raw: string): Record<string, DismissedEntry> {
+  if (!raw) return {}
   try {
-    const raw = window.localStorage.getItem(storageKey(contextKey))
-    return raw ? JSON.parse(raw) : {}
+    const parsed: unknown = JSON.parse(raw)
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {}
+    const result: Record<string, DismissedEntry> = {}
+    for (const [id, value] of Object.entries(parsed as Record<string, unknown>)) {
+      if (!value || typeof value !== "object") continue
+      const entry = value as { hash?: unknown; until?: unknown }
+      if (typeof entry.hash === "string" && typeof entry.until === "number") {
+        result[id] = { hash: entry.hash, until: entry.until }
+      }
+    }
+    return result
   } catch {
     return {}
+  }
+}
+
+function getDismissedRaw(contextKey: string): string {
+  if (typeof window === "undefined") return EMPTY_DISMISSED_RAW
+  return window.localStorage.getItem(storageKey(contextKey)) ?? EMPTY_DISMISSED_RAW
+}
+
+function subscribeDismissed(contextKey: string, onStoreChange: () => void) {
+  if (typeof window === "undefined") return () => undefined
+  const key = storageKey(contextKey)
+  const onStorage = (event: StorageEvent) => {
+    if (event.key === null || event.key === key) onStoreChange()
+  }
+  window.addEventListener("storage", onStorage)
+  window.addEventListener(DISMISSED_EVENT, onStoreChange)
+  return () => {
+    window.removeEventListener("storage", onStorage)
+    window.removeEventListener(DISMISSED_EVENT, onStoreChange)
   }
 }
 
 function saveDismissed(contextKey: string, data: Record<string, DismissedEntry>) {
   try {
     window.localStorage.setItem(storageKey(contextKey), JSON.stringify(data))
+    window.dispatchEvent(new Event(DISMISSED_EVENT))
   } catch {
     // Stockage indisponible (navigation privée...) : on continue sans persister.
   }
@@ -101,21 +133,29 @@ export function IntelligentGuidance({
   contextKey: string
 }) {
   const ranked = rankGuidanceItems(items)
-  const [dismissed, setDismissed] = useState<Record<string, DismissedEntry>>({})
   const [expanded, setExpanded] = useState(false)
+  const [now, setNow] = useState(() => Date.now())
+  const dismissedRaw = useSyncExternalStore(
+    useCallback((onStoreChange) => subscribeDismissed(contextKey, onStoreChange), [contextKey]),
+    useCallback(() => getDismissedRaw(contextKey), [contextKey]),
+    () => EMPTY_DISMISSED_RAW,
+  )
+  const dismissed = useMemo(() => parseDismissed(dismissedRaw), [dismissedRaw])
 
-  // Chargé après montage uniquement (localStorage indisponible côté serveur) :
-  // léger flash possible à l'hydratation, jamais d'erreur.
   useEffect(() => {
-    setDismissed(loadDismissed(contextKey))
-  }, [contextKey])
+    const nextExpiry = Object.values(dismissed).reduce((earliest, entry) => Math.min(earliest, entry.until), Infinity)
+    if (!Number.isFinite(nextExpiry)) return
+    const delay = Math.max(0, nextExpiry - now)
+    const timeout = window.setTimeout(() => setNow(Date.now()), delay)
+    return () => window.clearTimeout(timeout)
+  }, [dismissed, now])
 
   const visible = ranked.filter((item) => {
     if (!isDismissible(item)) return true
     const entry = dismissed[item.id]
     if (!entry) return true
     if (entry.hash !== contentHash(item)) return true // la situation a changé : on réaffiche
-    return Date.now() >= entry.until ? true : false
+    return now >= entry.until
   })
 
   if (visible.length === 0) return null
@@ -125,9 +165,8 @@ export function IntelligentGuidance({
   function dismiss(item: GuidanceItem) {
     const next = {
       ...dismissed,
-      [item.id]: { hash: contentHash(item), until: Date.now() + SNOOZE_DAYS * 24 * 60 * 60 * 1000 },
+      [item.id]: { hash: contentHash(item), until: now + SNOOZE_DAYS * 24 * 60 * 60 * 1000 },
     }
-    setDismissed(next)
     saveDismissed(contextKey, next)
   }
 

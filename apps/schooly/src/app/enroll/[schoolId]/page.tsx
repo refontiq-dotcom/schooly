@@ -1,6 +1,7 @@
 import { createClient } from "@/utils/supabase/server"
 import { createClient as createAdminClient } from "@supabase/supabase-js"
 import { notFound } from "next/navigation"
+import Image from "next/image"
 import PreEnrollmentForm from "./pre-enrollment-form"
 
 interface Props {
@@ -54,7 +55,7 @@ export default async function EnrollPage({ params }: Props) {
       <div className="max-w-2xl mx-auto space-y-8">
         <div className="text-center space-y-3">
           <div className="flex justify-center">
-            <img src="/schooly_logo_vector.svg" alt="Schooly" className="h-12 w-auto" />
+            <Image src="/schooly_logo_vector.svg" alt="Schooly" width={272} height={48} unoptimized className="h-12 w-auto" />
           </div>
           <h1 className="text-3xl font-bold">Pré-inscription</h1>
           <p className="text-muted-foreground">

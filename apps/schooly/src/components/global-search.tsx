@@ -38,6 +38,9 @@ export function GlobalSearch() {
   const [active, setActive] = useState(0)
   const [loading, setLoading] = useState(false)
   const [snapshot, setSnapshot] = useState<DirectorySnapshot>(EMPTY_SNAPSHOT)
+  // S2 : le snapshot est borné en base — on conserve la couverture réelle pour
+  // signaler honnêtement les personnes hors de portée de la recherche locale.
+  const [coverage, setCoverage] = useState<{ loaded: number; total: number } | null>(null)
   const loaded = useRef(false)
 
   const load = useCallback(async () => {
@@ -45,7 +48,10 @@ export function GlobalSearch() {
     loaded.current = true
     setLoading(true)
     const res = await getDirectorySnapshot()
-    if (res.data) setSnapshot(res.data as DirectorySnapshot)
+    if ("data" in res && res.data) {
+      setSnapshot(res.data as DirectorySnapshot)
+      setCoverage(res.meta ?? null)
+    }
     setLoading(false)
   }, [])
 
@@ -73,9 +79,10 @@ export function GlobalSearch() {
 
   const hits = useMemo(() => buildSearchHits(snapshot, query), [query, snapshot])
 
-  useEffect(() => {
+  function handleQueryChange(nextQuery: string) {
+    setQuery(nextQuery)
     setActive(0)
-  }, [query])
+  }
 
   function go(hit: SearchHit) {
     const url = `${hit.href}&q=${encodeURIComponent(query.trim())}`
@@ -122,11 +129,7 @@ export function GlobalSearch() {
           ref={inputRef}
           type="search"
           value={query}
-          onChange={(e) => {
-            setQuery(e.target.value)
-            setOpen(true)
-            void load()
-          }}
+          onChange={(e) => handleQueryChange(e.target.value)}
           onFocus={() => {
             setOpen(true)
             void load()
@@ -147,7 +150,7 @@ export function GlobalSearch() {
               className="min-h-8 min-w-8"
               aria-label="Effacer la recherche"
               onClick={() => {
-                setQuery("")
+                handleQueryChange("")
                 inputRef.current?.focus()
               }}
             >
@@ -179,40 +182,49 @@ export function GlobalSearch() {
               </p>
             </div>
           ) : (
-            grouped.map(([kind, items]) => {
-              const Icon = KIND_ICON[kind]
-              return (
-                <div key={kind} className="py-1">
-                  <p className="flex items-center gap-1.5 px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                    <Icon className="h-3 w-3" />
-                    {SEARCH_KIND_LABELS[kind]}
-                  </p>
-                  {items.map((hit) => {
-                    runningIndex += 1
-                    const index = runningIndex
-                    return (
-                      <button
-                        key={`${hit.kind}-${hit.id}`}
-                        type="button"
-                        role="option"
-                        aria-selected={index === active}
-                        className={cn(
-                          "flex w-full min-h-11 cursor-pointer flex-col items-start rounded-lg px-3 py-2 text-left transition-colors",
-                          index === active ? "bg-muted" : "hover:bg-muted/70",
-                        )}
-                        onMouseEnter={() => setActive(index)}
-                        onClick={() => go(hit)}
-                      >
-                        <span className="text-sm font-medium">{hit.title}</span>
-                        {hit.subtitle ? (
-                          <span className="text-xs text-muted-foreground">{hit.subtitle}</span>
-                        ) : null}
-                      </button>
-                    )
-                  })}
-                </div>
-              )
-            })
+            <>
+              {grouped.map(([kind, items]) => {
+                const Icon = KIND_ICON[kind]
+                return (
+                  <div key={kind} className="py-1">
+                    <p className="flex items-center gap-1.5 px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      <Icon className="h-3 w-3" />
+                      {SEARCH_KIND_LABELS[kind]}
+                    </p>
+                    {items.map((hit) => {
+                      runningIndex += 1
+                      const index = runningIndex
+                      return (
+                        <button
+                          key={`${hit.kind}-${hit.id}`}
+                          type="button"
+                          role="option"
+                          aria-selected={index === active}
+                          className={cn(
+                            "flex w-full min-h-11 cursor-pointer flex-col items-start rounded-lg px-3 py-2 text-left transition-colors",
+                            index === active ? "bg-muted" : "hover:bg-muted/70",
+                          )}
+                          onMouseEnter={() => setActive(index)}
+                          onClick={() => go(hit)}
+                        >
+                          <span className="text-sm font-medium">{hit.title}</span>
+                          {hit.subtitle ? (
+                            <span className="text-xs text-muted-foreground">{hit.subtitle}</span>
+                          ) : null}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )
+              })}
+              {coverage && coverage.total > coverage.loaded ? (
+                <p className="border-t px-3 py-2 text-[11px] leading-snug text-muted-foreground">
+                  Recherche locale limitée à {coverage.loaded} entrées sur{" "}
+                  {coverage.total} dans l’annuaire. Affinez la requête ou ouvrez
+                  l’onglet Annuaire pour tout parcourir.
+                </p>
+              ) : null}
+            </>
           )}
         </div>
       ) : null}

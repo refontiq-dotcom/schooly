@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
+import { normalizeHttpUrl, normalizeHttpUrlList } from "@/lib/safe-url"
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SECRET_KEY!)
 
@@ -30,11 +31,17 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   return NextResponse.json({
     school: {
       id: school.id, nom: school.name, ville: school.city, latitude: school.latitude, longitude: school.longitude,
-      description: school.description_publique, itineraire: school.itineraire, cover_photo: school.cover_photo_url,
-      gallery: Array.isArray(school.gallery_photos) ? school.gallery_photos : [],
-      photos_360: Array.isArray(school.photos_360) ? school.photos_360 : [],
-      video_url: school.video_url, grille_tarifaire: school.grille_tarifaire_publique,
-      contact: { address: school.public_address, phone: school.public_phone, email: school.public_email, website: school.public_website_url },
+      description: school.description_publique, itineraire: school.itineraire,
+      cover_photo: normalizeHttpUrl(school.cover_photo_url),
+      gallery: normalizeHttpUrlList(school.gallery_photos),
+      photos_360: normalizeHttpUrlList(school.photos_360),
+      video_url: normalizeHttpUrl(school.video_url), grille_tarifaire: school.grille_tarifaire_publique,
+      contact: {
+        address: school.public_address,
+        phone: school.public_phone,
+        email: school.public_email,
+        website: normalizeHttpUrl(school.public_website_url),
+      },
       highlights: Array.isArray(school.public_highlights) ? school.public_highlights : [], admission_notes: school.admission_notes
     },
     niveaux,

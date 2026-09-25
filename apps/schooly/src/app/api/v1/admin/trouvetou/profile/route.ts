@@ -2,6 +2,8 @@ import { NextResponse } from "next/server"
 import { TROUVETOU_ADMIN_ROLES } from "@/utils/supabase/roles"
 import { createClient } from "@/utils/supabase/server"
 import { createClient as createAdminClient } from "@supabase/supabase-js"
+import { trouvetouProfileSchema } from "@/lib/schemas/trouvetou"
+import { logServerEvent } from "@/lib/server-logger"
 
 export async function POST(request: Request) {
   try {
@@ -24,33 +26,30 @@ export async function POST(request: Request) {
 
     if (!role) return NextResponse.json({ error: "Non autorise" }, { status: 403 })
 
-    const body = await request.json()
-    const cleanArray = (value: unknown) => Array.isArray(value) ? value.filter((item) => typeof item === "string" && item.trim()) : []
+    const payload: unknown = await request.json()
+    const parsed = trouvetouProfileSchema.safeParse(payload)
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0]?.message ?? "Données du profil invalides." },
+        { status: 400 },
+      )
+    }
+    const body = parsed.data
 
     const { error } = await admin
       .from("schools")
       .update({
-        description_publique: String(body.description_publique || "").trim() || null,
-        latitude: Number.isFinite(Number(body.latitude)) ? Number(body.latitude) : null,
-        longitude: Number.isFinite(Number(body.longitude)) ? Number(body.longitude) : null,
-        itineraire: String(body.itineraire || "").trim() || null,
-        video_url: String(body.video_url || "").trim() || null,
-        photos_360: cleanArray(body.photos_360),
-        cover_photo_url: String(body.cover_photo_url || "").trim() || null,
-        gallery_photos: cleanArray(body.gallery_photos),
-        public_address: String(body.public_address || "").trim() || null,
-        public_phone: String(body.public_phone || "").trim() || null,
-        public_email: String(body.public_email || "").trim() || null,
-        public_website_url: String(body.public_website_url || "").trim() || null,
-        public_highlights: cleanArray(body.public_highlights),
-        admission_notes: String(body.admission_notes || "").trim() || null,
+        ...body,
         updated_at: new Date().toISOString(),
       })
       .eq("id", role.school_id)
 
     if (error) throw error
     return NextResponse.json({ success: true })
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message || "Erreur" }, { status: 500 })
+  } catch (error: unknown) {
+    logServerEvent("error", "trouvetou.profile.failed", {
+      message: error instanceof Error ? error.message : "Erreur inconnue",
+    })
+    return NextResponse.json({ error: "Impossible d'enregistrer le profil." }, { status: 500 })
   }
 }

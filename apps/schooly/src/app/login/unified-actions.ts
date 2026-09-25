@@ -20,7 +20,16 @@ function isEmail(contact: string) {
   return contact.includes("@")
 }
 
-async function findStaffUser(contact: string, admin: any) {
+function adminClient() {
+  return createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SECRET_KEY!
+  )
+}
+
+type AdminClient = ReturnType<typeof adminClient>
+
+async function findStaffUser(contact: string, admin: AdminClient) {
   const query = admin
     .from("users")
     .select("id, email, phone, full_name, is_activated")
@@ -44,7 +53,7 @@ async function sendStaffOtp(contact: string) {
 }
 
 async function getActiveStaffRole(
-  admin: any,
+  admin: AdminClient,
   userId: string
 ) {
   const { data } = await admin
@@ -76,10 +85,7 @@ export async function schoolLoginAction(
 
   if (!contact) return { error: "Email professionnel ou numéro de téléphone requis." }
 
-  const admin = createAdminClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SECRET_KEY!
-  )
+  const admin = adminClient()
 
   const { data: profile, error: profileError } = await findStaffUser(contact, admin)
   if (profileError) return { error: "Impossible de vérifier ce compte pour le moment." }
@@ -151,10 +157,7 @@ export async function schoolActivationVerifyAction(
     return { error: "Code invalide ou expiré. Demandez un nouveau code." }
   }
 
-  const admin = createAdminClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SECRET_KEY!
-  )
+  const admin = adminClient()
 
   const { data: profile } = await admin
     .from("users")
@@ -193,10 +196,7 @@ export async function completeStaffActivationAction(
     return { error: "Votre vérification a expiré. Recommencez l'activation." }
   }
 
-  const admin = createAdminClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SECRET_KEY!
-  )
+  const admin = adminClient()
 
   const { data: profile } = await admin
     .from("users")
