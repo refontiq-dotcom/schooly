@@ -4,7 +4,7 @@ import { notFound } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { verifyReceipt } from "@/app/dashboard/finance/actions"
-import { CheckCircle2, XCircle, QrCode, School } from "lucide-react"
+import { CheckCircle2, Clock, XCircle, QrCode, School } from "lucide-react"
 import Image from "next/image"
 
 interface Props {
@@ -13,17 +13,27 @@ interface Props {
 
 export default async function VerifyReceiptPage({ params }: Props) {
   const { code } = await params
-  const { data, error } = await verifyReceipt(code)
+  const { data, error, throttled } = await verifyReceipt(code)
 
   if (error || !data) {
     return (
       <div className="min-h-screen bg-muted/40 flex items-center justify-center p-4">
         <Card className="max-w-md w-full">
           <CardContent className="pt-6 text-center space-y-4">
-            <XCircle className="h-12 w-12 text-destructive mx-auto" />
-            <h1 className="text-xl font-bold">Reçu introuvable</h1>
+            {throttled ? (
+              <Clock className="h-12 w-12 text-amber-500 mx-auto" />
+            ) : (
+              <XCircle className="h-12 w-12 text-destructive mx-auto" />
+            )}
+            <h1 className="text-xl font-bold">
+              {throttled ? "Trop de consultations" : "Reçu introuvable"}
+            </h1>
+            {/* R2 : distinguer un refus de débit d'un code inconnu, sinon on
+                affirme à tort qu'un reçu valide « n'existe pas ». */}
             <p className="text-sm text-muted-foreground">
-              Ce code de vérification n&apos;existe pas ou a été supprimé.
+              {throttled
+                ? (error ?? "Merci de réessayer dans un instant.")
+                : "Ce code de vérification n'existe pas ou a été supprimé."}
             </p>
           </CardContent>
         </Card>

@@ -1,8 +1,16 @@
 "use server"
 
 import { createClient as createAdminClient } from "@supabase/supabase-js"
+import { RATE_LIMIT_POLICIES, rateLimit } from "@/lib/rate-limit"
 
 // ============================================ VÉRIFICATION PUBLIQUE ==============
+
+export type ReceiptVerification = {
+  data: Record<string, unknown> | null
+  error: string | null
+  /** true si la demande a été refusée par le limiteur de débit (R2). */
+  throttled?: boolean
+}
 
 /**
  * EXCEPTION VOLONTAIRE — pas de garde requireSchoolRole ici.
@@ -12,8 +20,29 @@ import { createClient as createAdminClient } from "@supabase/supabase-js"
  * d'aléa (`crypto.randomBytes(16)`), impossible à énumérer. Les données
  * retournées sont limitées au contenu du reçu (pas de liste ni de balayage).
  * Cf. docs/security/audit-socle-auth-tenancy.md — module Finance.
+ *
+ * R2 : le secret étant le code, on borne malgré tout le débit de consultation
+ * par code (le plafond par IP du middleware couvre le balayage d'IP
+ * successives). `throttled` distingue le refus de débit d'un code inconnu, pour
+ * que l'écran public n'affirme pas « reçu introuvable » à tort.
  */
-export async function verifyReceipt(verificationCode: string) {
+export async function verifyReceipt(
+  verificationCode: string
+): Promise<ReceiptVerification> {
+  const code = verificationCode.trim().toUpperCase()
+
+  const decision = rateLimit.check(
+    `verify:${code}`,
+    RATE_LIMIT_POLICIES.receiptVerification
+  )
+  if (!decision.ok) {
+    return {
+      data: null,
+      error: `Trop de consultations de ce reçu. Réessayez dans ${decision.retryAfterSeconds} s.`,
+      throttled: true,
+    }
+  }
+
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SECRET_KEY!
@@ -36,7 +65,7 @@ export async function verifyReceipt(verificationCode: string) {
       ),
       schools ( name, city )
     `)
-    .eq("verification_code", verificationCode.toUpperCase())
+    .eq("verification_code", code)
     .is("deleted_at", null)
     .single()
 

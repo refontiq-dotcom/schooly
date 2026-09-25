@@ -17,6 +17,7 @@ import {
   resolvePageRequest,
   type PageRequestOptions,
 } from "@/lib/pagination"
+import { RATE_LIMIT_POLICIES, rateLimit } from "@/lib/rate-limit"
 import { mapSchoolPaymentType, parseIdList, type PaymentMethod } from "./enrollment-utils"
 import { adminClient, generateCode, type ActionResult } from "./_shared"
 
@@ -51,6 +52,20 @@ export async function createPreEnrollment(formData: FormData): Promise<ActionRes
   } = parsed.data
   const acceptedChecklist = parseIdList(formData.get("acceptedChecklist") as string | null)
   const providedDocuments = parseIdList(formData.get("providedDocuments") as string | null)
+
+  // R2 : le tunnel est public et sans authentification — on borne par école et
+  // par téléphone, avant tout accès base. Un même numéro ne peut pas remplir la
+  // file de pré-inscriptions (SMS, bruit pour le secrétariat) ; le plafond par IP
+  // du middleware couvre le reste.
+  const decision = rateLimit.check(
+    `pre-enroll:${schoolId}:${guardianPhone}`,
+    RATE_LIMIT_POLICIES.preEnrollment
+  )
+  if (!decision.ok) {
+    return {
+      error: `Trop de demandes envoyées pour ce numéro. Réessayez dans ${decision.retryAfterSeconds} s.`,
+    }
+  }
 
   const admin = adminClient()
 

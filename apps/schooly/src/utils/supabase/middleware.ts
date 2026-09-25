@@ -1,12 +1,19 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
 import {
+  clientIpFromHeaders,
+  RATE_LIMIT_POLICIES,
+  rateLimit,
+} from "@/lib/rate-limit"
+import {
   isEntryPath,
   isPublicPath,
   isStudentPortalPath,
   legacyRedirectFor,
+  matchesPrefix,
   roleHome,
   isRoleAllowedPath,
+  PUBLIC_PATH_PREFIXES,
 } from "./route-rules"
 
 export async function updateSession(request: NextRequest) {
@@ -36,6 +43,27 @@ export async function updateSession(request: NextRequest) {
   )
 
   const path = request.nextUrl.pathname
+
+  // R2 : plafond de débit par IP sur la surface publique non authentifiée
+  // (`/login`, `/register-school`, `/verify`, `/enroll`). Placé avant la
+  // vérification de session pour qu'une rafale ne consomme pas d'appels
+  // Supabase. `/api/*` est volontairement exclu : ces routes portent leurs
+  // propres gardes (Bearer) et `/api/health` doit rester joignable par les
+  // sondes. Le budget est cloisonné par surface : saturer `/verify` ne doit pas
+  // rendre `/enroll` inutilisable.
+  if (matchesPrefix(path, PUBLIC_PATH_PREFIXES)) {
+    const ip = clientIpFromHeaders((name) => request.headers.get(name))
+    if (ip !== null) {
+      const surface = path.split("/")[1] || "racine"
+      const decision = rateLimit.check(
+        `page:${surface}:${ip}`,
+        RATE_LIMIT_POLICIES.publicPage
+      )
+      if (!decision.ok) {
+        return tooManyRequests(decision.retryAfterSeconds)
+      }
+    }
+  }
 
   const legacy = legacyRedirectFor(path)
   if (legacy) {
@@ -83,6 +111,29 @@ export async function updateSession(request: NextRequest) {
 
   return supabaseResponse
 }
+/**
+ * Réponse 429 de l'edge : page HTML minimale (les surfaces concernées sont des
+ * pages) avec un en-tête `Retry-After`. Un client ou un robot honnête attendra,
+ * un client malveillant n'obtiendra rien de plus.
+ */
+function tooManyRequests(retryAfterSeconds: number): NextResponse {
+  return new NextResponse(
+    `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Trop de requêtes</title></head>` +
+      `<body style="font-family:system-ui,sans-serif;max-width:32rem;margin:4rem auto;padding:0 1rem">` +
+      `<h1 style="font-size:1.25rem">Trop de requêtes</h1>` +
+      `<p>Merci de patienter ${retryAfterSeconds} secondes avant de réessayer.</p>` +
+      `</body></html>`,
+    {
+      status: 429,
+      headers: {
+        "content-type": "text/html; charset=utf-8",
+        "retry-after": String(retryAfterSeconds),
+      },
+    }
+  )
+}
+
+
 
 async function resolveRoleCode(
   supabase: ClaimsClient,

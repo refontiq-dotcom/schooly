@@ -4,6 +4,7 @@ import { createClient } from "@/utils/supabase/server"
 import { createClient as createAdminClient } from "@supabase/supabase-js"
 import { revalidatePath } from "next/cache"
 import { PRICING_ROLES } from "@/utils/supabase/roles"
+import { RATE_LIMIT_POLICIES, rateLimit } from "@/lib/rate-limit"
 import { denial, requireSchoolRole } from "@/utils/supabase/require-role"
 import type { ActionResult } from "./_shared"
 
@@ -23,7 +24,22 @@ export async function generateDueReminders(): Promise<ActionResult<{ queued: num
 
   const guard = await requireSchoolRole(supabase, { allowedRoles: [...PRICING_ROLES] })
   if (!guard.ok) return { error: denial(guard.reason, []).error }
-  const { schoolId } = guard.context
+  const { schoolId, userId } = guard.context
+
+  // R2 : chaque file générée part en SMS. On borne à quelques envois par heure
+  // et par utilisateur, pour qu'un double-clic involontaire ne déclenche pas une
+  // campagne à l'école entière. La garde de rôle reste la vraie porte : ce
+  // plafond protège l'accident et l'abus, pas l'accès.
+  const decision = rateLimit.check(
+    `reminders:${userId}:${schoolId}`,
+    RATE_LIMIT_POLICIES.reminders
+  )
+  if (!decision.ok) {
+    const minutes = Math.max(1, Math.ceil(decision.retryAfterSeconds / 60))
+    return {
+      error: `Relances déjà générées récemment. Réessayez dans ${minutes} min.`,
+    }
+  }
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
