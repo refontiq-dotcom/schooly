@@ -34,7 +34,7 @@ export default function RegisterSchoolPage() {
           <div className="space-y-4">
             
             <div className="space-y-2">
-              <Label htmlFor="schoolName">Nom de l'établissement</Label>
+              <Label htmlFor="schoolName">Nom de l&apos;établissement</Label>
               <div className="relative">
                 <Building2 className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input

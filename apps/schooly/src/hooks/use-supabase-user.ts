@@ -3,8 +3,10 @@
 import { useEffect, useState } from "react"
 import { createClient } from "@/utils/supabase/browser"
 
+export type UserMetadata = Record<string, unknown>
+
 export function useSupabaseUser() {
-  const [user, setUser] = useState<{ id: string; role?: string; user_metadata?: any } | null>(null)
+  const [user, setUser] = useState<{ id: string; role?: string; user_metadata?: UserMetadata } | null>(null)
 
   useEffect(() => {
     let cancelled = false

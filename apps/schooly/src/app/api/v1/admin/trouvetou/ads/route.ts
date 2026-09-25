@@ -2,6 +2,8 @@ import { NextResponse } from "next/server"
 import { TROUVETOU_ADMIN_ROLES } from "@/utils/supabase/roles"
 import { createClient } from "@/utils/supabase/server"
 import { createClient as createAdminClient } from "@supabase/supabase-js"
+import { trouvetouAdSchema } from "@/lib/schemas/trouvetou"
+import { logServerEvent } from "@/lib/server-logger"
 
 export async function POST(request: Request) {
   try {
@@ -24,24 +26,30 @@ export async function POST(request: Request) {
 
     if (!role) return NextResponse.json({ error: "Non autorise" }, { status: 403 })
 
-    const body = await request.json()
+    const payload: unknown = await request.json()
+    const parsed = trouvetouAdSchema.safeParse(payload)
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0]?.message ?? "Données de la publicité invalides." },
+        { status: 400 },
+      )
+    }
+    const body = parsed.data
 
     const { error } = await admin
       .from("trouvetou_ads")
       .insert({
         school_id: role.school_id,
-        title: body.title,
-        message: body.message,
-        image_url: body.image_url || null,
-        target_url: body.target_url || null,
-        start_date: body.start_date,
-        end_date: body.end_date,
+        ...body,
         is_active: true,
       })
 
     if (error) throw error
     return NextResponse.json({ success: true })
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message || "Erreur" }, { status: 500 })
+  } catch (error: unknown) {
+    logServerEvent("error", "trouvetou.ad.failed", {
+      message: error instanceof Error ? error.message : "Erreur inconnue",
+    })
+    return NextResponse.json({ error: "Impossible de créer la publicité." }, { status: 500 })
   }
 }

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
+import { normalizeHttpUrl, normalizeHttpUrlList } from "@/lib/safe-url"
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -32,8 +33,11 @@ export async function GET(request: Request) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   const results = (schools || []).map(school => {
-    const gallery = Array.isArray(school.gallery_photos) ? school.gallery_photos : []
-    const photos360 = Array.isArray(school.photos_360) ? school.photos_360 : []
+    const coverPhoto = normalizeHttpUrl(school.cover_photo_url)
+    const gallery = normalizeHttpUrlList(school.gallery_photos)
+    const photos360 = normalizeHttpUrlList(school.photos_360)
+    const videoUrl = normalizeHttpUrl(school.video_url)
+    const website = normalizeHttpUrl(school.public_website_url)
 
     return {
       id: school.id,
@@ -43,13 +47,13 @@ export async function GET(request: Request) {
       disponibilite: true,
       prix_min: 0,
       prix_max: 0,
-      medias: [school.cover_photo_url, ...gallery].filter(Boolean),
+      medias: [coverPhoto, ...gallery].filter((url): url is string => url !== null),
       badge_verifie: true,
       attributs_specifiques: {
         description: school.description_publique,
         itineraire: school.itineraire,
         photos_360: photos360,
-        video_url: school.video_url,
+        video_url: videoUrl,
         grille_tarifaire_publique: school.grille_tarifaire_publique || {},
         highlights: school.public_highlights || [],
         admission_notes: school.admission_notes,
@@ -58,7 +62,7 @@ export async function GET(request: Request) {
           address: school.public_address,
           phone: school.public_phone,
           email: school.public_email,
-          website: school.public_website_url,
+          website,
         }
       }
     }

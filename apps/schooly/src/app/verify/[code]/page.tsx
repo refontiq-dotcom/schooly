@@ -23,7 +23,7 @@ export default async function VerifyReceiptPage({ params }: Props) {
             <XCircle className="h-12 w-12 text-destructive mx-auto" />
             <h1 className="text-xl font-bold">Reçu introuvable</h1>
             <p className="text-sm text-muted-foreground">
-              Ce code de vérification n'existe pas ou a été supprimé.
+              Ce code de vérification n&apos;existe pas ou a été supprimé.
             </p>
           </CardContent>
         </Card>
@@ -39,7 +39,7 @@ export default async function VerifyReceiptPage({ params }: Props) {
       <div className="max-w-2xl mx-auto space-y-6">
         <div className="text-center space-y-2">
           <div className="flex justify-center">
-            <img src="/schooly_logo_vector.svg" alt="Schooly" className="h-10 w-auto" />
+            <Image src="/schooly_logo_vector.svg" alt="Schooly" width={227} height={40} unoptimized className="h-10 w-auto" />
           </div>
           <h1 className="text-2xl font-bold">Vérification de reçu</h1>
           <p className="text-sm text-muted-foreground">
@@ -56,7 +56,7 @@ export default async function VerifyReceiptPage({ params }: Props) {
                   Reçu valide et authentique
                 </h2>
                 <p className="text-sm text-green-600 dark:text-green-300">
-                  Ce reçu a été émis par {school?.name} et n'a pas été modifié.
+                  Ce reçu a été émis par {school?.name} et n&apos;a pas été modifié.
                 </p>
               </div>
             </div>
@@ -130,7 +130,7 @@ export default async function VerifyReceiptPage({ params }: Props) {
         <Card>
           <CardContent className="pt-6">
             <p className="text-xs text-center text-muted-foreground">
-              Cette page est générée automatiquement par Schooly. Pour toute contestation, contactez l'établissement.
+              Cette page est générée automatiquement par Schooly. Pour toute contestation, contactez l&apos;établissement.
             </p>
           </CardContent>
         </Card>

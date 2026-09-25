@@ -42,17 +42,13 @@ function Select({ value, onValueChange, children, disabled, name, required, id, 
   const [open, setOpen] = React.useState(false)
   const [itemLabel, setItemLabel] = React.useState("")
 
-  React.useEffect(() => {
-    if (!value) setItemLabel("")
-  }, [value])
-
   const handleChange = (next: string, label?: string) => {
     if (label) setItemLabel(label)
     onValueChange?.(next)
   }
 
   const currentValue = value || defaultValue || ""
-  const label = displayLabel || itemLabel
+  const label = displayLabel || (value ? itemLabel : "")
 
   return (
     <SelectContext.Provider value={{ value: currentValue, label, onValueChange: handleChange, open, setOpen }}>

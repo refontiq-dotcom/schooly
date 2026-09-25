@@ -14,6 +14,7 @@ import {
   parseOptionalServices,
   parseSchoolSupplies,
 } from "@/lib/fiches/normalize"
+import { normalizeHttpUrl } from "@/lib/safe-url"
 
 function supa() {
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SECRET_KEY!)
@@ -60,7 +61,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       adresse: (school as { public_address: string | null }).public_address,
       telephone: (school as { public_phone: string | null }).public_phone,
       email: (school as { public_email: string | null }).public_email,
-      logo: (school as { cover_photo_url: string | null }).cover_photo_url,
+      logo: normalizeHttpUrl(school.cover_photo_url),
     },
     cycles,
     tarifs: fees,

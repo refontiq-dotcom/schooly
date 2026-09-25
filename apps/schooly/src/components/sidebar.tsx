@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useState } from "react"
+import Image from "next/image"
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion"
 import { ChevronLeft, LogOut, Sparkles } from "lucide-react"
 import { NAV_BY_ROLE, type NavItem } from "@/lib/nav"
@@ -61,7 +62,7 @@ export function Sidebar({ role, schoolName, userName }: SidebarProps) {
         </AnimatePresence>
 
         {collapsed && (
-          <img src="/schooly_logo_vector.svg" alt="Schooly" className="mx-auto h-8 w-auto" />
+          <Image src="/schooly_logo_vector.svg" alt="Schooly" width={182} height={32} unoptimized className="mx-auto h-8 w-auto" />
         )}
 
         <Button

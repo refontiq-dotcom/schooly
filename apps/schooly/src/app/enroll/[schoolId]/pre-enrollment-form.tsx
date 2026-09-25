@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react"
 import { createPreEnrollment } from "@/app/dashboard/admissions/actions"
 import { capitalizeWords, calculateAge, formatGuardianPhone } from "@/app/dashboard/admissions/enrollment-utils"
+import { parsePreEnrollmentDraft } from "./pre-enrollment-draft"
+
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -134,40 +136,42 @@ export default function PreEnrollmentForm({
 
   // ── Brouillon local : la saisie survit à un refresh ou une fermeture d'onglet ──
   useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(DRAFT_KEY)
-      if (raw) {
-        const d = JSON.parse(raw) as Record<string, unknown>
-        const str = (v: unknown) => (typeof v === "string" ? v : "")
-        setFirstName(str(d.firstName))
-        setLastName(str(d.lastName))
-        setDateOfBirth(str(d.dateOfBirth))
-        setBirthCertificateNumber(str(d.birthCertificateNumber))
-        setGuardianName(str(d.guardianName))
-        setGuardianPhone(str(d.guardianPhone))
-        setGuardianRelation(str(d.guardianRelation))
-        setGuardianRelationDetail(str(d.guardianRelationDetail))
-        setSameEmergencyContact(d.sameEmergencyContact !== false)
-        setEmergencyName(str(d.emergencyName))
-        setEmergencyPhone(str(d.emergencyPhone))
-        setFirstEnrollment(d.firstEnrollment === true)
-        setPreviousSchool(str(d.previousSchool))
-        setPreviousClass(str(d.previousClass))
-        setPreviousClassTouched(Boolean(str(d.previousClass)))
-        setEnrollmentType(str(d.enrollmentType) || "nouvelle")
-        setStateOrientation(str(d.stateOrientation) || "non_oriente")
-        setOrientationNumber(str(d.orientationNumber))
-        setPreviousMatricule(str(d.previousMatricule))
-        setSelectedGradeLevel(str(d.gradeLevelId))
-        setDraftRestored(true)
+    const hydrateDraft = () => {
+      try {
+        const draft = parsePreEnrollmentDraft(window.localStorage.getItem(DRAFT_KEY))
+        if (draft) {
+          setFirstName(draft.firstName ?? "")
+          setLastName(draft.lastName ?? "")
+          setDateOfBirth(draft.dateOfBirth ?? "")
+          setBirthCertificateNumber(draft.birthCertificateNumber ?? "")
+          setGuardianName(draft.guardianName ?? "")
+          setGuardianPhone(draft.guardianPhone ?? "")
+          setGuardianRelation(draft.guardianRelation ?? "")
+          setGuardianRelationDetail(draft.guardianRelationDetail ?? "")
+          setSameEmergencyContact(draft.sameEmergencyContact ?? true)
+          setEmergencyName(draft.emergencyName ?? "")
+          setEmergencyPhone(draft.emergencyPhone ?? "")
+          setFirstEnrollment(draft.firstEnrollment ?? false)
+          setPreviousSchool(draft.previousSchool ?? "")
+          setPreviousClass(draft.previousClass ?? "")
+          setPreviousClassTouched(Boolean(draft.previousClass))
+          setEnrollmentType(draft.enrollmentType || "nouvelle")
+          setStateOrientation(draft.stateOrientation || "non_oriente")
+          setOrientationNumber(draft.orientationNumber ?? "")
+          setPreviousMatricule(draft.previousMatricule ?? "")
+          setSelectedGradeLevel(draft.gradeLevelId ?? "")
+          setDraftRestored(true)
+        }
+      } catch {
+        // Brouillon corrompu ou stockage indisponible : formulaire vide.
+      } finally {
+        setDraftHydrated(true)
       }
-    } catch {
-      // brouillon corrompu ou stockage indisponible : formulaire vide
-    } finally {
-      setDraftHydrated(true)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+
+    const timeoutId = window.setTimeout(hydrateDraft, 0)
+    return () => window.clearTimeout(timeoutId)
+  }, [DRAFT_KEY])
 
   useEffect(() => {
     if (!draftHydrated) return
@@ -339,7 +343,7 @@ export default function PreEnrollmentForm({
               <Clock className="h-3 w-3" /> Valable 72h
             </p>
             <p className="text-xs text-green-600 dark:text-green-300">
-              Présentez-vous au guichet de l'établissement avec ce code pour finaliser l'inscription.
+              Présentez-vous au guichet de l&apos;établissement avec ce code pour finaliser l&apos;inscription.
             </p>
           </div>
         </CardContent>
@@ -350,7 +354,7 @@ export default function PreEnrollmentForm({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Informations de l'élève</CardTitle>
+        <CardTitle>Informations de l&apos;élève</CardTitle>
         <CardDescription>
           Tous les champs marqués * sont obligatoires.
         </CardDescription>
@@ -479,7 +483,7 @@ export default function PreEnrollmentForm({
           <div className="space-y-4 rounded-lg border p-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="enrollmentType">Type d'inscription *</Label>
+                <Label htmlFor="enrollmentType">Type d&apos;inscription *</Label>
                 <Select
                   value={enrollmentType}
                   onValueChange={setEnrollmentType}
@@ -520,14 +524,14 @@ export default function PreEnrollmentForm({
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  L'élève vous a été affecté par l'État (notification d'orientation) ?
+                  L&apos;élève vous a été affecté par l&apos;État (notification d&apos;orientation) ?
                 </p>
               </div>
             </div>
 
             {enrollmentType === "reinscription" && (
               <div className="space-y-2">
-                <Label htmlFor="previousMatricule">Matricule de l'élève (si connu)</Label>
+                <Label htmlFor="previousMatricule">Matricule de l&apos;élève (si connu)</Label>
                 <Input
                   id="previousMatricule"
                   name="previousMatricule"
@@ -538,14 +542,14 @@ export default function PreEnrollmentForm({
                   className="min-h-11"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Figurant sur les anciens reçus ou bulletins — permet de retrouver l'élève et de réinscrire sans créer de doublon.
+                  Figurant sur les anciens reçus ou bulletins — permet de retrouver l&apos;élève et de réinscrire sans créer de doublon.
                 </p>
               </div>
             )}
 
             {stateOrientation === "oriente_etat" && (
               <div className="space-y-2">
-                <Label htmlFor="orientationNumber">N° de notification d'orientation (optionnel)</Label>
+                <Label htmlFor="orientationNumber">N° de notification d&apos;orientation (optionnel)</Label>
                 <Input
                   id="orientationNumber"
                   name="orientationNumber"
@@ -571,7 +575,7 @@ export default function PreEnrollmentForm({
               />
               <span className="text-sm flex items-center gap-2">
                 <School className="h-4 w-4 text-primary shrink-0" />
-                Première scolarisation — l'élève n'a jamais été scolarisé
+                Première scolarisation — l&apos;élève n&apos;a jamais été scolarisé
               </span>
             </label>
 
@@ -618,7 +622,7 @@ export default function PreEnrollmentForm({
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground">
-                    Pré-rempli avec la classe juste avant le niveau souhaité — modifiez si l'école précédente nomme différemment.
+                    Pré-rempli avec la classe juste avant le niveau souhaité — modifiez si l&apos;école précédente nomme différemment.
                   </p>
                 </div>
               </div>
@@ -633,7 +637,7 @@ export default function PreEnrollmentForm({
                 Fournitures scolaires
               </div>
               <p className="text-xs text-muted-foreground">
-                Liste définie par l'établissement. Les articles cochés seront à fournir lors de la finalisation.
+                Liste définie par l&apos;établissement. Les articles cochés seront à fournir lors de la finalisation.
               </p>
               <div className="space-y-2">
                 {checklistItems.map((item) => (
@@ -670,7 +674,7 @@ export default function PreEnrollmentForm({
                 Pièces à fournir
               </div>
               <p className="text-xs text-muted-foreground">
-                Documents demandés par l'établissement pour ce niveau.
+                Documents demandés par l&apos;établissement pour ce niveau.
               </p>
               <div className="space-y-2">
                 {applicableDocuments.map((doc) => (
@@ -740,7 +744,7 @@ export default function PreEnrollmentForm({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="guardianRelation">Lien avec l'élève *</Label>
+              <Label htmlFor="guardianRelation">Lien avec l&apos;élève *</Label>
               <Select
                 value={guardianRelation}
                 onValueChange={setGuardianRelation}
@@ -815,7 +819,7 @@ export default function PreEnrollmentForm({
                 className="h-4 w-4 mt-0.5"
               />
               <span className="text-sm">
-                Le parent ci-dessus est le contact en cas d'urgence
+                Le parent ci-dessus est le contact en cas d&apos;urgence
                 <span className="block text-xs text-muted-foreground">
                   Décochez pour désigner une autre personne à appeler.
                 </span>
@@ -825,7 +829,7 @@ export default function PreEnrollmentForm({
             {!sameEmergencyContact && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="emergencyName">Nom du contact d'urgence *</Label>
+                  <Label htmlFor="emergencyName">Nom du contact d&apos;urgence *</Label>
                   <Input
                     id="emergencyName"
                     required
@@ -838,7 +842,7 @@ export default function PreEnrollmentForm({
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="emergencyPhone">Téléphone d'urgence *</Label>
+                  <Label htmlFor="emergencyPhone">Téléphone d&apos;urgence *</Label>
                   <Input
                     id="emergencyPhone"
                     type="tel"
