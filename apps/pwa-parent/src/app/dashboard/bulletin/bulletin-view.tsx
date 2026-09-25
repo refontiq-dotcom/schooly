@@ -29,23 +29,23 @@ export function BulletinView({ enrollmentId }: { enrollmentId: string }) {
   const [isPending, startTransition] = useTransition()
 
   useEffect(() => {
-    if (!enrollmentId) {
-      setErrorCode("NO_ID")
-      return
-    }
+    if (!enrollmentId) return
     startTransition(async () => {
+      setErrorCode(null)
       const result = await getBulletinData(enrollmentId)
       if (result.ok) setData(result.data)
       else setErrorCode(result.code)
     })
   }, [enrollmentId])
 
-  if (errorCode) {
+  const displayedErrorCode = enrollmentId ? errorCode : "NO_ID"
+
+  if (displayedErrorCode) {
     return (
       <div className="rounded-lg bg-card p-8 text-center text-sm text-muted-foreground">
-        {errorCode === "NOT_YOUR_CHILD"
+        {displayedErrorCode === "NOT_YOUR_CHILD"
           ? "Ce bulletin n'est pas accessible depuis votre compte."
-          : errorCode === "NO_ID"
+          : displayedErrorCode === "NO_ID"
             ? "Aucun enfant sélectionné. Retournez au tableau de bord et choisissez un enfant."
             : "Bulletin indisponible pour le moment."}
         <div className="mt-4">

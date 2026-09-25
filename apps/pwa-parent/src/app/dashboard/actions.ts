@@ -28,18 +28,29 @@ async function requireGuardian() {
     process.env.SUPABASE_SECRET_KEY!
   )
 
-  const { data: guardian } = await admin
+  // 1) Lien direct guardians.user_id (comptes créés par téléphone —
+  //    architecture cible). 2) Fallback legacy : email (comptes historiques).
+  const byUserId = await admin
     .from("guardians")
     .select("id, full_name, phone, email")
-    .eq("email", user.email)
+    .eq("user_id", user.id)
     .is("deleted_at", null)
-    .maybeSingle()
 
-  if (!guardian) throw new Error("NO_GUARDIAN_PROFILE")
+  let rows = (byUserId.data ?? []) as unknown as Array<{ id: string; full_name: string; phone: string; email: string | null }>
+  if (rows.length === 0) {
+    const byEmail = await admin
+      .from("guardians")
+      .select("id, full_name, phone, email")
+      .eq("email", user.email)
+      .is("deleted_at", null)
+    rows = (byEmail.data ?? []) as unknown as typeof rows
+  }
 
+  if (rows.length === 0) throw new Error("NO_GUARDIAN_PROFILE")
 
-
-  return { admin, guardian, user }
+  // Multi-établissements : toutes les fiches du même numéro/compte sont
+  // agrégées — un parent voit ses enfants de toutes ses écoles.
+  return { admin, guardian: rows[0], guardianIds: rows.map((r) => r.id), user }
 }
 
 // ---------------------------------------------------------------- types ----
@@ -52,6 +63,7 @@ export type Child = {
   classId: string | null
   gradeLevel: string
   yearLabel: string
+  yearStatus: string
   schoolName: string
 }
 
@@ -70,10 +82,23 @@ export type ReceiptItem = {
   amount: number
 }
 
+export type ScheduleItem = {
+  id: string
+  label: string
+  amount: number
+  dueDate: string | null
+  paidOnItem: number
+  remaining: number
+}
+
 export type FinanceData = {
   totalDue: number
   totalPaid: number
   pending: number
+  /** Statut Phase 2 : soldé / impaye / avance / moratoire / non_genere. */
+  feeStatus: string | null
+  /** Tranches attendues avec allocation FIFO des paiements. */
+  schedule: ScheduleItem[]
   lastPaymentAt: string | null
   payments: PaymentItem[]
   receipts: ReceiptItem[]
@@ -136,7 +161,7 @@ type EnrollmentRow = {
   students: { id: string; first_name: string; last_name: string } | null
   classes: { name: string } | null
   grade_levels: { name: string; cycle: string } | null
-  academic_years: { label: string } | null
+  academic_years: { label: string; status: string } | null
   schools: { name: string } | null
 }
 
@@ -150,6 +175,7 @@ function toChild(e: EnrollmentRow): Child {
     classId: e.class_id,
     gradeLevel: e.grade_levels?.name ?? "—",
     yearLabel: e.academic_years?.label ?? "—",
+    yearStatus: e.academic_years?.status ?? "planifiee",
     schoolName: e.schools?.name ?? "—",
   }
 }
@@ -160,7 +186,7 @@ export type DashboardResult =
 
 async function loadChildren(
   admin: AdminClient,
-  guardianId: string
+  guardianIds: string[]
 ) {
   const { data, error } = await admin
     .from("enrollments")
@@ -173,7 +199,7 @@ async function loadChildren(
        academic_years ( label ),
        schools ( name )`
     )
-    .eq("guardian_id", guardianId)
+    .in("guardian_id", guardianIds)
     .is("deleted_at", null)
     .order("enrollment_date", { ascending: false })
 
@@ -187,21 +213,21 @@ async function loadFinance(
   admin: AdminClient,
   child: EnrollmentRow
 ): Promise<FinanceData> {
-  // Total dû : tarif standard (profil null) ou profil financier dédié de l'inscription
-  const { data: fees } = await admin
-    .from("fee_schedules")
-    .select("amount, financial_profile_id")
-    .eq("school_id", child.school_id)
-    .eq("grade_level_id", child.grade_level_id)
-    .eq("academic_year_id", child.academic_year_id)
-    .is("deleted_at", null)
-
-  const feeRows = (fees ?? []) as unknown as { amount: number; financial_profile_id: string | null }[]
-  const matchingProfile = child.financial_profile_id
-    ? feeRows.find((f) => f.financial_profile_id === child.financial_profile_id)
-    : undefined
-  const standardRow = feeRows.find((f) => f.financial_profile_id === null)
-  const totalDue = matchingProfile?.amount ?? standardRow?.amount ?? 0
+  // Phase 2 : les colonnes fee_* de l'inscription sont maintenues par le
+  // trigger sync_enrollment_fee_status (tranches − remises fratrie/bourse
+  // − paiements). Lecture nette en O(1), statut inclus.
+  const { data: feeState } = await admin
+    .from("enrollments")
+    .select("fee_expected, fee_paid, fee_status")
+    .eq("id", child.id)
+    .single()
+  const state = (feeState ?? {}) as unknown as {
+    fee_expected: number | null
+    fee_paid: number | null
+    fee_status: string | null
+  }
+  const feeExpected = Number(state.fee_expected ?? 0)
+  const feePaid = Number(state.fee_paid ?? 0)
 
   // Paiements
   const { data: payments } = await admin
@@ -212,7 +238,6 @@ async function loadFinance(
     .order("received_at", { ascending: false })
 
   const paymentRows = (payments ?? []) as unknown as { id: string; amount: number; payment_method: string; reference: string | null; received_at: string }[]
-  const totalPaid = paymentRows.reduce((sum, p) => sum + Number(p.amount ?? 0), 0)
 
   // Reçus (le montant vit sur payments, receipts ne porte que le numéro)
   const amountByPayment = new Map(paymentRows.map((p) => [p.id, Number(p.amount ?? 0)]))
@@ -234,10 +259,73 @@ async function loadFinance(
     }))
   }
 
+  if (feeExpected > 0) {
+    // Échéancier détaillé : tranches avec allocation FIFO des paiements.
+    const { data: items } = await admin
+      .from("v_student_fee_items_state")
+      .select("id, label, amount, due_date, paid_on_item, remaining_on_item, position")
+      .eq("enrollment_id", child.id)
+      .order("due_date", { ascending: true, nullsFirst: false })
+      .order("position", { ascending: true })
+
+    const schedule: ScheduleItem[] = ((items ?? []) as unknown as Array<{
+      id: string
+      label: string
+      amount: number
+      due_date: string | null
+      paid_on_item: number
+      remaining_on_item: number
+    }>).map((i) => ({
+      id: i.id,
+      label: i.label,
+      amount: Number(i.amount ?? 0),
+      dueDate: i.due_date,
+      paidOnItem: Number(i.paid_on_item ?? 0),
+      remaining: Number(i.remaining_on_item ?? 0),
+    }))
+
+    return {
+      totalDue: feeExpected,
+      totalPaid: feePaid,
+      pending: Math.max(feeExpected - feePaid, 0),
+      feeStatus: state.fee_status,
+      schedule,
+      lastPaymentAt: paymentRows[0]?.received_at ?? null,
+      payments: paymentRows.map((p) => ({
+        id: p.id,
+        amount: Number(p.amount ?? 0),
+        method: p.payment_method,
+        reference: p.reference,
+        receivedAt: p.received_at,
+      })),
+      receipts,
+    }
+  }
+
+  // Fallback historique : inscription sans échéancier généré (aucun
+  // paiement ni tranche depuis la Phase 2) — grille brute comme avant.
+  const { data: fees } = await admin
+    .from("fee_schedules")
+    .select("amount, financial_profile_id")
+    .eq("school_id", child.school_id)
+    .eq("grade_level_id", child.grade_level_id)
+    .eq("academic_year_id", child.academic_year_id)
+    .is("deleted_at", null)
+
+  const feeRows = (fees ?? []) as unknown as { amount: number; financial_profile_id: string | null }[]
+  const matchingProfile = child.financial_profile_id
+    ? feeRows.find((f) => f.financial_profile_id === child.financial_profile_id)
+    : undefined
+  const standardRow = feeRows.find((f) => f.financial_profile_id === null)
+  const totalDue = matchingProfile?.amount ?? standardRow?.amount ?? 0
+  const totalPaid = paymentRows.reduce((sum, p) => sum + Number(p.amount ?? 0), 0)
+
   return {
     totalDue,
     totalPaid,
     pending: Math.max(totalDue - totalPaid, 0),
+    feeStatus: null,
+    schedule: [],
     lastPaymentAt: paymentRows[0]?.received_at ?? null,
     payments: paymentRows.map((p) => ({
       id: p.id,
@@ -254,9 +342,9 @@ export async function getDashboardData(
   selectedEnrollmentId?: string
 ): Promise<DashboardResult> {
   try {
-    const { admin, guardian } = await requireGuardian()
+    const { admin, guardian, guardianIds } = await requireGuardian()
 
-    const rows = await loadChildren(admin, guardian.id)
+    const rows = await loadChildren(admin, guardianIds)
     if (rows === null) return { ok: false, code: "DB_ERROR" }
 
     const children = rows.map(toChild)
@@ -343,7 +431,7 @@ export async function getDashboardData(
     const { data: mors } = await admin
       .from("moratoriums")
       .select("id, reason, requested_amount, approved_amount, status, due_date, requested_at")
-      .eq("guardian_id", guardian.id)
+      .in("guardian_id", guardianIds)
       .is("deleted_at", null)
       .order("requested_at", { ascending: false })
 
@@ -414,7 +502,7 @@ export type BulletinResult =
 
 export async function getBulletinData(enrollmentId: string): Promise<BulletinResult> {
   try {
-    const { admin, guardian } = await requireGuardian()
+    const { admin, guardian, guardianIds } = await requireGuardian()
 
     // L'inscription DOIT appartenir au guardian connecté — jamais d'id client naïf.
     const { data: rows, error } = await admin
@@ -428,7 +516,7 @@ export async function getBulletinData(enrollmentId: string): Promise<BulletinRes
          academic_years ( label ),
          schools ( name )`
       )
-      .eq("guardian_id", guardian.id)
+      .in("guardian_id", guardianIds)
       .eq("id", enrollmentId)
       .is("deleted_at", null)
       .limit(1)
@@ -550,7 +638,7 @@ export type MoratoriumResult =
 
 export async function requestMoratorium(formData: FormData): Promise<MoratoriumResult> {
   try {
-    const { admin, guardian } = await requireGuardian()
+    const { admin, guardian, guardianIds } = await requireGuardian()
 
     const enrollmentId = String(formData.get("enrollmentId") ?? "")
     const reason = String(formData.get("reason") ?? "").trim()
@@ -570,7 +658,7 @@ export async function requestMoratorium(formData: FormData): Promise<MoratoriumR
       .from("enrollments")
       .select("id, school_id")
       .eq("id", enrollmentId)
-      .eq("guardian_id", guardian.id)
+      .in("guardian_id", guardianIds)
       .is("deleted_at", null)
       .limit(1)
 

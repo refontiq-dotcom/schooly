@@ -168,6 +168,11 @@ export default function ParentDashboardPage() {
                 <p className="text-sm text-muted-foreground">
                   {selectedChild.schoolName} · {selectedChild.className ?? selectedChild.gradeLevel} ·{" "}
                   {selectedChild.yearLabel}
+                  {selectedChild.yearStatus === "cloturee" && (
+                    <Badge variant="outline" className="ml-2 align-middle">
+                      Année clôturée — consultation
+                    </Badge>
+                  )}
                 </p>
                 {selectedChild.matricule && (
                   <p className="text-xs text-muted-foreground">Matricule {selectedChild.matricule}</p>
@@ -195,7 +200,13 @@ export default function ParentDashboardPage() {
                     : "bg-green-50 text-green-700 border-green-300 dark:bg-green-950 dark:text-green-300"
                 }
               >
-                {(finance?.pending ?? 0) > 0 ? "Reste à payer" : "À jour"}
+                {finance?.feeStatus === "moratoire"
+                  ? "Moratoire en cours"
+                  : finance?.feeStatus === "avance"
+                    ? "Avance enregistrée"
+                    : (finance?.pending ?? 0) > 0
+                      ? "Reste à payer"
+                      : "À jour"}
               </Badge>
             </div>
             <div className="grid grid-cols-3 gap-3">
@@ -220,6 +231,42 @@ export default function ParentDashboardPage() {
                 </CardContent>
               </Card>
             </div>
+
+            {/* Échéancier : tranches attendues, allocation FIFO des paiements */}
+            {(finance?.schedule?.length ?? 0) > 0 && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm">Échéancier</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {finance?.schedule.map((t) => (
+                    <div
+                      key={t.id}
+                      className="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm"
+                    >
+                      <div>
+                        <p className="font-medium">{t.label}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {t.dueDate ? `Échéance ${formatDate(t.dueDate)}` : "Sans échéance"}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-mono font-semibold">{XOF.format(t.amount)}</p>
+                        <p
+                          className={`text-xs ${
+                            t.remaining > 0
+                              ? "text-amber-600 dark:text-amber-400"
+                              : "text-green-600 dark:text-green-400"
+                          }`}
+                        >
+                          {t.remaining > 0 ? `Reste ${XOF.format(t.remaining)}` : "Payée"}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
 
             {(finance?.pending ?? 0) > 0 && !pendingMoratorium && (
               <Card className="border-amber-300 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30">
