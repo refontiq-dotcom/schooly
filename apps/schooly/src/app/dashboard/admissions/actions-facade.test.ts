@@ -16,6 +16,7 @@ const ADMISSIONS_ACTION_EXPORTS = [
   "getPreEnrollmentByCode",
   "getPreEnrollments",
   "getStudents",
+  "searchDirectory",
   "validatePreEnrollment",
 ]
 

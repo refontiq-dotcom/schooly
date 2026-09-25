@@ -1,16 +1,14 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react"
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react"
 import { useRouter } from "next/navigation"
 import { Clock, FileText, GraduationCap, Loader2, Search, Users, X } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { getDirectorySnapshot } from "@/app/dashboard/admissions/actions"
+import { searchDirectory } from "@/app/dashboard/admissions/actions"
 import {
-  buildSearchHits,
   SEARCH_KIND_LABELS,
-  type DirectorySnapshot,
   type SearchHit,
   type SearchKind,
 } from "@/lib/directory-index"
@@ -22,12 +20,14 @@ const KIND_ICON: Record<SearchKind, typeof GraduationCap> = {
   enrollment: FileText,
 }
 
-const EMPTY_SNAPSHOT: DirectorySnapshot = {
-  students: [],
-  guardians: [],
-  enrollments: [],
-  preEnrollments: [],
-}
+/** Anti-rebond : on ne part pas au serveur à chaque frappe. */
+const SEARCH_DEBOUNCE_MS = 200
+
+/** En dessous de deux caractères, la recherche n'a pas d'intérêt (ni de requête). */
+const SEARCH_MIN_LENGTH = 2
+
+/** Référence stable : évite de recréer un tableau vide à chaque rendu. */
+const NO_HITS: SearchHit[] = []
 
 export function GlobalSearch() {
   const router = useRouter()
@@ -36,24 +36,45 @@ export function GlobalSearch() {
   const [query, setQuery] = useState("")
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState(0)
-  const [loading, setLoading] = useState(false)
-  const [snapshot, setSnapshot] = useState<DirectorySnapshot>(EMPTY_SNAPSHOT)
-  // S2 : le snapshot est borné en base — on conserve la couverture réelle pour
-  // signaler honnêtement les personnes hors de portée de la recherche locale.
-  const [coverage, setCoverage] = useState<{ loaded: number; total: number } | null>(null)
-  const loaded = useRef(false)
+  // S3 : les hits viennent du serveur (filtrage trigram en base) — plus aucun
+  // instantané de l'annuaire en mémoire. Le résultat est étiqueté par la requête
+  // qui l'a produit, ce qui permet de dériver « chargement » et « obsolète »
+  // pendant le rendu au lieu d'entretenir des drapeaux dans un effet.
+  const [result, setResult] = useState<{
+    query: string
+    hits: SearchHit[]
+    mayHaveMore: boolean
+  } | null>(null)
 
-  const load = useCallback(async () => {
-    if (loaded.current) return
-    loaded.current = true
-    setLoading(true)
-    const res = await getDirectorySnapshot()
-    if ("data" in res && res.data) {
-      setSnapshot(res.data as DirectorySnapshot)
-      setCoverage(res.meta ?? null)
+  const trimmed = query.trim()
+  const isSearchable = trimmed.length >= SEARCH_MIN_LENGTH
+  const isFresh = result !== null && result.query === trimmed
+  const hits = isSearchable && isFresh ? result.hits : NO_HITS
+  const mayHaveMore = isSearchable && isFresh ? result.mayHaveMore : false
+  const loading = isSearchable && !isFresh
+
+  // Effet : uniquement l'appel réseau. Aucun setState synchrone dans son corps
+  // (règle react-hooks/set-state-in-effect) ; le garde `cancelled` empêche une
+  // réponse tardive d'écraser les résultats d'une frappe plus récente.
+  useEffect(() => {
+    if (!isSearchable) return
+
+    let cancelled = false
+    const timer = setTimeout(async () => {
+      const res = await searchDirectory(trimmed)
+      if (cancelled) return
+      setResult(
+        "data" in res
+          ? { query: trimmed, hits: res.data.hits, mayHaveMore: res.data.mayHaveMore }
+          : { query: trimmed, hits: NO_HITS, mayHaveMore: false }
+      )
+    }, SEARCH_DEBOUNCE_MS)
+
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
     }
-    setLoading(false)
-  }, [])
+  }, [trimmed, isSearchable])
 
   useEffect(() => {
     function onKey(e: globalThis.KeyboardEvent) {
@@ -61,13 +82,12 @@ export function GlobalSearch() {
         e.preventDefault()
         inputRef.current?.focus()
         setOpen(true)
-        void load()
       }
       if (e.key === "Escape") setOpen(false)
     }
     document.addEventListener("keydown", onKey)
     return () => document.removeEventListener("keydown", onKey)
-  }, [load])
+  }, [])
 
   useEffect(() => {
     function onPointer(e: MouseEvent) {
@@ -76,8 +96,6 @@ export function GlobalSearch() {
     document.addEventListener("mousedown", onPointer)
     return () => document.removeEventListener("mousedown", onPointer)
   }, [])
-
-  const hits = useMemo(() => buildSearchHits(snapshot, query), [query, snapshot])
 
   function handleQueryChange(nextQuery: string) {
     setQuery(nextQuery)
@@ -130,10 +148,7 @@ export function GlobalSearch() {
           type="search"
           value={query}
           onChange={(e) => handleQueryChange(e.target.value)}
-          onFocus={() => {
-            setOpen(true)
-            void load()
-          }}
+          onFocus={() => setOpen(true)}
           onKeyDown={onKeyDown}
           placeholder="Nom, téléphone, matricule, classe…"
           aria-label="Recherche élèves, tuteurs, inscriptions"
@@ -169,16 +184,23 @@ export function GlobalSearch() {
           role="listbox"
           className="absolute left-0 right-0 z-50 mt-1.5 max-h-[min(70vh,28rem)] overflow-y-auto rounded-xl border bg-card p-1 shadow-lg"
         >
-          {loading && snapshot.students.length === 0 ? (
+          {loading && hits.length === 0 ? (
             <div className="flex items-center gap-2 px-3 py-6 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Chargement de l’annuaire…
+              Recherche en cours…
             </div>
-          ) : hits.length === 0 ? (
+          ) : hits.length === 0 && !mayHaveMore ? (
             <div className="space-y-1 px-3 py-6 text-center">
               <p className="text-sm font-medium">Aucun résultat pour « {query.trim()} »</p>
               <p className="text-xs text-muted-foreground">
                 Nom, prénom, téléphone, matricule ou classe. Accents ignorés.
+              </p>
+            </div>
+          ) : hits.length === 0 ? (
+            <div className="space-y-1 px-3 py-6 text-center">
+              <p className="text-sm font-medium">Trop de correspondances pour « {query.trim()} »</p>
+              <p className="text-xs text-muted-foreground">
+                Affinez avec un nom, un matricule ou un numéro de téléphone.
               </p>
             </div>
           ) : (
@@ -217,11 +239,10 @@ export function GlobalSearch() {
                   </div>
                 )
               })}
-              {coverage && coverage.total > coverage.loaded ? (
+              {mayHaveMore ? (
                 <p className="border-t px-3 py-2 text-[11px] leading-snug text-muted-foreground">
-                  Recherche locale limitée à {coverage.loaded} entrées sur{" "}
-                  {coverage.total} dans l’annuaire. Affinez la requête ou ouvrez
-                  l’onglet Annuaire pour tout parcourir.
+                  D’autres correspondances ont pu être écartées : affinez avec un
+                  nom, un matricule ou un numéro de téléphone.
                 </p>
               ) : null}
             </>
