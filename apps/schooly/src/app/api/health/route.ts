@@ -61,6 +61,22 @@ export async function GET() {
       // Outbox indisponible : health reste vert, métriques à null.
     }
 
+    // Sessions de caisse restées ouvertes (R5) : une session ouverte depuis plus
+    // de 24 h empêche le rapprochement de la journée. Compteur seul, pas de
+    // détail : la route est publique et ne doit rien divulguer.
+    let sessionsOuvertesAnciennes: number | null = null;
+    try {
+      const { count } = await supabase
+        .from("cash_sessions")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "open")
+        .is("deleted_at", null)
+        .lt("opened_at", new Date(Date.now() - 24 * 3600 * 1000).toISOString());
+      sessionsOuvertesAnciennes = count ?? 0;
+    } catch {
+      // Caisse indisponible : health reste vert, métrique à null.
+    }
+
     return NextResponse.json({
       status: "ok",
       timestamp: new Date().toISOString(),
@@ -70,6 +86,7 @@ export async function GET() {
       uptime_seconds: Math.floor(process.uptime()),
       outbox_backlog: outboxBacklog,
       outbox_oldest_pending_at: outboxOldestPendingAt,
+      sessions_ouvertes_anciennes: sessionsOuvertesAnciennes,
     });
   } catch (err: any) {
     return NextResponse.json(
