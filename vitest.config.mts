@@ -32,6 +32,14 @@ export default defineConfig({
         },
       },
       {
+        test: {
+          name: "billing-scripts",
+          environment: "node",
+          globals: true,
+          include: ["packages/billing/scripts/**/*.test.mjs"],
+        },
+      },
+      {
         // Tests unitaires de l'app admin (server actions, helpers…).
         // L'alias « @ » reproduit celui de apps/schooly/tsconfig.json.
         resolve: {

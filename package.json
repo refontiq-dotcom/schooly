@@ -19,7 +19,7 @@
     "build:parent": "npm run build --workspace apps/pwa-parent",
     "build:billing": "npm run build --workspace packages/billing",
     "typecheck": "tsc -p packages/ui --noEmit && tsc -p packages/db --noEmit && tsc -p apps/schooly --noEmit && tsc -p apps/pwa-parent --noEmit && tsc -p packages/billing --noEmit",
-    "lint": "eslint .",
+    "lint": "eslint . --max-warnings=0",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",

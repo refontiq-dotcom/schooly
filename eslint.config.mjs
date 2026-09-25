@@ -1,7 +1,7 @@
 import next from 'eslint-config-next';
 
 /** @type {import('eslint').Linter.Config[]} */
-export default [
+const eslintConfig = [
   ...next,
   {
     ignores: [
@@ -12,6 +12,12 @@ export default [
       'playwright-report',
       'test-results',
       'packages/db/supabase',
+      // Worktrees d'IDE (Kilo) : copies d'un autre checkout — ne jamais les
+      // qualifier (sinon chaque erreur est comptée deux fois, dont une fois
+      // sur un snapshot périmé).
+      '.kilo',
     ],
   },
 ];
+
+export default eslintConfig;
