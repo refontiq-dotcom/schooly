@@ -333,6 +333,9 @@ function ModeBDocumentComponent({ data }: { data: ModeBData }) {
         ) : null}
 
         <View style={styles.qrBox}>
+          {/* Le renderer PDF ne rend pas d'arbre HTML : `alt` n'est pas un
+              prop valide, et la cible imprimée sous le QR joue ce rôle. */}
+          {/* eslint-disable-next-line jsx-a11y/alt-text */}
           <Image style={styles.qrImage} src={data.qrDataUrl} />
           <Text style={styles.qrCaption}>
             Scannez ce code pour télécharger la liste des fournitures de la classe de votre enfant.
