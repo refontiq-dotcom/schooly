@@ -12,7 +12,10 @@ export type MovementRequest = {
 }
 
 export type MovementActivation = {
-  request_id: string; activated_at: string; expires_at: string
+  request_id: string
+  activated_at: string
+  expires_at: string
+  expired: boolean
 }
 export type ActivationResult = {
   tracking_code: string; status: "ACTIVE" | "EXPIRED"; expires_at: string
@@ -67,7 +70,14 @@ export async function getMovementActivations(): Promise<{
   if (error) return { canActivate: false, error: ["42P01", "PGRST205"].includes(error.code)
     ? "L’activation TRF n’est pas encore installée sur cette base. Contactez l’administrateur."
     : "Impossible de charger les activations. Réessayez." }
-  return { canActivate: true, data: (data ?? []) as MovementActivation[] }
+  const now = Date.now()
+  return {
+    canActivate: true,
+    data: ((data ?? []) as MovementActivation[]).map((activation) => ({
+      ...activation,
+      expired: new Date(activation.expires_at).getTime() <= now,
+    })),
+  }
 }
 
 export async function activateMovement(form: FormData): Promise<{ error?: string; data?: ActivationResult }> {

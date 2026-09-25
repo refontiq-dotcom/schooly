@@ -157,7 +157,8 @@ export async function createCourseSession(formData: FormData): Promise<ActionRes
     .select("id,teacher_id,class_id,starts_at,ends_at")
     .eq("school_id", schoolId).eq("academic_year_id", academicYearId).is("deleted_at", null)
     .lt("starts_at", endsAt).gt("ends_at", startsAt)
-  if ((conflicts ?? []).some((s: any) => s.teacher_id === teacherId || s.class_id === classId)) {
+  const conflictRows = asRows<{ teacher_id: string | null; class_id: string | null }>(conflicts)
+  if (conflictRows.some((s) => s.teacher_id === teacherId || s.class_id === classId)) {
     return { error: "Conflit détecté : ce professeur ou cette classe a déjà un cours sur ce créneau." }
   }
 

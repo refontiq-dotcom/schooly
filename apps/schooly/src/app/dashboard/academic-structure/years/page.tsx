@@ -6,22 +6,30 @@
  * Le test du hub moque cette page — celle-ci-même n'est donc pas couverte
  * par tabs/page.test.tsx, mais par son propre test d'extrémité.
  */
-import { useState, useEffect } from "react"
+import { useEffect, useState } from "react"
 import { useSupabaseUser } from "@/hooks/use-supabase-user"
 import { getAcademicYears } from "../actions"
 import { computeAcademicWindow } from "@/components/academic-year-selector"
 import { YearsPanel } from "../_components/years-panel"
+import type { AcademicYear } from "../_components/types"
 
 export default function YearsPage() {
   const user = useSupabaseUser()
-  const [years, setYears] = useState<{ id: string; label: string; status: string }[]>([])
+  const [years, setYears] = useState<AcademicYear[]>([])
 
   async function reload() {
     const res = await getAcademicYears()
     if (res.data) setYears(res.data)
   }
 
-  useEffect(() => { if (user) void reload() }, [user])
+  useEffect(() => {
+    if (!user) return
+    let active = true
+    void getAcademicYears().then((res) => {
+      if (active && res.data) setYears(res.data)
+    })
+    return () => { active = false }
+  }, [user])
 
   const currentYear = years.find((y) => y.status === "en_cours")
   return (

@@ -6,6 +6,9 @@ import { createClient as createAdminClient } from "@supabase/supabase-js"
 import { revalidatePath } from "next/cache"
 
 import { denial, requireSchoolRole } from "@/utils/supabase/require-role"
+import { parseForm } from "@/lib/schemas/parse-form"
+import { createMoratoriumSchema, decideMoratoriumSchema } from "@/lib/schemas/moratoriums"
+import { paymentReminderSchema } from "@/lib/schemas/finance"
 
 type ActionResult<T = void> = {
   error?: string
@@ -70,13 +73,9 @@ export async function createMoratorium(formData: FormData): Promise<ActionResult
   const guard = await requireSchoolRole(supabase, { allowedRoles: [...MORATORIUM_ROLES] })
   if (!guard.ok) return { error: denial(guard.reason, []).error }
   const { schoolId } = guard.context
-  const enrollmentId = String(formData.get("enrollmentId") ?? "")
-  const reason = String(formData.get("reason") ?? "").trim()
-  const requestedAmount = Number(formData.get("requestedAmount") ?? 0)
-  const dueDate = String(formData.get("dueDate") ?? "")
-  if (!enrollmentId || reason.length < 5 || !Number.isInteger(requestedAmount) || requestedAmount <= 0 || !dueDate) {
-    return { error: "Élève, motif, montant et date limite sont requis." }
-  }
+  const parsed = parseForm(createMoratoriumSchema, formData)
+  if (!parsed.ok) return { error: parsed.error }
+  const { enrollmentId, reason, requestedAmount, dueDate } = parsed.data
   const admin = createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SECRET_KEY!)
   const { data: enrollment } = await admin.from("enrollments")
     .select("school_id, guardian_id, fee_balance").eq("id", enrollmentId).single()
@@ -103,11 +102,9 @@ export async function reviewMoratorium(formData: FormData): Promise<ActionResult
   const guard = await requireSchoolRole(supabase, { allowedRoles: [...MORATORIUM_ROLES] })
   if (!guard.ok) return { error: denial(guard.reason, []).error }
   const { schoolId, userId } = guard.context
-  const moratoriumId = String(formData.get("moratoriumId") ?? "")
-  const action = String(formData.get("action") ?? "")
-  const approvedAmount = Number(formData.get("approvedAmount") ?? 0)
-  const installmentCount = Number(formData.get("installmentCount") ?? 0)
-  if (!moratoriumId || !["approve","reject"].includes(action)) return { error: "Décision invalide." }
+  const parsed = parseForm(decideMoratoriumSchema, formData)
+  if (!parsed.ok) return { error: parsed.error }
+  const { moratoriumId, action, approvedAmount, installmentCount } = parsed.data
   const admin = createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SECRET_KEY!)
   const { data: m } = await admin.from("moratoriums").select("*").eq("id", moratoriumId).single()
   if (!m || m.school_id !== schoolId || m.status !== "pending") return { error: "Moratoire introuvable ou déjà traité." }
@@ -117,9 +114,9 @@ export async function reviewMoratorium(formData: FormData): Promise<ActionResult
     revalidatePath("/dashboard/direction/finance"); revalidatePath("/dashboard/direction/finance/moratoriums")
     return { data:{ nextAction:"relance_or_payment_plan" } }
   }
-  const amount = approvedAmount > 0 ? approvedAmount : Number(m.requested_amount)
+  const amount = approvedAmount && approvedAmount > 0 ? approvedAmount : Number(m.requested_amount)
   if (!Number.isInteger(amount) || amount <= 0 || amount > Number(m.requested_amount)) return { error: "Le montant approuvé doit être positif et ne pas dépasser le montant demandé." }
-  const count = Number.isInteger(installmentCount) && installmentCount >= 1 && installmentCount <= 12 ? installmentCount : 3
+  const count = installmentCount && installmentCount >= 1 && installmentCount <= 12 ? installmentCount : 3
   const endDate = new Date(String(m.due_date))
   const now = new Date()
   const start = now > new Date() ? now : now
@@ -188,13 +185,9 @@ export async function sendPaymentReminder(formData: FormData): Promise<ActionRes
   if (!guard.ok) return { error: denial(guard.reason, []).error }
   const { schoolId, userId } = guard.context
 
-  const enrollmentId = formData.get("enrollmentId") as string
-  const reminderType = formData.get("reminderType") as string
-  const channel = formData.get("channel") as string
-
-  if (!enrollmentId || !reminderType || !channel) {
-    return { error: "Inscription, type et canal requis." }
-  }
+  const parsed = parseForm(paymentReminderSchema, formData)
+  if (!parsed.ok) return { error: parsed.error }
+  const { enrollmentId, reminderType, channel } = parsed.data
 
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

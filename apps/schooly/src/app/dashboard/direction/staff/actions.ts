@@ -8,7 +8,24 @@ import { ALL_STAFF_ROLES } from "@/utils/supabase/roles"
 
 const STAFF_ROLES = ALL_STAFF_ROLES
 
-type Result = { error?: string; data?: unknown }
+type Result<T = unknown> = { error?: string; data?: T }
+
+export type StaffMember = {
+  id: string
+  user_id: string
+  role_code: string
+  is_active: boolean
+  created_at: string
+  users: {
+    id: string
+    full_name: string | null
+    email: string | null
+    phone: string | null
+    is_activated: boolean | null
+    activated_at: string | null
+  } | null
+  activation_stale: boolean
+}
 
 async function context() {
   const supabase = await createClient()
@@ -30,7 +47,7 @@ async function sendActivationCode(contact: { email?: string; phone?: string }) {
   return error
 }
 
-export async function getStaff(): Promise<Result> {
+export async function getStaff(): Promise<Result<StaffMember[]>> {
   const ctx = await context()
   if (!ctx.ok) return { error: ctx.error }
 
@@ -57,12 +74,15 @@ export async function getStaff(): Promise<Result> {
   if (usersError) return { error: usersError.message }
 
   const usersById = new Map((users ?? []).map((user) => [user.id, user]))
+  const now = Date.now()
 
   return {
-    data: roleRows.map((role) => ({
-      ...role,
-      users: usersById.get(role.user_id) ?? null,
-    })),
+    data: roleRows.map((role) => {
+      const user = usersById.get(role.user_id) ?? null
+      const activationStale = !user?.is_activated &&
+        now - new Date(role.created_at).getTime() >= 3 * 86_400_000
+      return { ...role, users: user, activation_stale: activationStale }
+    }),
   }
 }
 

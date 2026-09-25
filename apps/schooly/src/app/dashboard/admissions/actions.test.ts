@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   createAdminClient: vi.fn(),
   revalidatePath: vi.fn(),
   alertEnrollmentConfirmed: vi.fn(),
+  rpc: vi.fn(),
 }))
 
 vi.mock("@/utils/supabase/server", () => ({
@@ -16,7 +17,12 @@ vi.mock("@/utils/supabase/server", () => ({
 }))
 
 vi.mock("@supabase/supabase-js", () => ({ createClient: mocks.createAdminClient }))
-vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath }))
+vi.mock("next/cache", () => ({
+  revalidatePath: mocks.revalidatePath,
+  // P1-B : purges de tag et cache de lectures — no-op en test unitaire.
+  updateTag: vi.fn(),
+  unstable_cache: <T>(fn: T) => fn,
+}))
 vi.mock("@/lib/telegram", () => ({
   alertEnrollmentConfirmed: mocks.alertEnrollmentConfirmed,
 }))
@@ -25,9 +31,11 @@ import { completeCounterEnrollment, createPreEnrollment, validatePreEnrollment }
 
 const SCHOOL_ID = "61ccee8e-f135-4223-b5ce-88a450142e22"
 const USER_ID = "0f7d00f9-9af5-43ed-b0b0-0e824385e97c"
-const PRE_ID = "pre-1"
-const YEAR_ID = "year-1"
-const GRADE_ID = "grade-1"
+// P1-A : les ids portés par le FormData doivent être des UUID valides
+// (contrat zod) — les valeurs mockées sont des UUID factices.
+const PRE_ID = "b2c9e0a1-3f4d-4c5b-8a9e-1d2f3a4b5c6d"
+const YEAR_ID = "year-1" // résolu en SQL, jamais porté par le FormData
+const GRADE_ID = "c3d0f1b2-4a5e-4d6c-9b0f-2e3f4a5b6c7d"
 
 type QueryResult = { data?: unknown; error?: unknown }
 type Write = { table: string; op: "insert" | "update"; payload: Record<string, unknown> }
@@ -107,7 +115,18 @@ beforeEach(() => {
   mocks.sessionFrom.mockImplementation((table: string) => builderFor(table))
   mocks.createAdminClient.mockImplementation(() => ({
     from: (table: string) => builderFor(table),
+    rpc: mocks.rpc,
   }))
+  // P0-2 : l'encaissement passe par la RPC record_payment (atomique).
+  mocks.rpc.mockResolvedValue({
+    data: {
+      payment_id: "pay-1",
+      receipt_number: "R-TEST-0001",
+      verification_code: "CODE0001",
+      balance_after: 0,
+    },
+    error: null,
+  })
   mocks.alertEnrollmentConfirmed.mockResolvedValue(undefined)
   stub("user_school_roles", DIRECTION)
 })
@@ -154,7 +173,7 @@ describe("createPreEnrollment", () => {
         emergencyContactPhone: "+2250600000000",
       })
     )
-    expect(res.error).toBe("Le type d'inscription et l'orientation sont requis.")
+    expect(res.error).toBe("Le type d'inscription est requis.")
     expect(writes).toHaveLength(0)
   })
 
@@ -216,7 +235,7 @@ describe("createPreEnrollment", () => {
         stateOrientation: "non_oriente",
       })
     )
-    expect(res.error).toBe("Le contact d'urgence (nom et téléphone) est requis.")
+    expect(res.error).toBe("Le contact d'urgence est requis.")
     expect(writes).toHaveLength(0)
   })
 
@@ -244,7 +263,7 @@ describe("createPreEnrollment", () => {
         stateOrientation: "oriente_etat",
         orientationNumber: "DECO-2026-123",
         birthCertificateNumber: "ACTE-1",
-        paymentMethodId: "pm-1",
+        paymentMethodId: "d4e1a2b3-c5d6-4e7f-8a9b-3c4d5e6f7a8b",
         acceptedChecklist: '["c1"]',
         providedDocuments: '["d1"]',
       })
@@ -439,8 +458,6 @@ describe("validatePreEnrollment", () => {
     stub("guardians", { data: { id: "g1" } })
     stub("enrollments", { data: { id: "enr-1" }, error: null })
     stub("student_qr_codes", { data: { id: "qr" }, error: null })
-    stub("payments", { data: { id: "pay-1" }, error: null })
-    stub("receipts", { data: { id: "r1" }, error: null })
     stub("schools", { data: { name: "Ecole Test" } })
 
     const res = await validatePreEnrollment(
@@ -456,8 +473,12 @@ describe("validatePreEnrollment", () => {
     expect(res.data?.matricule).toMatch(/^61CC-\d{4}-\d{4}$/)
     expect(res.data?.amountCollected).toBe(150000)
     expect(res.data?.receiptNumber).toBeTruthy()
-    expect(writes.some((w) => w.table === "payments" && w.op === "insert")).toBe(true)
-    expect(writes.some((w) => w.table === "receipts" && w.op === "insert")).toBe(true)
+    // P0-2 : l'encaissement passe par la RPC atomique record_payment
+    // (plus aucun insert PostgREST direct sur payments/receipts).
+    expect(mocks.rpc).toHaveBeenCalledWith(
+      "record_payment",
+      expect.objectContaining({ p_amount: 150000, p_payment_method: "cash" })
+    )
     expect(writes.some((w) => w.table === "student_qr_codes" && w.op === "insert")).toBe(true)
     expect(mocks.alertEnrollmentConfirmed).toHaveBeenCalled()
   })
@@ -489,8 +510,6 @@ describe("completeCounterEnrollment", () => {
     stub("guardians", { data: null }, { data: { id: "g-new" }, error: null })
     stub("enrollments", { data: { id: "enr-2" }, error: null })
     stub("student_qr_codes", { data: { id: "qr" }, error: null })
-    stub("payments", { data: { id: "pay-2" }, error: null })
-    stub("receipts", { data: { id: "r2" }, error: null })
     stub("schools", { data: { name: "Ecole Test" } })
 
     const res = await completeCounterEnrollment(
@@ -509,6 +528,11 @@ describe("completeCounterEnrollment", () => {
 
     expect(res.error).toBeUndefined()
     expect(res.data?.amountCollected).toBe(75000)
+    // P0-2 : l'encaissement passe par la RPC atomique record_payment.
+    expect(mocks.rpc).toHaveBeenCalledWith(
+      "record_payment",
+      expect.objectContaining({ p_amount: 75000, p_payment_method: "cash" })
+    )
     const guardianInsert = writes.find((w) => w.table === "guardians" && w.op === "insert")
     expect(guardianInsert?.payload).toMatchObject({ full_name: "Mariam Kone" })
     const enrollmentInsert = writes.find((w) => w.table === "enrollments" && w.op === "insert")

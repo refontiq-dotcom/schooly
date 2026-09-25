@@ -4,6 +4,8 @@
  * invalide est écartée avant d'atteindre l'UI d'administration.
  */
 
+import { normalizeHttpUrl, normalizeHttpUrlList } from "@/lib/safe-url"
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null
 }
@@ -80,15 +82,15 @@ export function normalizeSchool(raw: unknown): TrouvetouSchool | null {
     latitude: typeof raw.latitude === "number" ? raw.latitude : null,
     longitude: typeof raw.longitude === "number" ? raw.longitude : null,
     itineraire: asNullableString(raw.itineraire),
-    photos_360: asStringArray(raw.photos_360),
-    video_url: asNullableString(raw.video_url),
+    photos_360: normalizeHttpUrlList(raw.photos_360),
+    video_url: normalizeHttpUrl(raw.video_url),
     grille_tarifaire_publique: raw.grille_tarifaire_publique ?? null,
-    cover_photo_url: asNullableString(raw.cover_photo_url),
-    gallery_photos: asStringArray(raw.gallery_photos),
+    cover_photo_url: normalizeHttpUrl(raw.cover_photo_url),
+    gallery_photos: normalizeHttpUrlList(raw.gallery_photos),
     public_address: asNullableString(raw.public_address),
     public_phone: asNullableString(raw.public_phone),
     public_email: asNullableString(raw.public_email),
-    public_website_url: asNullableString(raw.public_website_url),
+    public_website_url: normalizeHttpUrl(raw.public_website_url),
     public_highlights: asStringArray(raw.public_highlights),
     admission_notes: asNullableString(raw.admission_notes),
   }
@@ -124,8 +126,8 @@ export function normalizeAds(raw: unknown): TrouvetouAd[] {
       id: row.id,
       title: row.title,
       message: asString(row.message),
-      image_url: asNullableString(row.image_url),
-      target_url: asNullableString(row.target_url),
+      image_url: normalizeHttpUrl(row.image_url),
+      target_url: normalizeHttpUrl(row.target_url),
       start_date: asString(row.start_date),
       end_date: asString(row.end_date),
       is_active: Boolean(row.is_active),

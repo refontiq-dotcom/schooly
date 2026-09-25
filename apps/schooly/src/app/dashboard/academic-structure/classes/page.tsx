@@ -1,29 +1,43 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useEffect, useState } from "react"
 import { useSupabaseUser } from "@/hooks/use-supabase-user"
 import { getAcademicYears, getClasses, getGradeLevels, getTeachersForSchool } from "../actions"
 import { computeAcademicWindow } from "@/components/academic-year-selector"
 import { ClassesPanel } from "../_components/classes-panel"
+import type { AcademicYear, ClassItem, GradeLevel, Teacher } from "../_components/types"
+
+async function loadClassesPageData() {
+  return Promise.all([getAcademicYears(), getClasses(), getGradeLevels(), getTeachersForSchool()])
+}
 
 export default function ClassesPage() {
   const user = useSupabaseUser()
-  const [years, setYears] = useState<{ id: string; label: string; status: string }[]>([])
-  const [classes, setClasses] = useState<any[]>([])
-  const [levels, setLevels] = useState<any[]>([])
-  const [teachers, setTeachers] = useState<any[]>([])
+  const [years, setYears] = useState<AcademicYear[]>([])
+  const [classes, setClasses] = useState<ClassItem[]>([])
+  const [levels, setLevels] = useState<GradeLevel[]>([])
+  const [teachers, setTeachers] = useState<Teacher[]>([])
 
   async function reload() {
-    const [yr, cl, lv, te] = await Promise.all([
-      getAcademicYears(), getClasses(), getGradeLevels(), getTeachersForSchool(),
-    ])
+    const [yr, cl, lv, te] = await loadClassesPageData()
     if (yr.data) setYears(yr.data)
     if (cl.data) setClasses(cl.data)
     if (lv.data) setLevels(lv.data)
     if (te.data) setTeachers(te.data)
   }
 
-  useEffect(() => { if (user) void reload() }, [user])
+  useEffect(() => {
+    if (!user) return
+    let active = true
+    void loadClassesPageData().then(([yr, cl, lv, te]) => {
+      if (!active) return
+      if (yr.data) setYears(yr.data)
+      if (cl.data) setClasses(cl.data)
+      if (lv.data) setLevels(lv.data)
+      if (te.data) setTeachers(te.data)
+    })
+    return () => { active = false }
+  }, [user])
 
   return (
     <ClassesPanel

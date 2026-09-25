@@ -103,7 +103,7 @@ export function AcademicGuidancePanel({
           <div>
             <CardTitle className="text-base">Schooly vous guide</CardTitle>
             <p className="mt-1 text-sm text-muted-foreground">
-              Les étapes sont proposées dans l'ordre logique. Une étape bloquée indique ce qu'il faut préparer avant de continuer.
+              Les étapes sont proposées dans l&apos;ordre logique. Une étape bloquée indique ce qu&apos;il faut préparer avant de continuer.
             </p>
           </div>
           <span className="text-xs text-muted-foreground whitespace-nowrap">
@@ -164,7 +164,7 @@ export function AcademicGuidancePanel({
 
         {blocked > 0 && (
           <p className="text-xs text-muted-foreground">
-            Schooly évite de vous faire remplir une étape impossible : les prérequis sont identifiés automatiquement avant l'action.
+            Schooly évite de vous faire remplir une étape impossible : les prérequis sont identifiés automatiquement avant l&apos;action.
           </p>
         )}
       </CardContent>

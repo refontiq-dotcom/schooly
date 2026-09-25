@@ -6,15 +6,47 @@
  * données existant (scolarité, caisse, recouvrement, vie scolaire).
  *
  * Deux niveaux :
- * - des helpers **purs** (aucun accès réseau, `now` injectable) : ils portent
- *   toute la logique métier (taux de recouvrement, deltas, soldes, séries) et
- *   sont couverts par des tests unitaires ;
+ * - des helpers **purs** dans `dashboard-helpers.ts` (aucun accès réseau, `now`
+ *   injectable) : ils portent toute la logique métier (taux de recouvrement,
+ *   deltas, soldes, séries) et sont couverts par des tests unitaires ;
  * - `getDirectionDashboard()` : lecture PostgREST via le client service_role,
  *   toujours scopée par `school_id`, qui assemble le modèle de la vue.
  *
  * Le client admin est injecté (paramètre `admin`) pour rester testable sans
  * variable d'environnement ni Supabase réel.
  */
+
+import { unstable_cache } from "next/cache"
+import {
+  DIRECTION_DASHBOARD_CACHE_TAG,
+  READ_CACHE_TTL_SECONDS,
+} from "@/lib/cache-tags"
+import { logServerEvent } from "@/lib/server-logger"
+import {
+  addDaysUTC,
+  addMonthsUTC,
+  bucketPaymentsByDay,
+  computeBalances,
+  computeExpectedRevenue,
+  computeRecoveryRate,
+  isoDateUTC,
+  paidTotalsByEnrollment,
+  percentageChange,
+  pickActiveYear,
+  startOfMonthUTC,
+  studentName,
+  sumAmounts,
+  sumAmountsByMethod,
+  type AcademicYearRow,
+  type EnrollmentRow,
+  type FeeScheduleRow,
+  type PaymentRow,
+} from "./dashboard-helpers"
+import {
+  loadDirectionBalanceKpis,
+  loadDirectionFinancialKpis,
+  type RpcCall,
+} from "./financial-kpis"
 
 type QueryResult = { data: unknown; error?: unknown; count?: number | null }
 
@@ -37,6 +69,11 @@ type QueryBuilder = PromiseLike<QueryResult> & {
 
 export type AdminLike = {
   from: (table: string) => unknown
+  /**
+   * Appel RPC PostgREST optionnel : les consommateurs qui ne l'exposent pas
+   * (client dégradé, fixtures de test) conservent l'agrégation JS.
+   */
+  rpc?: RpcCall
 }
 
 function table(admin: AdminLike, name: string): QueryBuilder {
@@ -44,42 +81,6 @@ function table(admin: AdminLike, name: string): QueryBuilder {
 }
 
 // ─────────────────────────────────────────────────────────── Lignes brutes ──
-
-export type AcademicYearRow = {
-  id: string
-  label: string
-  status: string
-  start_date: string
-  end_date: string
-}
-
-export type EnrollmentRow = {
-  id: string
-  enrollment_date: string
-  status: string
-  matricule: string | null
-  academic_year_id: string
-  grade_level_id: string
-  financial_profile_id: string | null
-  class_id: string | null
-  students: { first_name: string; last_name: string } | null
-}
-
-export type FeeScheduleRow = {
-  grade_level_id: string | null
-  financial_profile_id: string | null
-  amount: number
-}
-
-export type PaymentRow = {
-  id: string
-  enrollment_id: string
-  amount: number
-  payment_method: string | null
-  received_at: string
-  cash_session_id: string | null
-  enrollments: { academic_year_id: string } | null
-}
 
 export type PreEnrollmentRow = {
   id: string
@@ -177,168 +178,6 @@ export type DirectionDashboard = {
   }
 }
 
-// ─────────────────────────────────────────────────────── Helpers de date ────
-
-export const DAY_MS = 24 * 60 * 60 * 1000
-
-export function startOfMonthUTC(reference: Date): Date {
-  return new Date(
-    Date.UTC(reference.getUTCFullYear(), reference.getUTCMonth(), 1)
-  )
-}
-
-export function addMonthsUTC(reference: Date, months: number): Date {
-  return new Date(
-    Date.UTC(
-      reference.getUTCFullYear(),
-      reference.getUTCMonth() + months,
-      1
-    )
-  )
-}
-
-export function addDaysUTC(reference: Date, days: number): Date {
-  return new Date(reference.getTime() + days * DAY_MS)
-}
-
-export function isoDateUTC(reference: Date): string {
-  return reference.toISOString().slice(0, 10)
-}
-
-// ───────────────────────────────────────────────────────── Helpers purs ────
-
-export function sumAmounts(rows: Array<{ amount: number | null }>): number {
-  return rows.reduce((total, row) => total + (row.amount ?? 0), 0)
-}
-
-/**
- * Variation relative entre deux valeurs. `previous = 0` n'a pas de pourcentage
- * interprétable (division par zéro) → `null` : l'UI affiche « nouveau » plutôt
- * qu'un « +∞ % » trompeur.
- */
-export function percentageChange(
-  current: number,
-  previous: number
-): number | null {
-  if (previous <= 0) return null
-  return ((current - previous) / previous) * 100
-}
-
-/** Taux de recouvrement borné à [0, 100] : un surplus ne « masque » pas un impayé. */
-export function computeRecoveryRate(collected: number, expected: number): number {
-  if (expected <= 0) return 0
-  return Math.min(100, Math.max(0, (collected / expected) * 100))
-}
-
-/**
- * Index des frais scolarité : clé `niveau|profil` puis repli `niveau|` (profil
- * standard). Renvoie le montant dû pour un couple (niveau, profil financier).
- */
-export function buildFeeLookup(feeSchedules: FeeScheduleRow[]) {
-  const byProfile = new Map<string, number>()
-  const standard = new Map<string, number>()
-  for (const fee of feeSchedules) {
-    if (!fee.grade_level_id) continue
-    if (fee.financial_profile_id) {
-      byProfile.set(`${fee.grade_level_id}|${fee.financial_profile_id}`, fee.amount)
-    } else {
-      standard.set(fee.grade_level_id, fee.amount)
-    }
-  }
-  return (gradeLevelId: string, financialProfileId: string | null): number => {
-    if (financialProfileId) {
-      const specific = byProfile.get(`${gradeLevelId}|${financialProfileId}`)
-      if (specific !== undefined) return specific
-    }
-    return standard.get(gradeLevelId) ?? 0
-  }
-}
-
-/** Somme attendue des frais pour une liste d'inscriptions (une par élève actif). */
-export function computeExpectedRevenue(
-  enrollments: EnrollmentRow[],
-  feeSchedules: FeeScheduleRow[]
-): number {
-  const lookup = buildFeeLookup(feeSchedules)
-  return enrollments.reduce(
-    (total, enrollment) =>
-      total + lookup(enrollment.grade_level_id, enrollment.financial_profile_id),
-    0
-  )
-}
-
-/**
- * Séries journalières (N derniers jours, aujourd'hui inclus). Les jours sans
- * encaissement restent à 0 pour éviter une courbe qui « saute » les trous.
- */
-export function bucketPaymentsByDay(
-  payments: PaymentRow[],
-  days: number,
-  now: Date
-): Array<{ date: string; total: number }> {
-  const buckets = new Map<string, number>()
-  const today = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
-  )
-  for (let i = days - 1; i >= 0; i--) {
-    buckets.set(isoDateUTC(addDaysUTC(today, -i)), 0)
-  }
-  for (const payment of payments) {
-    const key = payment.received_at.slice(0, 10)
-    if (buckets.has(key)) {
-      buckets.set(key, (buckets.get(key) ?? 0) + payment.amount)
-    }
-  }
-  return Array.from(buckets, ([date, total]) => ({ date, total }))
-}
-
-/**
- * Sélection de l'année active : cookie explicite, sinon année « en_cours »,
- * sinon la plus récente. `years` doit être trié par `start_date` décroissant.
- */
-export function pickActiveYear(
-  years: AcademicYearRow[],
-  preferredId?: string | null
-): AcademicYearRow | null {
-  if (years.length === 0) return null
-  if (preferredId) {
-    const selected = years.find((year) => year.id === preferredId)
-    if (selected) return selected
-  }
-  return years.find((year) => year.status === "en_cours") ?? years[0]
-}
-
-/** Solde par inscription : dû (grille) − déjà encaissé. */
-export function computeBalances(
-  enrollments: EnrollmentRow[],
-  payments: PaymentRow[],
-  feeSchedules: FeeScheduleRow[]
-): Array<{ enrollment: EnrollmentRow; expected: number; paid: number; balance: number }> {
-  const lookup = buildFeeLookup(feeSchedules)
-  const paidByEnrollment = new Map<string, number>()
-  for (const payment of payments) {
-    paidByEnrollment.set(
-      payment.enrollment_id,
-      (paidByEnrollment.get(payment.enrollment_id) ?? 0) + payment.amount
-    )
-  }
-  return enrollments.map((enrollment) => {
-    const expected = lookup(
-      enrollment.grade_level_id,
-      enrollment.financial_profile_id
-    )
-    const paid = paidByEnrollment.get(enrollment.id) ?? 0
-    return { enrollment, expected, paid, balance: expected - paid }
-  })
-}
-
-export function studentName(enrollment: EnrollmentRow): string {
-  const first = enrollment.students?.first_name ?? ""
-  const last = enrollment.students?.last_name ?? ""
-  const full = `${last} ${first}`.trim()
-  return full || enrollment.matricule || "Élève"
-}
-
 function uniqBy<T>(rows: T[], key: (row: T) => string): T[] {
   const seen = new Set<string>()
   const out: T[] = []
@@ -371,11 +210,91 @@ export async function getDirectionDashboard(
   const now = options.now ?? new Date()
   const dailyWindow = options.dailyWindow ?? 14
 
+  // P1-B : les lectures PostgREST passent par le Data Cache, clé scoppée
+  // par école, purgé par tag à chaque mutation (`updateTag`) avec un TTL de
+  // sécurité de 60 s pour les écritures non tagguées. Le client `admin`
+  // reste dans la fermeture : non sérialisable, il ne fait pas partie de la
+  // clé (seul `schoolId` identifie le jeu de données).
+  //
+  // `payments` n'y figure plus (S1) : ses agrégats sont demandés aux RPC, et la
+  // lecture complète n'est relancée qu'en repli (voir `loadFallbackPayments`).
+  const loadDashboardRows = unstable_cache(
+    async () =>
+      Promise.all([
+        table(admin, "academic_years")
+          .select("id, label, status, start_date, end_date")
+          .eq("school_id", schoolId)
+          .is("deleted_at", null)
+          .order("start_date", { ascending: false }),
+        table(admin, "enrollments")
+          .select(
+            "id, enrollment_date, status, matricule, academic_year_id, grade_level_id, financial_profile_id, class_id, students ( first_name, last_name )"
+          )
+          .eq("school_id", schoolId)
+          .is("deleted_at", null),
+        table(admin, "fee_schedules")
+          .select("grade_level_id, financial_profile_id, amount")
+          .eq("school_id", schoolId)
+          .is("deleted_at", null),
+        table(admin, "pre_enrollments")
+          .select("id, status, expires_at")
+          .eq("school_id", schoolId)
+          .is("deleted_at", null),
+        table(admin, "moratoriums")
+          .select("id, status, requested_amount, due_date")
+          .eq("school_id", schoolId)
+          .is("deleted_at", null),
+        table(admin, "dropout_alerts")
+          .select("id, status, detected_at")
+          .eq("school_id", schoolId)
+          .is("deleted_at", null),
+        table(admin, "notification_outbox")
+          .select("id, status")
+          .eq("school_id", schoolId)
+          .is("deleted_at", null),
+        table(admin, "cash_sessions")
+          .select(
+            "id, status, opening_amount, closing_amount, expected_amount, difference, opened_at, closed_at"
+          )
+          .eq("school_id", schoolId)
+          .is("deleted_at", null)
+          .order("opened_at", { ascending: false })
+          .limit(5),
+        table(admin, "grade_levels")
+          .select("id, name, level, cycle")
+          .eq("school_id", schoolId)
+          .is("deleted_at", null)
+          .order("level", { ascending: true }),
+        table(admin, "classes")
+          .select("id, name, capacity, grade_level_id")
+          .eq("school_id", schoolId)
+          .is("deleted_at", null),
+      ]),
+    ["direction-dashboard-rows", schoolId],
+    { revalidate: READ_CACHE_TTL_SECONDS, tags: [DIRECTION_DASHBOARD_CACHE_TAG] }
+  )
+
+  // Repli dégradé : lecture intégrale des encaissements, dans un jeton de cache
+  // distinct (même tag) pour qu'elle ne soit jamais mémorisée quand les RPC
+  // répondent. Conserve l'exactitude historique du dashboard si la base refuse
+  // les agrégats, au prix du scan que S1 cherche à supprimer.
+  const loadFallbackPayments = unstable_cache(
+    async () =>
+      table(admin, "payments")
+        .select(
+          "id, enrollment_id, amount, payment_method, received_at, cash_session_id, enrollments ( academic_year_id )"
+        )
+        .eq("school_id", schoolId)
+        .is("deleted_at", null)
+        .order("received_at", { ascending: false }),
+    ["direction-dashboard-payments-fallback", schoolId],
+    { revalidate: READ_CACHE_TTL_SECONDS, tags: [DIRECTION_DASHBOARD_CACHE_TAG] }
+  )
+
   const [
     yearsRes,
     enrollmentsRes,
     feesRes,
-    paymentsRes,
     preEnrollmentsRes,
     moratoriumsRes,
     alertsRes,
@@ -383,63 +302,7 @@ export async function getDirectionDashboard(
     cashRes,
     levelsRes,
     classesRes,
-  ] = await Promise.all([
-    table(admin, "academic_years")
-      .select("id, label, status, start_date, end_date")
-      .eq("school_id", schoolId)
-      .is("deleted_at", null)
-      .order("start_date", { ascending: false }),
-    table(admin, "enrollments")
-      .select(
-        "id, enrollment_date, status, matricule, academic_year_id, grade_level_id, financial_profile_id, class_id, students ( first_name, last_name )"
-      )
-      .eq("school_id", schoolId)
-      .is("deleted_at", null),
-    table(admin, "fee_schedules")
-      .select("grade_level_id, financial_profile_id, amount")
-      .eq("school_id", schoolId)
-      .is("deleted_at", null),
-    table(admin, "payments")
-      .select(
-        "id, enrollment_id, amount, payment_method, received_at, cash_session_id, enrollments ( academic_year_id )"
-      )
-      .eq("school_id", schoolId)
-      .is("deleted_at", null)
-      .order("received_at", { ascending: false }),
-    table(admin, "pre_enrollments")
-      .select("id, status, expires_at")
-      .eq("school_id", schoolId)
-      .is("deleted_at", null),
-    table(admin, "moratoriums")
-      .select("id, status, requested_amount, due_date")
-      .eq("school_id", schoolId)
-      .is("deleted_at", null),
-    table(admin, "dropout_alerts")
-      .select("id, status, detected_at")
-      .eq("school_id", schoolId)
-      .is("deleted_at", null),
-    table(admin, "notification_outbox")
-      .select("id, status")
-      .eq("school_id", schoolId)
-      .is("deleted_at", null),
-    table(admin, "cash_sessions")
-      .select(
-        "id, status, opening_amount, closing_amount, expected_amount, difference, opened_at, closed_at"
-      )
-      .eq("school_id", schoolId)
-      .is("deleted_at", null)
-      .order("opened_at", { ascending: false })
-      .limit(5),
-    table(admin, "grade_levels")
-      .select("id, name, level, cycle")
-      .eq("school_id", schoolId)
-      .is("deleted_at", null)
-      .order("level", { ascending: true }),
-    table(admin, "classes")
-      .select("id, name, capacity, grade_level_id")
-      .eq("school_id", schoolId)
-      .is("deleted_at", null),
-  ])
+  ] = await loadDashboardRows()
 
   const years = (yearsRes?.data ?? []) as unknown as AcademicYearRow[]
   const allEnrollments = uniqBy(
@@ -447,10 +310,6 @@ export async function getDirectionDashboard(
     (row) => row.id
   )
   const feeSchedules = (feesRes?.data ?? []) as unknown as FeeScheduleRow[]
-  const payments = uniqBy(
-    ((paymentsRes?.data ?? []) as unknown as PaymentRow[]).filter(Boolean),
-    (row) => row.id
-  )
   const preEnrollments =
     (preEnrollmentsRes?.data ?? []) as unknown as PreEnrollmentRow[]
   const moratoriums = (moratoriumsRes?.data ?? []) as unknown as MoratoriumRow[]
@@ -472,10 +331,66 @@ export async function getDirectionDashboard(
     : -1
   const previousYear =
     activeYearIndex >= 0 ? years[activeYearIndex + 1] ?? null : null
+  // S1 : plus aucun agrégat de ce dashboard n'est recalculé en JS à partir des
+  // lignes de paiement. Deux RPC renvoient des totaux déjà agrégés en base, et
+  // sont interrogées en parallèle — `get_direction_financial_kpis` (cumul
+  // exercice, M vs M-1, ventilation par mode, série journalière) et
+  // `get_direction_balance_kpis` (total encaissé par inscription, total de la
+  // session de caisse). Le module `financial-kpis` porte l'appel, la validation
+  // du JSONB et le cache. Le chemin nominal ne transporte plus qu'une entrée par
+  // élève crédité, au lieu de toutes les lignes de paiement.
+  const openSession = sessions.find((s) => s.status === "open") ?? null
+  const [financialKpis, balanceKpis] = activeYear
+    ? await Promise.all([
+        loadDirectionFinancialKpis(admin.rpc ?? null, {
+          schoolId,
+          academicYearId: activeYear.id,
+          now,
+          dailyWindow,
+        }),
+        loadDirectionBalanceKpis(admin.rpc ?? null, {
+          schoolId,
+          academicYearId: activeYear.id,
+          cashSessionId: openSession?.id ?? null,
+        }),
+      ])
+    : [null, null]
 
   const activeYearEnrollments = activeYear
     ? allEnrollments.filter((e) => e.academic_year_id === activeYear.id)
     : []
+
+  // Un solde incohérent — identifiants d'inscription inconnus du jeu de lignes —
+  // afficherait un encours nul sans aucun signal : on le traite donc comme un
+  // échec de RPC (journal + repli), plutôt que comme une donnée fiable.
+  const yearEnrollmentIds = new Set(
+    activeYearEnrollments.map((enrollment) => enrollment.id)
+  )
+  const balancesAreConsistent =
+    balanceKpis === null ||
+    balanceKpis.enrollmentPaid.every((row) =>
+      yearEnrollmentIds.has(row.enrollmentId)
+    )
+  if (balanceKpis !== null && !balancesAreConsistent) {
+    logServerEvent("warn", "direction.balance_kpis_unmatched", {
+      schoolId,
+      academicYearId: activeYear?.id ?? "none",
+    })
+  }
+  const usableBalanceKpis = balancesAreConsistent ? balanceKpis : null
+
+  // Le repli n'est lu que si un agrégat manque : client sans RPC, erreur base,
+  // charge utile invalide ou soldes incohérents.
+  const payments =
+    financialKpis !== null && usableBalanceKpis !== null
+      ? []
+      : uniqBy(
+          (
+            ((await loadFallbackPayments())?.data ??
+              []) as unknown as PaymentRow[]
+          ).filter(Boolean),
+          (row) => row.id
+        )
   const activeEnrollments = activeYearEnrollments.filter(
     (e) => e.status === "confirmed" || e.status === "active"
   )
@@ -553,32 +468,41 @@ export async function getDirectionDashboard(
     const at = new Date(p.received_at)
     return at >= previousMonthStart && at < currentMonthStart
   })
-  const collectedThisMonth = sumAmounts(paymentsThisMonth)
-  const collectedPreviousMonth = sumAmounts(paymentsPreviousMonth)
+  // KPI en base quand disponibles, repli sur l'agrégation JS sinon. Le delta
+  // reste dérivé des deux totaux retenus : une seule formule, quelle que soit
+  // la source (mêmes bornes mensuelles UTC des deux côtés).
+  const collectedThisMonth =
+    financialKpis?.collectedThisMonth ?? sumAmounts(paymentsThisMonth)
+  const collectedPreviousMonth =
+    financialKpis?.collectedPreviousMonth ?? sumAmounts(paymentsPreviousMonth)
   const collectedDeltaPercent = percentageChange(
     collectedThisMonth,
     collectedPreviousMonth
   )
 
-  const collectedThisYear = sumAmounts(activeYearPayments)
+  const collectedThisYear =
+    financialKpis?.collectedThisYear ?? sumAmounts(activeYearPayments)
   const expectedThisYear = computeExpectedRevenue(activeEnrollments, feeSchedules)
   const recoveryRate = computeRecoveryRate(collectedThisYear, expectedThisYear)
 
-  const balances = computeBalances(activeEnrollments, payments, feeSchedules)
+  // Soldes : source unique, soit les totaux agrégés par la base, soit le repli
+  // calculé sur les lignes de paiement.
+  const paidByEnrollment = usableBalanceKpis
+    ? new Map(
+        usableBalanceKpis.enrollmentPaid.map((row) => [row.enrollmentId, row.paid])
+      )
+    : paidTotalsByEnrollment(payments)
+  const balances = computeBalances(
+    activeEnrollments,
+    paidByEnrollment,
+    feeSchedules
+  )
   const debtors = balances
     .filter((entry) => entry.balance > 0)
     .sort((a, b) => b.balance - a.balance)
   const outstanding = debtors.reduce((total, entry) => total + entry.balance, 0)
 
-  const methodTotals = new Map<string, number>()
-  for (const payment of activeYearPayments) {
-    const method = payment.payment_method ?? "autre"
-    methodTotals.set(method, (methodTotals.get(method) ?? 0) + payment.amount)
-  }
-  const byMethod = Array.from(methodTotals, ([method, total]) => ({
-    method,
-    total,
-  })).sort((a, b) => b.total - a.total)
+  const byMethod = financialKpis?.byMethod ?? sumAmountsByMethod(activeYearPayments)
 
   const topDebtors = debtors.slice(0, 5).map((entry) => ({
     id: entry.enrollment.id,
@@ -608,11 +532,9 @@ export async function getDirectionDashboard(
   const failedNotifications = outbox.filter(
     (o) => o.status === "failed"
   ).length
-  const openSession = sessions.find((s) => s.status === "open") ?? null
   const collectedInSession = openSession
-    ? sumAmounts(
-        payments.filter((p) => p.cash_session_id === openSession.id)
-      )
+    ? (usableBalanceKpis?.sessionPaid ??
+      sumAmounts(payments.filter((p) => p.cash_session_id === openSession.id)))
     : 0
   const lastClosed = sessions.find((s) => s.status !== "open") ?? null
 
@@ -692,8 +614,10 @@ export async function getDirectionDashboard(
       recoveryRate,
       outstanding,
       debtorsCount: debtors.length,
-      // série complétée à 0 pour les jours sans encaissement (pas de trou)
-      daily: bucketPaymentsByDay(activeYearPayments, dailyWindow, now),
+      // série complétée à 0 pour les jours sans encaissement (pas de trou) :
+      // calculée en base quand la RPC répond, sinon en JS sur les paiements
+      daily:
+        financialKpis?.daily ?? bucketPaymentsByDay(activeYearPayments, dailyWindow, now),
       byMethod,
       topDebtors,
     },

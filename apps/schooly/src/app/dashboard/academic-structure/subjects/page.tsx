@@ -5,20 +5,28 @@
  * Extrait du module matières du hub académique. À enrichir d’un vrai
  * SubjectsPanel dès la prochaine itération du périmètre structure.
  */
-import { useState, useEffect } from "react"
+import { useEffect, useState } from "react"
 import { useSupabaseUser } from "@/hooks/use-supabase-user"
 import { getSubjects } from "../actions"
+import type { Subject } from "../_components/types"
 
 export default function SubjectsPage() {
   const user = useSupabaseUser()
-  const [subjects, setSubjects] = useState<{ id: string; name: string; code: string | null; coefficient: number }[]>([])
+  const [subjects, setSubjects] = useState<Subject[]>([])
 
   async function reload() {
     const res = await getSubjects()
     if (res.data) setSubjects(res.data)
   }
 
-  useEffect(() => { if (user) void reload() }, [user])
+  useEffect(() => {
+    if (!user) return
+    let active = true
+    void getSubjects().then((res) => {
+      if (active && res.data) setSubjects(res.data)
+    })
+    return () => { active = false }
+  }, [user])
 
   return (
     <section className="space-y-3">

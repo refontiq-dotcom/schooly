@@ -26,7 +26,7 @@ export default async function MovementsPage() {
         {data.requests.length === 0 ? <p>Aucune demande enregistrée.</p> : <ul className="space-y-3">
           {data.requests.map(r => {
             const activation = activations.data?.find(a => a.request_id === r.id)
-            const expired = activation && Date.now() >= new Date(activation.expires_at).getTime()
+            const expired = activation?.expired ?? false
             return <li key={r.id} className="rounded border p-3">
             <p className="font-medium">{data.enrollments.find(e => e.id === r.enrollment_id)?.label ?? "Inscription source non active ou indisponible"}</p>
             <p>{r.kind === "ORT" ? "ORT — Orientation à vérifier" : "TRF — Transfert volontaire"}</p>

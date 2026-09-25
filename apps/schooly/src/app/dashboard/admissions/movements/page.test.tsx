@@ -109,6 +109,7 @@ it.each([
 ])("affiche l’échéance %s sans proposer une nouvelle activation", async (expiresAt, label) => {
   mocks.activations.mockResolvedValueOnce({ canActivate: true, data: [{
     request_id: "r1", activated_at: "2000-09-17T09:00:00Z", expires_at: expiresAt,
+    expired: new Date(expiresAt).getTime() <= Date.now(),
   }] })
   await renderRequest()
   expect(container.textContent).toContain(label)
