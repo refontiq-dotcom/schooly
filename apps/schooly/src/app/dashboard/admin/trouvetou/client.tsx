@@ -278,6 +278,31 @@ export function TrouvetouAdminClient({
     setter(prev => prev.filter((_, i) => i !== index))
   }
 
+  /**
+   * Suppression réelle : l'API efface l'objet dans R2 puis sa référence en
+   * base. Ne retirer l'URL que de l'état React laisserait le fichier dans le
+   * bucket pour toujours — un stockage ne se libère pas tout seul, et la
+   * référence disparue rendrait l'objet introuvable pour le dépanner.
+   */
+  const removeMedia = useCallback(async (url: string, apply: () => void) => {
+    setLoading(true)
+    try {
+      const res = await fetch("/api/v1/admin/trouvetou/media", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Suppression impossible")
+      apply()
+      toast.success("Média supprimé")
+    } catch (error) {
+      toast.error(errorMessage(error, "Suppression impossible"))
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
   return (
     <div className="space-y-5">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -470,9 +495,9 @@ export function TrouvetouAdminClient({
         <DialogContent className="max-w-2xl">
           <DialogHeader><DialogTitle>Médias de l&apos;établissement</DialogTitle><DialogDescription>Ajoute directement les photos depuis ton téléphone ou ton ordinateur. Les images sont stockées dans Cloudflare R2.</DialogDescription></DialogHeader>
           <div className="space-y-6 py-4">
-            <MediaSection title="Photo principale" description="La photo de couverture de l'établissement." files={coverPhoto ? [coverPhoto] : []} multiple={false} onUpload={e=>handleMediaUpload(e,"cover")} onRemove={()=>setCoverPhoto("")} />
-            <MediaSection title="Galerie photos" description={`4 photos classiques maximum, photo principale comprise. ${gallery.length + (coverPhoto ? 1 : 0)}/4`} files={gallery} multiple={gallery.length + (coverPhoto ? 1 : 0) < 4} onUpload={e=>handleMediaUpload(e,"gallery")} onRemove={i=>{ if(i!==undefined) removeItem(setGallery,i) }} />
-            <MediaSection title="Visite 360°" description="Une seule visite 360° de l'établissement : entrée et cour, sans entrer dans les salles de classe." files={photos360} multiple={false} onUpload={e=>handleMediaUpload(e,"360")} onRemove={i=>{ if(i!==undefined) removeItem(setPhotos360,i) }} />
+            <MediaSection title="Photo principale" description="La photo de couverture de l'établissement." files={coverPhoto ? [coverPhoto] : []} multiple={false} onUpload={e=>handleMediaUpload(e,"cover")} onRemove={()=>{ if (coverPhoto) removeMedia(coverPhoto, () => setCoverPhoto("")) }} />
+            <MediaSection title="Galerie photos" description={`4 photos classiques maximum, photo principale comprise. ${gallery.length + (coverPhoto ? 1 : 0)}/4`} files={gallery} multiple={gallery.length + (coverPhoto ? 1 : 0) < 4} onUpload={e=>handleMediaUpload(e,"gallery")} onRemove={i=>{ const url = i !== undefined ? gallery[i] : undefined; if (url) removeMedia(url, () => removeItem(setGallery, i as number)) }} />
+            <MediaSection title="Visite 360°" description="Une seule visite 360° de l'établissement : entrée et cour, sans entrer dans les salles de classe." files={photos360} multiple={false} onUpload={e=>handleMediaUpload(e,"360")} onRemove={i=>{ const url = i !== undefined ? photos360[i] : undefined; if (url) removeMedia(url, () => removeItem(setPhotos360, i as number)) }} />
           </div>
           <DialogFooter><Button onClick={saveProfile} disabled={loading}>{loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Enregistrer les médias</Button></DialogFooter>
           <DialogClose onClick={()=>setModal(null)} />

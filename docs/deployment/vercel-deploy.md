@@ -23,11 +23,12 @@ Ne jamais copier une valeur secrète dans ce document. Les valeurs ci-dessous so
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | `<supabase-publishable-key>` | clé client, navigateur autorisé |
 | `SUPABASE_SECRET_KEY` | `<supabase-secret-key>` | secrète, serveur uniquement |
 | `CRON_SECRET` | `<secret-aleatoire-long>` | secrète, entête `Authorization: Bearer` des deux routes `/api/cron/*` |
-| `R2_ACCOUNT_ID` | `<account-id Cloudflare>` | publique, compose l'endpoint R2 |
-| `R2_ACCESS_KEY_ID` | `<clé d'accès R2>` | secrète, lecture/écriture du bucket |
-| `R2_SECRET_ACCESS_KEY` | `<secret R2>` | secrète |
-| `R2_BUCKET` | `trouvetou-media` | publique, nom du bucket |
-| `R2_PUBLIC_URL` | `https://media.<domaine>.ci` | publique, base des URL de médias |
+| `R2_ACCOUNT_ID` | `fe6f046166fb1f4f7ed1bc7088d89095` | publique, compose l'endpoint S3 R2 |
+| `R2_ACCESS_KEY_ID` | *à créer — jamais versionné* | secrète, lecture/écriture du bucket |
+| `R2_SECRET_ACCESS_KEY` | *à créer — jamais versionné* | secrète |
+| `R2_BUCKET` | `schooly-media` | publique, nom du bucket |
+| `R2_PUBLIC_URL` | `https://pub-86f196c5781c428caf42be75e4cce653.r2.dev` | publique, base des URL de médias |
+| `R2_S3_ENDPOINT` | *(vide)* | surcharge l'endpoint, pour un émulateur local |
 | `TELEGRAM_BOT_TOKEN` | `<telegram-bot-token>` | secrète |
 | `TELEGRAM_CHAT_ID` | `<telegram-chat-id>` | identifiant |
 | `TELEGRAM_ADMIN_URL` | `https://<schooly-admin-domain>/billing` | configuration |
@@ -70,13 +71,28 @@ Vercel Cron.
 
 #### Médias : Cloudflare R2
 
-Les photos et les visites 360° sont stockées dans un bucket **Cloudflare R2** (stockage
-objet compatible S3, sans frais de sortie). Le bucket `trouvetou-media` doit être :
+Les photos et la visite 360° sont stockées dans le bucket **`schooly-media`**
+(Cloudflare R2, stockage objet compatible S3, sans frais de sortie). L'endpoint S3
+retenu est `https://fe6f046166fb1f4f7ed1bc7088d89095.r2.cloudflarestorage.com` —
+et non `r2.cloudflarest.com`, qui n'est pas l'endpoint S3 et ferait échouer
+toutes les signatures.
 
-1. **public en lecture** (Settings → Public access) — les photos sont servies
-   directement au navigateur ;
-2. doté d'une règle **CORS** autorisant le `PUT` depuis l'origine de l'application,
-   sinon le navigateur bloque l'envoi direct avant même la requête.
+**Structure des clés** (déterministe, jamais le nom du fichier d'origine) :
+
+```
+schooly/{environnement}/360/{etablissementId}/{mediaId}.jpg        visite 360°
+schooly/{environnement}/photos/cover/{etablissementId}/{mediaId}.jpg
+schooly/{environnement}/photos/gallery/{etablissementId}/{mediaId}.jpg
+schooly/{environnement}/ads/{etablissementId}/{mediaId}.jpg
+```
+
+`{environnement}` vaut `production`, `staging` (prévisualisation Vercel) ou
+`development`, de sorte qu'une prévisualisation n'écrive jamais dans le préfixe
+de la production. `{mediaId}` est un UUID.
+
+Le bucket doit être **public en lecture** et doté d'une règle **CORS** autorisant
+le `PUT` depuis l'origine de l'application, sinon le navigateur bloque l'envoi
+direct avant même la requête :
 
 ```json
 [
@@ -94,13 +110,19 @@ Les identifiants d'accès se créent dans R2 → Manage R2 Access Tokens, avec l
 **Object Read & Write** limités au bucket. Ce ne sont pas les identifiants de l'API
 Cloudflare globale.
 
-**Pourquoi un envoi direct par URL signée** : la route
-`POST /api/v1/admin/trouvetou/media` n'héberge plus le fichier. Elle vérifie le quota,
-le type MIME et la taille, puis renvoie une URL signée valable 5 minutes ; le navigateur
-envoie ensuite le fichier **directement sur R2**. Le fichier ne transite donc jamais par
-la fonction Next.js, et la limite de 4,5 Mo du corps de requête de Vercel Hobby
-s'applique à un JSON de quelques octets au lieu d'une photo. Un aller-retour par le
-serveur aurait plafonné les photos 360, les plus lourdes.
+**Suppression.** `DELETE /api/v1/admin/trouvetou/media` supprime réellement l'objet
+puis sa référence en base, dans cet ordre — R2 d'abord, pour qu'un échec R2 laisse
+la référence intacte et permette de réessayer. Trois garde-fous : l'URL doit être une
+référence de cet établissement (lu en base), la clé déduite doit appartenir à cet
+établissement (structure de clé), et l'objet est vérifié par `HEAD` avant suppression
+car `DeleteObject` est idempotent chez R2.
+
+**Envoi direct par URL signée** : la route `POST /api/v1/admin/trouvetou/media` n'héberge
+plus le fichier. Elle vérifie le quota, le type MIME et la taille, puis renvoie une URL
+signée valable 5 minutes ; le navigateur envoie le fichier **directement sur R2**. Le
+fichier ne transite donc jamais par la fonction Next.js, et la limite de 4,5 Mo du
+corps de requête de Vercel Hobby porte sur un JSON de quelques octets au lieu d'une
+photo. Un aller-retour par le serveur aurait plafonné les photos 360, les plus lourdes.
 
 Conséquence à connaître : le quota est contrôlé au moment où l'URL est signée, pas au
 moment du dépôt. Deux envois simultanés peuvent tous deux obtenir une URL ; c'est la
