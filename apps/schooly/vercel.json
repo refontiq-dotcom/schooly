@@ -7,12 +7,11 @@
   "crons": [
     {
       "path": "/api/cron/outbox-drain",
-      "schedule": "*/5 * * * *"
+      "schedule": "0 3 * * *"
     },
     {
       "path": "/api/cron/control-center-metrics",
-      "schedule": "0 * * * *"
+      "schedule": "0 2 * * *"
     }
   ]
 }
-

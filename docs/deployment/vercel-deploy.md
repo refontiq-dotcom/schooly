@@ -22,6 +22,7 @@ Ne jamais copier une valeur secrète dans ce document. Les valeurs ci-dessous so
 | `NEXT_PUBLIC_SUPABASE_URL` | `https://<project-ref>.supabase.co` | publique |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | `<supabase-publishable-key>` | clé client, navigateur autorisé |
 | `SUPABASE_SECRET_KEY` | `<supabase-secret-key>` | secrète, serveur uniquement |
+| `CRON_SECRET` | `<secret-aleatoire-long>` | secrète, entête `Authorization: Bearer` des deux routes `/api/cron/*` |
 | `TELEGRAM_BOT_TOKEN` | `<telegram-bot-token>` | secrète |
 | `TELEGRAM_CHAT_ID` | `<telegram-chat-id>` | identifiant |
 | `TELEGRAM_ADMIN_URL` | `https://<schooly-admin-domain>/billing` | configuration |
@@ -37,6 +38,39 @@ Ne jamais copier une valeur secrète dans ce document. Les valeurs ci-dessous so
 1. Vérifier les variables d'environnement dans Vercel.
 2. Lancer le déploiement.
 3. Vérifier l'URL et le health check.
+
+#### Contrainte du plan Hobby sur les crons
+
+Le projet est sur le plan **Hobby**. Vercel y limite les cron jobs à **une exécution
+par jour** : toute expression plus fréquente fait **échouer le déploiement**, avec
+l'erreur *« Hobby accounts are limited to daily cron jobs. This cron expression
+would run more than once per day. »*
+
+C'est ce qui a bloqué les déploiements entre le 24 et le 27 septembre 2026 :
+`0 * * * *` avait été ajouté à `apps/schooly/vercel.json` par le commit `2b43045`
+alors que le dernier déploiement réussi datait de `409b74e`, le commit
+immédiatement précédent. Les deux crons sont donc quotidiens (`0 2 * * *` et
+`0 3 * * *`) — horaires distincts pour ne pas déclencher les deux ensemble.
+
+Le drain de `notification_outbox` toutes les 5 minutes n'est pas tenable sur Hobby.
+Ce n'est pas bloquant aujourd'hui : la route est en **mode preview** (elle stocke
+un aperçu et passe les lignes en état terminal, sans envoyer de SMS). Le délai de
+5 minutes n'aurait un sens que le jour où un provider WhatsApp sera branché — à ce
+moment là, basculer le déclenchement vers `pg_cron` côté Supabase plutôt que vers
+Vercel Cron.
+
+> Une modification de `vercel.json` ne prend effet qu'au **prochain déploiement** :
+> c'est aussi la raison des commits vides de type « trigger production deployment »
+> dans l'historique.
+
+#### Migration à appliquer avant le déploiement
+
+Vercel n'applique pas les migrations SQL. `supabase/migrations/20260927005000_limit_trouvetou_media.sql`
+pose les contraintes `schools_trouvetou_gallery_max_4` et
+`schools_trouvetou_photos_360_max_1` ; elle doit être appliquée manuellement
+(`supabase db push` ou éditeur SQL) **avant** de publier le code qui écrit sur ces
+colonnes. Le code tronque déjà avant écriture, donc l'application reste sûre, mais
+sans la migration les plafonds ne sont garantis que par l'application.
 
 ### 4. Post-déploiement
 
