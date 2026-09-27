@@ -122,11 +122,20 @@ export type ParsedMediaKey = {
  * Découpe une clé R2. Renvoie `null` si la structure n'est pas celle de Schooly :
  * la suppression s'appuie sur ce refus pour ne jamais toucher un objet étranger,
  * y compris s'il se trouvait par erreur dans le même bucket.
+ *
+ * Le groupe est de profondeur variable — `360` et `ads` font un seul segment,
+ * `photos/cover` et `photos/gallery` deux — donc l'établissement est lu comme
+ * l'avant-dernier segment et non à une position fixe. Une profondeur figée
+ * aurait laissé tous les médias autres que la 360 « non possédés », donc
+ * indelibles.
  */
 export function parseMediaKey(key: string): ParsedMediaKey | null {
   const segments = key.split("/")
-  if (segments.length !== 5) return null
-  const [root, environment, group, schoolId, fileName] = segments
+  if (segments.length < 5) return null
+  const [root, environment] = segments
+  const fileName = segments[segments.length - 1]
+  const schoolId = segments[segments.length - 2]
+  const group = segments.slice(2, segments.length - 2).join("/")
   if (root !== KEY_ROOT || !environment || !group || !schoolId || !fileName) return null
   const dot = fileName.lastIndexOf(".")
   if (dot <= 0) return null
@@ -179,7 +188,9 @@ export function readR2Config(): R2Config | null {
   const accountId = process.env.R2_ACCOUNT_ID?.trim()
   const accessKeyId = process.env.R2_ACCESS_KEY_ID?.trim()
   const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY?.trim()
-  const bucket = process.env.R2_BUCKET?.trim()
+  // `R2_BUCKET_NAME` est le nom canonique ; `R2_BUCKET` reste accepté pour ne
+  // pas casser un environnement déjà configuré avec l'ancien nom.
+  const bucket = (process.env.R2_BUCKET_NAME ?? process.env.R2_BUCKET)?.trim()
   const publicBaseUrl = process.env.R2_PUBLIC_URL?.trim()
   if (!accountId || !accessKeyId || !secretAccessKey || !bucket || !publicBaseUrl) return null
   return {
@@ -231,8 +242,17 @@ export async function presignMediaUpload(options: {
   const command = new PutObjectCommand({
     Bucket: config.bucket,
     Key: key,
-    // Rejoué dans la signature : le navigateur doit renvoyer exactement ce
-    // Content-Type, sinon R2 refuse (SignatureDoesNotMatch).
+    // MESURÉ contre le bucket, pas supposé : le presigner ne signe QUE
+    // `host` (`X-Amz-SignedHeaders=host`). Un PUT avec un `Content-Type`
+    // différent de celui déclaré est accepté (200) et c'est la valeur du
+    // CLIENT qui est enregistrée sur l'objet. `unhoistableHeaders` ne change
+    // rien, et les métadonnées hissées en query string sont ignorées par R2.
+    //
+    // Ce qui reste garanti par le serveur, et qui est ce qui compte : l'extension
+    // de la clé. Elle est déduite du type validé contre l'allowlist, donc un
+    // client ne peut pas déposer que .jpg, .png ou .webp — jamais de .html.
+    // Le durcissement du Content-Type servi est donc à faire côté Cloudflare
+    // (cf. docs/deployment/vercel-deploy.md), pas ici.
     ContentType: contentType,
     // Un an : les URLs sont immuables, on n'a rien à révoquer de court.
     CacheControl: "31536000",
@@ -246,22 +266,33 @@ export async function presignMediaUpload(options: {
   }
 }
 
+export type MediaObjectInfo = {
+  exists: boolean
+  sizeBytes?: number
+}
+
 /**
- * L'objet existe-t-il réellement dans le bucket ?
+ * Interroge l'objet dans le bucket : existence et taille réelle.
  *
- * Indispensable avant de prétendre qu'un média fonctionne : DeleteObject est
+ * `HeadObject` et non un `GET` : aucune donnée n'est transférée, seul l'état.
+ * Indispensable avant de prétendre qu'un média fonctionne : `DeleteObject` est
  * idempotent chez R2 (il réussit même sur une clé absente), donc sans ce HEAD
  * on ne distingue pas « supprimé » de « n'a jamais existé ».
  */
-export async function mediaObjectExists(options: { key: string; config: R2Config }): Promise<boolean> {
+export async function headMediaObject(options: { key: string; config: R2Config }): Promise<MediaObjectInfo> {
   try {
-    await getClient(options.config).send(
+    const response = await getClient(options.config).send(
       new HeadObjectCommand({ Bucket: options.config.bucket, Key: options.key }),
     )
-    return true
+    return { exists: true, sizeBytes: response.ContentLength }
   } catch {
-    return false
+    return { exists: false }
   }
+}
+
+/** L'objet existe-t-il réellement dans le bucket ? */
+export async function mediaObjectExists(options: { key: string; config: R2Config }): Promise<boolean> {
+  return (await headMediaObject(options)).exists
 }
 
 /**

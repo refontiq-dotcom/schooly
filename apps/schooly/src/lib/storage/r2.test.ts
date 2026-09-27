@@ -15,8 +15,10 @@ const R2_VARS = [
   "R2_ACCOUNT_ID",
   "R2_ACCESS_KEY_ID",
   "R2_SECRET_ACCESS_KEY",
+  "R2_BUCKET_NAME",
   "R2_BUCKET",
   "R2_PUBLIC_URL",
+  "R2_S3_ENDPOINT",
 ] as const
 
 afterEach(() => {
@@ -127,6 +129,17 @@ describe("parseMediaKey", () => {
     expect(parseMediaKey("schooly//360/s1/x.jpg")).toBeNull()
     expect(parseMediaKey("")).toBeNull()
   })
+
+  it("accepte un groupe de profondeur variable", () => {
+    // Bug trouvé par le test d'intégration réel : la galerie produit SIX
+    // segments (schooly/env/photos/gallery/école/uuid) alors que la 360 en
+    // produit cinq. Une profondeur figée rendait tous les médias autres que
+    // la 360 « non possédés », donc indelibles.
+    expect(parseMediaKey("schooly/production/360/s1/abc.jpg")?.group).toBe("360")
+    expect(parseMediaKey("schooly/production/photos/gallery/s1/abc.jpg")?.group).toBe("photos/gallery")
+    expect(parseMediaKey("schooly/production/photos/gallery/s1/abc.jpg")?.schoolId).toBe("s1")
+    expect(parseMediaKey("schooly/production/ads/s1/abc.jpg")?.group).toBe("ads")
+  })
 })
 
 describe("isKeyOwnedBySchool", () => {
@@ -193,16 +206,27 @@ describe("readR2Config", () => {
     process.env.R2_ACCOUNT_ID = "acct"
     process.env.R2_ACCESS_KEY_ID = "key"
     process.env.R2_SECRET_ACCESS_KEY = "secret"
-    process.env.R2_BUCKET = "medias"
+    process.env.R2_BUCKET_NAME = "schooly-media"
     process.env.R2_PUBLIC_URL = "   "
     expect(readR2Config()).toBeNull()
+  })
+
+  it("accepte encore l'ancien nom R2_BUCKET", () => {
+    // Transition : les environnements configurés avant le renommage doivent
+    // continuer de fonctionner sans qu'on ait à les réintervenir.
+    process.env.R2_ACCOUNT_ID = "acct"
+    process.env.R2_ACCESS_KEY_ID = "key"
+    process.env.R2_SECRET_ACCESS_KEY = "secret"
+    process.env.R2_BUCKET = "ancien-nom"
+    process.env.R2_PUBLIC_URL = "https://pub.example.dev"
+    expect(readR2Config()?.bucket).toBe("ancien-nom")
   })
 
   it("compose l'endpoint S3 officiel de R2 a partir de l'account id", () => {
     process.env.R2_ACCOUNT_ID = "fe6f046166fb1f4f7ed1bc7088d89095"
     process.env.R2_ACCESS_KEY_ID = "key"
     process.env.R2_SECRET_ACCESS_KEY = "secret"
-    process.env.R2_BUCKET = "schooly-media"
+    process.env.R2_BUCKET_NAME = "schooly-media"
     process.env.R2_PUBLIC_URL = "https://pub-86f196c5781c428caf42be75e4cce653.r2.dev"
     const config = readR2Config()
     expect(config).not.toBeNull()
@@ -216,7 +240,7 @@ describe("readR2Config", () => {
     process.env.R2_ACCOUNT_ID = "acct"
     process.env.R2_ACCESS_KEY_ID = "key"
     process.env.R2_SECRET_ACCESS_KEY = "secret"
-    process.env.R2_BUCKET = "schooly-media"
+    process.env.R2_BUCKET_NAME = "schooly-media"
     process.env.R2_PUBLIC_URL = "http://localhost:9000"
     process.env.R2_S3_ENDPOINT = "http://127.0.0.1:9000"
     try {
