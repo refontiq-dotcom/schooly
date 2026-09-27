@@ -78,6 +78,21 @@ for (const school of schools) {
     places_disponibles: 0,
   }));
 
+  const coverPhoto = typeof school.cover_photo_url === "string" && school.cover_photo_url.trim()
+    ? school.cover_photo_url.trim()
+    : null;
+  const galleryPhotos = Array.from(new Set(
+    (Array.isArray(school.gallery_photos) ? school.gallery_photos : [])
+      .filter((photo) => typeof photo === "string" && photo.trim())
+      .map((photo) => String(photo).trim())
+      .filter((photo) => photo !== coverPhoto)
+  )).slice(0, coverPhoto ? 3 : 4);
+  const photos360 = Array.from(new Set(
+    (Array.isArray(school.photos_360) ? school.photos_360 : [])
+      .filter((photo) => typeof photo === "string" && photo.trim())
+      .map((photo) => String(photo).trim())
+  )).slice(0, 1);
+
   const schoolPayload = {
     id: school.id,
     schooly_instance_url: instanceUrl,
@@ -87,9 +102,9 @@ for (const school of schools) {
     longitude: school.longitude,
     description_publique: school.description_publique,
     itineraire: school.itineraire,
-    cover_photo: school.cover_photo_url,
-    gallery: Array.isArray(school.gallery_photos) ? school.gallery_photos : [],
-    photos_360: Array.isArray(school.photos_360) ? school.photos_360 : [],
+    cover_photo: coverPhoto,
+    gallery: galleryPhotos,
+    photos_360: photos360,
     video_url: school.video_url,
     grille_tarifaire_publique: school.grille_tarifaire_publique || [],
     contact: {
