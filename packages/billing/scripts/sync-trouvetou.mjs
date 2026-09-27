@@ -79,6 +79,18 @@ for (const school of schools) {
     places_disponibles: 0,
   }));
 
+  // Règles médias Trouvetou, alignées sur la contrainte SQL
+  // schools_trouvetou_gallery_max_4 / schools_trouvetou_photos_360_max_1
+  // (migration 20260927005000) : 4 photos classiques au total, la photo
+  // principale comprise, et une seule source 360°. On normalise d'abord — ce qui
+  // écarte toute URL non http/https — puis on plafonne. L'ordre inverse
+  // laisserait une URL dangereuse occuper l'une des places autorisées.
+  const coverPhoto = normalizeHttpUrl(school.cover_photo_url);
+  const galleryPhotos = normalizeHttpUrlList(school.gallery_photos)
+    .filter((photo) => photo !== coverPhoto)
+    .slice(0, coverPhoto ? 3 : 4);
+  const photos360 = normalizeHttpUrlList(school.photos_360).slice(0, 1);
+
   const schoolPayload = {
     id: school.id,
     schooly_instance_url: instanceUrl,
@@ -88,9 +100,9 @@ for (const school of schools) {
     longitude: school.longitude,
     description_publique: school.description_publique,
     itineraire: school.itineraire,
-    cover_photo: normalizeHttpUrl(school.cover_photo_url),
-    gallery: normalizeHttpUrlList(school.gallery_photos),
-    photos_360: normalizeHttpUrlList(school.photos_360),
+    cover_photo: coverPhoto,
+    gallery: galleryPhotos,
+    photos_360: photos360,
     video_url: normalizeHttpUrl(school.video_url),
     grille_tarifaire_publique: school.grille_tarifaire_publique || [],
     contact: {

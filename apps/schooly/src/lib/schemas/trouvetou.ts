@@ -74,8 +74,20 @@ export const trouvetouAdSchema = z
   .object({
     title: requiredText("Le titre", 160),
     message: requiredText("Le message", 1000),
-    image_url: optionalHttpUrl("L'image de la publicité"),
+    // L'affiche est obligatoire : une publicité sans visuel n'a pas d'intérêt
+    // sur Trouvetou. Règle métier appliquée côté Control Center.
+    image_url: httpUrl("L'affiche de la publicité"),
     target_url: optionalHttpUrl("La destination de la publicité"),
+    contact_phone: optionalText("Le téléphone de contact", 40),
+    cta_label: z.preprocess(
+      (value) =>
+        typeof value === "string" && value.trim() === "" ? undefined : value,
+      z
+        .string()
+        .trim()
+        .max(80, "Le libellé du bouton est trop long (80 caractères max).")
+        .default("En savoir plus"),
+    ),
     start_date: isoDate("La date de début", { allowFuture: true }),
     end_date: isoDate("La date de fin", { allowFuture: true }),
   })

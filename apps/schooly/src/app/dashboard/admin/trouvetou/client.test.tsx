@@ -60,8 +60,14 @@ const AN_AD = {
   message: "Inscriptions ouvertes",
   image_url: null,
   target_url: null,
+  contact_phone: "+2250700000001",
+  cta_label: "En savoir plus",
   start_date: "2026-09-01",
   end_date: "2026-09-30",
+  duration_days: 30,
+  daily_rate: 700,
+  total_amount: 21000,
+  payment_status: "active",
   is_active: true,
   created_at: "2026-08-20T08:00:00.000Z",
 }
@@ -165,11 +171,13 @@ describe("TrouvetouAdminClient", () => {
     act(() => root.unmount())
   })
 
-  it("liste les publicités avec leur état d'activation", () => {
+  it("liste les publicités avec leur tarif et leur état d'activation", () => {
     const { container, root } = renderClient({ ads: [AN_AD] })
     clickByText(container, "Publicités (1)")
     expect(container.textContent).toContain("Rentrée 2026")
     expect(container.textContent).toContain("Inscriptions ouvertes")
+    expect(container.textContent).toContain("30 jour(s)")
+    expect(container.textContent).toContain("FCFA")
     expect(container.textContent).toContain("Active")
     act(() => root.unmount())
   })

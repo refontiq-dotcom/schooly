@@ -51,6 +51,18 @@ export function profileCompletion(state: ProfileCompletionState): ProfileComplet
   }
 }
 
+/**
+ * Traduit le cycle de vie d'une publicité en libellé français. Depuis la
+ * facturation centralisée, `is_active` seul ne suffit plus : une annonce ne
+ * s'affiche que si le paiement a abouti ET que l'établissement l'a activée.
+ */
+export function adLabel(paymentStatus: string, isActive: boolean): string {
+  if (paymentStatus === "active" && isActive) return "Active"
+  if (paymentStatus === "pending_payment") return "Paiement en attente"
+  if (paymentStatus === "expired") return "Expirée"
+  return "Brouillon"
+}
+
 /** Message affichable pour n'importe quelle erreur (jamais `error: any`). */
 export function errorMessage(error: unknown, fallback: string): string {
   if (error instanceof Error && error.message) return error.message

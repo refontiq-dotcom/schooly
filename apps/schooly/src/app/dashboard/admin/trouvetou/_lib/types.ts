@@ -18,6 +18,10 @@ function asNullableString(value: unknown): string | null {
   return typeof value === "string" ? value : null
 }
 
+function asNumberOrNull(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null
+}
+
 function asStringArray(value: unknown): string[] {
   return Array.isArray(value)
     ? value.filter((x): x is string => typeof x === "string")
@@ -65,8 +69,16 @@ export type TrouvetouAd = {
   message: string
   image_url: string | null
   target_url: string | null
+  contact_phone: string | null
+  cta_label: string
   start_date: string
   end_date: string
+  /** Tarifisation calculée côté serveur à la création (cf. ad-pricing). */
+  duration_days: number | null
+  daily_rate: number | null
+  total_amount: number | null
+  /** Cycle de vie : pending_payment | paid | active | expired | … */
+  payment_status: string
   is_active: boolean
   created_at?: string
 }
@@ -128,8 +140,14 @@ export function normalizeAds(raw: unknown): TrouvetouAd[] {
       message: asString(row.message),
       image_url: normalizeHttpUrl(row.image_url),
       target_url: normalizeHttpUrl(row.target_url),
+      contact_phone: asNullableString(row.contact_phone),
+      cta_label: asString(row.cta_label, "En savoir plus"),
       start_date: asString(row.start_date),
       end_date: asString(row.end_date),
+      duration_days: asNumberOrNull(row.duration_days),
+      daily_rate: asNumberOrNull(row.daily_rate),
+      total_amount: asNumberOrNull(row.total_amount),
+      payment_status: asString(row.payment_status, "pending_payment"),
       is_active: Boolean(row.is_active),
       created_at: asNullableString(row.created_at) ?? undefined,
     })

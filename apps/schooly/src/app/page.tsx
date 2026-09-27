@@ -4,6 +4,8 @@ import { useState } from "react"
 import { useActionState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { School, Users } from "lucide-react"
+import Link from "next/link"
+import Image from "next/image"
 import { Badge } from "@/components/ui/badge"
 import {
   schoolLoginAction,
@@ -13,7 +15,7 @@ import {
   parentOtpVerifyAction,
 } from "./login/unified-actions"
 import { SchoolLoginForm, ParentLoginForm } from "./login-form-components"
-import { FadeIn, GeminiBackdrop, GradientText } from "@/components/gemini"
+import { FadeIn, GeminiBackdrop } from "@/components/gemini"
 
 type Tab = "school" | "parent"
 
@@ -56,19 +58,18 @@ export default function Home() {
         <div className="text-center space-y-3">
           <FadeIn>
             <div className="flex justify-center">
-              <div className="w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg bg-gradient-to-br from-primary to-emerald-600 shadow-primary/25">
-                <span className="text-white text-2xl font-bold">S</span>
-              </div>
+              <Image
+                src="/schooly_logo_vector.svg"
+                alt="Schooly"
+                width={260}
+                height={48}
+                className="h-12 w-auto max-w-[260px] object-contain"
+              />
             </div>
-          </FadeIn>
-          <FadeIn delay={0.08}>
-            <h1 className="text-4xl font-bold tracking-tight">
-              <GradientText>Schooly</GradientText>
-            </h1>
           </FadeIn>
           <FadeIn delay={0.16}>
             <p className="text-muted-foreground text-sm">
-              La plateforme de gestion scolaire pour l&apos;Afrique de l&apos;Ouest
+              La plateforme de gestion scolaire pour les réalités de l&apos;Afrique
             </p>
           </FadeIn>
         </div>
@@ -141,10 +142,12 @@ export default function Home() {
         </AnimatePresence>
 
         <FadeIn delay={0.3}>
-          <div className="text-center pt-2">
-            <Badge variant="outline" className="text-xs gemini-glass border-0">
-              © {new Date().getFullYear()} Refontiq
-            </Badge>
+          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 pt-2 text-xs text-muted-foreground">
+            <Link href="/legal">Mentions légales</Link>
+            <Link href="/legal/conditions">Conditions</Link>
+            <Link href="/legal/confidentialite">Confidentialité</Link>
+            <Link href="/legal/tarifs">Tarifs</Link>
+            <span>© {new Date().getFullYear()} Refontiq</span>
           </div>
         </FadeIn>
       </div>

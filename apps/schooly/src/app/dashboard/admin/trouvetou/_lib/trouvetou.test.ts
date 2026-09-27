@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { errorMessage, profileCompletion, reservationLabel } from "./helpers"
+import { adLabel, errorMessage, profileCompletion, reservationLabel } from "./helpers"
 import { normalizeAds, normalizeReservations, normalizeSchool } from "./types"
 
 const FULL_STATE = {
@@ -131,5 +131,21 @@ describe("normalisation trouvetou", () => {
     expect(ads).toHaveLength(1)
     expect(ads[0].title).toBe("Titre")
     expect(normalizeAds("nawak")).toEqual([])
+  })
+})
+
+describe("adLabel", () => {
+  it("n'affiche Active que si le paiement a abouti et l' annonce est active", () => {
+    expect(adLabel("active", true)).toBe("Active")
+    expect(adLabel("active", false)).toBe("Brouillon")
+  })
+
+  it("distingue les états de facturation en attente et expirés", () => {
+    expect(adLabel("pending_payment", false)).toBe("Paiement en attente")
+    expect(adLabel("expired", false)).toBe("Expirée")
+  })
+
+  it("retombe sur Brouillon pour un statut inconnu", () => {
+    expect(adLabel("inconnu", false)).toBe("Brouillon")
   })
 })
