@@ -136,14 +136,28 @@ export function TrouvetouAdminClient({
     }
   }, [description, latitude, longitude, itineraire, videoUrl, coverPhoto, gallery, photos360, address, phone, email, website, highlights, admissionNotes, router])
 
+  // Upload en deux temps. La route n'autorise que : elle vérifie le quota, le type
+  // et la taille côté serveur, puis renvoie une URL signée. Le navigateur envoie
+  // ensuite le fichier directement sur R2 — il ne transite jamais par la fonction
+  // Next.js, ce qui permet de dépasser le plafond de 4,5 Mo de Vercel Hobby.
   const uploadMedia = useCallback(async (file: File, kind: "cover" | "gallery" | "360" | "ad") => {
-    const form = new FormData()
-    form.append("file", file)
-    form.append("kind", kind)
-    const res = await fetch("/api/v1/admin/trouvetou/media", { method: "POST", body: form })
+    const res = await fetch("/api/v1/admin/trouvetou/media", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kind, contentType: file.type, size: file.size }),
+    })
     const data = await res.json()
     if (!res.ok) throw new Error(data.error || "Upload impossible")
-    return data.url as string
+
+    // Le Content-Type entre dans la signature : il doit être renvoyé à l'identique.
+    const put = await fetch(data.uploadUrl, {
+      method: "PUT",
+      headers: data.headers,
+      body: file,
+    })
+    if (!put.ok) throw new Error("Envoi vers le stockage impossible.")
+
+    return data.publicUrl as string
   }, [])
 
   const handleMediaUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>, kind: "cover" | "gallery" | "360") => {
@@ -454,7 +468,7 @@ export function TrouvetouAdminClient({
 
       <Dialog open={modal === "media"} onOpenChange={(open) => setModal(open ? "media" : null)} label="Gérer les photos">
         <DialogContent className="max-w-2xl">
-          <DialogHeader><DialogTitle>Médias de l&apos;établissement</DialogTitle><DialogDescription>Ajoute directement les photos depuis ton téléphone ou ton ordinateur. Les images sont stockées dans Supabase Storage.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>Médias de l&apos;établissement</DialogTitle><DialogDescription>Ajoute directement les photos depuis ton téléphone ou ton ordinateur. Les images sont stockées dans Cloudflare R2.</DialogDescription></DialogHeader>
           <div className="space-y-6 py-4">
             <MediaSection title="Photo principale" description="La photo de couverture de l'établissement." files={coverPhoto ? [coverPhoto] : []} multiple={false} onUpload={e=>handleMediaUpload(e,"cover")} onRemove={()=>setCoverPhoto("")} />
             <MediaSection title="Galerie photos" description={`4 photos classiques maximum, photo principale comprise. ${gallery.length + (coverPhoto ? 1 : 0)}/4`} files={gallery} multiple={gallery.length + (coverPhoto ? 1 : 0) < 4} onUpload={e=>handleMediaUpload(e,"gallery")} onRemove={i=>{ if(i!==undefined) removeItem(setGallery,i) }} />
