@@ -25,7 +25,15 @@ export async function POST(request: Request) {
     if (!role) return NextResponse.json({ error: "Non autorise" }, { status: 403 })
 
     const body = await request.json()
-    const cleanArray = (value: unknown) => Array.isArray(value) ? value.filter((item) => typeof item === "string" && item.trim()) : []
+    const cleanArray = (value: unknown) => Array.isArray(value)
+      ? Array.from(new Set(value.filter((item) => typeof item === "string" && item.trim()).map((item) => String(item).trim())))
+      : []
+
+    const coverPhoto = String(body.cover_photo_url || "").trim()
+    const galleryPhotos = cleanArray(body.gallery_photos)
+      .filter((photo) => photo !== coverPhoto)
+      .slice(0, coverPhoto ? 3 : 4)
+    const photos360 = cleanArray(body.photos_360).slice(0, 1)
 
     const { error } = await admin
       .from("schools")
@@ -35,9 +43,9 @@ export async function POST(request: Request) {
         longitude: Number.isFinite(Number(body.longitude)) ? Number(body.longitude) : null,
         itineraire: String(body.itineraire || "").trim() || null,
         video_url: String(body.video_url || "").trim() || null,
-        photos_360: cleanArray(body.photos_360),
-        cover_photo_url: String(body.cover_photo_url || "").trim() || null,
-        gallery_photos: cleanArray(body.gallery_photos),
+        photos_360: photos360,
+        cover_photo_url: coverPhoto || null,
+        gallery_photos: galleryPhotos,
         public_address: String(body.public_address || "").trim() || null,
         public_phone: String(body.public_phone || "").trim() || null,
         public_email: String(body.public_email || "").trim() || null,
