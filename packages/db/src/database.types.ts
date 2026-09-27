@@ -3523,6 +3523,85 @@ export type Database = {
           },
         ]
       }
+      school_media: {
+        Row: {
+          byte_size: number | null
+          content_type: string
+          created_at: string
+          height: number | null
+          id: string
+          kind: string
+          public_url: string
+          published_at: string | null
+          r2_key: string
+          rejection_code: string | null
+          rejection_details: string | null
+          room_id: string | null
+          school_id: string
+          status: string
+          updated_at: string
+          validated_at: string | null
+          validation: Json | null
+          width: number | null
+        }
+        Insert: {
+          byte_size?: number | null
+          content_type: string
+          created_at?: string
+          height?: number | null
+          id?: string
+          kind?: string
+          public_url: string
+          published_at?: string | null
+          r2_key: string
+          rejection_code?: string | null
+          rejection_details?: string | null
+          room_id?: string | null
+          school_id: string
+          status?: string
+          updated_at?: string
+          validated_at?: string | null
+          validation?: Json | null
+          width?: number | null
+        }
+        Update: {
+          byte_size?: number | null
+          content_type?: string
+          created_at?: string
+          height?: number | null
+          id?: string
+          kind?: string
+          public_url?: string
+          published_at?: string | null
+          r2_key?: string
+          rejection_code?: string | null
+          rejection_details?: string | null
+          room_id?: string | null
+          school_id?: string
+          status?: string
+          updated_at?: string
+          validated_at?: string | null
+          validation?: Json | null
+          width?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "school_media_room_school_fkey"
+            columns: ["room_id", "school_id"]
+            isOneToOne: false
+            referencedRelation: "dorm_rooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "school_media_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+
       school_supplies: {
         Row: {
           academic_year_id: string | null

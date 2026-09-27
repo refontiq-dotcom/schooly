@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@/utils/supabase/server"
-import { createClient as createAdminClient } from "@supabase/supabase-js"
-import { TROUVETOU_ADMIN_ROLES } from "@/utils/supabase/roles"
 import { logServerEvent } from "@/lib/server-logger"
+import {
+  createAdmin,
+  requireTrouvetouAdmin,
+  type AdminClient,
+} from "@/lib/trouvetou/admin-auth"
 import {
   MEDIA_KINDS,
   MEDIA_MAX_BYTES,
@@ -18,56 +20,6 @@ import {
 
 const QUOTA_CLASSIC_PHOTOS = 4
 const QUOTA_360 = 1
-
-/**
- * Fabrique du client Supabase service (contourne le RLS).
- *
- * Le type du client est déduit de CET appel et non de `createAdminClient` :
- * `ReturnType<typeof createClient>` retomberait sur les paramètres génériques
- * par défaut de la bibliothèque et ferait perdre tout typage de colonne.
- */
-function createAdmin() {
-  return createAdminClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SECRET_KEY!
-  )
-}
-
-type AdminClient = ReturnType<typeof createAdmin>
-
-type AuthorizedContext = {
-  admin: AdminClient
-  schoolId: string
-}
-
-/**
- * Résout l'établissement de l'appelant à partir de son rôle en base.
- *
- * L'identifiant d'établissement ne vient JAMAIS du navigateur. C'est la seule
- * façon d'interdire d'écrire — ou de supprimer — dans le namespace d'un autre
- * établissement, y compris en forgeant un `schoolId` dans le corps de la requête
- * ou une clé R2 « bien formée » pointant ailleurs.
- *
- * Renvoie une `NextResponse` d'erreur si l'appelant n'est pas autorisé : les
- * appelers testent avec `instanceof NextResponse` et la renvoient telle quelle.
- */
-async function requireTrouvetouAdmin(): Promise<AuthorizedContext | NextResponse> {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: "Non authentifie" }, { status: 401 })
-
-  const admin = createAdmin()
-  const { data: role } = await admin
-    .from("user_school_roles")
-    .select("school_id, role_code")
-    .eq("user_id", user.id)
-    .eq("is_active", true)
-    .in("role_code", [...TROUVETOU_ADMIN_ROLES])
-    .maybeSingle()
-
-  if (!role) return NextResponse.json({ error: "Non autorise" }, { status: 403 })
-  return { admin, schoolId: role.school_id }
-}
 
 /**
  * POST /api/v1/admin/trouvetou/media

@@ -7,6 +7,7 @@ import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createClient } from "@supabase/supabase-js";
 import { normalizeHttpUrl, normalizeHttpUrlList } from "./safe-url.mjs";
+import { buildPanoramaPayload } from "./trouvetou-panorama.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(here, "..", "..", "..");
@@ -89,7 +90,29 @@ for (const school of schools) {
   const galleryPhotos = normalizeHttpUrlList(school.gallery_photos)
     .filter((photo) => photo !== coverPhoto)
     .slice(0, coverPhoto ? 3 : 4);
-  const photos360 = normalizeHttpUrlList(school.photos_360).slice(0, 1);
+
+  // Photos 360° : le nouveau champ `panoramas` porte le contrat typé, et
+  // `photos_360` reste envoyé pour les lecteurs actuels. Sans visite publiée,
+  // le script retombe sur l'historique `schools.photos_360` — une école
+  // migrée ne perd donc jamais ses panoramas.
+  // Pas de filtre `deleted_at` ici : la suppression d'un média efface la ligne
+  // (la table n'a pas de suppression logique), donc l'absence de ligne EST
+  // l'absence de média.
+  const { data: panoramas, error: panoErr } = await schooly
+    .from("school_media")
+    .select("id, school_id, kind, status, public_url, width, height, byte_size, content_type, room_id, validated_at")
+    .eq("school_id", school.id)
+    .eq("kind", "panorama_360");
+
+  if (panoErr) {
+    console.error(`[trouvetou:sync] Echec lecture panoramas pour ${school.name}: ${panoErr.message}`);
+    continue;
+  }
+
+  const { panoramas: panoramaContracts, photos_360: photos360 } = buildPanoramaPayload({
+    media: panoramas || [],
+    legacyPhotos360: school.photos_360,
+  });
 
   const schoolPayload = {
     id: school.id,
@@ -103,6 +126,7 @@ for (const school of schools) {
     cover_photo: coverPhoto,
     gallery: galleryPhotos,
     photos_360: photos360,
+    panoramas: panoramaContracts,
     video_url: normalizeHttpUrl(school.video_url),
     grille_tarifaire_publique: school.grille_tarifaire_publique || [],
     contact: {

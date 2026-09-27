@@ -11,7 +11,7 @@
  * aller-retour par le serveur rendrait cette limite infranchissable.
  */
 
-import { DeleteObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3"
+import { DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3"
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner"
 
 /** Durée de validité d'une URL signée : le temps d'un upload, pas davantage. */
@@ -106,7 +106,24 @@ export function buildMediaKey(
   contentType: string,
   environment: string = mediaEnvironment(),
 ): string {
-  const mediaId = crypto.randomUUID()
+  return buildMediaKeyFor(schoolId, crypto.randomUUID(), kind, contentType, environment)
+}
+
+/**
+ * Même clé, mais avec un identifiant imposé par l'appelant.
+ *
+ * Le flux 360° s'en sert : le même UUID devient l'identifiant de la ligne
+ * `school_media` ET le suffixe de la clé R2. Clé et base restent donc
+ * déductibles l'une de l'autre, sans colonne redondante, et la suppression
+ * retrouve l'objet même si l'URL publique change de domaine.
+ */
+export function buildMediaKeyFor(
+  schoolId: string,
+  mediaId: string,
+  kind: MediaKind,
+  contentType: string,
+  environment: string = mediaEnvironment(),
+): string {
   return [KEY_ROOT, environment, KEY_GROUP_BY_KIND[kind], schoolId, `${mediaId}.${extensionFor(contentType)}`].join("/")
 }
 
@@ -236,9 +253,17 @@ export async function presignMediaUpload(options: {
   kind: MediaKind
   contentType: string
   config: R2Config
+  /**
+   * Identifiant imposé. Le flux 360° le renseigne pour que le suffixe de clé et
+   * l'identifiant de ligne soient le même UUID : la suppression retrouve alors
+   * l'objet sans colonne supplémentaire.
+   */
+  mediaId?: string
 }): Promise<PresignedUpload> {
-  const { schoolId, kind, contentType, config } = options
-  const key = buildMediaKey(schoolId, kind, contentType)
+  const { schoolId, kind, contentType, config, mediaId } = options
+  const key = mediaId
+    ? buildMediaKeyFor(schoolId, mediaId, kind, contentType)
+    : buildMediaKey(schoolId, kind, contentType)
   const command = new PutObjectCommand({
     Bucket: config.bucket,
     Key: key,
@@ -293,6 +318,27 @@ export async function headMediaObject(options: { key: string; config: R2Config }
 /** L'objet existe-t-il réellement dans le bucket ? */
 export async function mediaObjectExists(options: { key: string; config: R2Config }): Promise<boolean> {
   return (await headMediaObject(options)).exists
+}
+
+/**
+ * Relit un objet et renvoie ses octets.
+ *
+ * Indispensable pour valider une photo 360° : le navigateur dépose le fichier
+ * en direct dans R2, donc le serveur ne l'a jamais vu passer. Sans cette
+ * relecture, la validation ne porterait que sur ce que le client AFFIRME — type
+ * MIME, taille — et une photo 4:3 se ferait passer pour un panorama.
+ */
+export async function readMediaObject(options: { key: string; config: R2Config }): Promise<Buffer | null> {
+  try {
+    const response = await getClient(options.config).send(
+      new GetObjectCommand({ Bucket: options.config.bucket, Key: options.key }),
+    )
+    if (!response.Body) return null
+    const bytes = await response.Body.transformToByteArray()
+    return Buffer.from(bytes)
+  } catch {
+    return null
+  }
 }
 
 /**

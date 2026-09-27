@@ -383,3 +383,69 @@ trouvetou :
 La clé locale doit être présente dans `.env.local`, qui ne doit pas être
 commitée. Le dépôt Trouvetou fourni précédemment était inaccessible ; vérifier
 son URL et son contrat avant de modifier l'API partenaire.
+
+
+## 12. Photos 360° — contrat d'ingestion (P2, phase 7)
+
+### 12.1 Ce qui change pour Trouvetou
+
+Le payload d'ingestion **gagne un champ** `panoramas`. Rien n'est retiré ni
+renommé : `cover_photo`, `gallery`, `photos_360` et `video_url` continuent
+d'arriver exactement comme avant. Trouvetou peut donc continuer à lire
+`photos_360` seul, et adopter `panoramas` quand sa visionneuse sera prête.
+
+```jsonc
+{
+  "school": {
+    "photos_360": ["https://…/m1.jpg"],   // inchangé : tableau d'URL
+    "panoramas": [                          // nouveau : contrat riche
+      {
+        "id": "11111111-1111-1111-1111-111111111111",
+        "media_type": "photo_360",
+        "url": "https://pub…r2.dev/schooly/production/360/s1/1111….jpg",
+        "width": 6000,
+        "height": 3000,
+        "byte_size": 4200000,
+        "content_type": "image/jpeg",
+        "room_id": null,
+        "projection": "equirectangular_2_1",
+        "validated_at": "2026-09-28T10:00:00.000Z"
+      }
+    ]
+  }
+}
+```
+
+### 12.2 Garanties d'émetteur
+
+- Seuls les médias au statut **`published`** sont émis. Une visite en cours de
+  validation ne peut pas devenir une annonce publique, même par accident de
+  script.
+- `url` est filtrée : seules les URL `http(s)` absolues sont transmises. Un
+  `javascript:` stocké en base ne peut pas être poussé vers le site public.
+- Les dimensions absentes sont envoyées `null`, jamais `undefined` (qui
+  disparaîtrait du JSON sans bruit).
+
+### 12.3 Règle de repli
+
+`photos_360` est renseigné depuis la visite publiée si elle existe, **sinon**
+depuis l'historique `schools.photos_360`. Une école qui n'a pas encore migré ne
+perd donc jamais son panorama lors d'une synchronisation.
+
+### 12.4 Rattachement à une chambre
+
+`room_id` est non nul uniquement pour une visite de chambre. L'identifiant est
+celui de `dorm_rooms` côté Schooly ; **il n'est pas encore garanti
+interchangeable** avec l'identifiant de chambre de Trouvetou. Tant que
+l'alignement des deux référentiels n'est pas tranché, Trouvetou doit traiter
+`room_id` comme opaque et ne pas s'en servir pour lier à son propre modèle.
+
+### 12.5 Avant de brancher l'affichage
+
+- Trouvetou n'a encore aucun commit de sa part : le dépôt n'a pas été modifié.
+- La projection `equirectangular_2_1` annonce un rapport 2:1, mais **garantir
+  la projection correcte relève du stitcher**, qui n'existe pas encore. Un
+  logo 2:1 collé sur une image plate passera la validation.
+- Le flux d'upload, lui, n'expose rien tant que l'interface Schooly n'appelle
+  pas `POST /api/v1/admin/trouvetou/media/panorama` (phase 8).
+
