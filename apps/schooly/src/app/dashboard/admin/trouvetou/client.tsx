@@ -49,8 +49,10 @@ export function TrouvetouAdminClient({
   const [itineraire, setItineraire] = useState(school?.itineraire || "")
   const [videoUrl, setVideoUrl] = useState(school?.video_url || "")
   const [coverPhoto, setCoverPhoto] = useState(school?.cover_photo_url || "")
-  const [gallery, setGallery] = useState<string[]>(asStrings(school?.gallery_photos))
-  const [photos360, setPhotos360] = useState<string[]>(asStrings(school?.photos_360))
+  const [gallery, setGallery] = useState<string[]>(
+    asStrings(school?.gallery_photos).slice(0, school?.cover_photo_url ? 3 : 4)
+  )
+  const [photos360, setPhotos360] = useState<string[]>(asStrings(school?.photos_360).slice(0, 1))
   const [address, setAddress] = useState(school?.public_address || "")
   const [phone, setPhone] = useState(school?.public_phone || "")
   const [email, setEmail] = useState(school?.public_email || "")
@@ -149,10 +151,15 @@ export function TrouvetouAdminClient({
     try {
       if (kind === "cover") {
         setCoverPhoto(await uploadMedia(files[0], "cover"))
+      } else if (kind === "gallery") {
+        const remaining = Math.max(0, 4 - (coverPhoto.trim() ? 1 : 0) - gallery.length)
+        if (remaining <= 0) throw new Error("Maximum 4 photos classiques, photo principale comprise.")
+        const urls = await Promise.all(files.slice(0, remaining).map(file => uploadMedia(file, kind)))
+        setGallery(prev => [...prev, ...urls].slice(0, coverPhoto.trim() ? 3 : 4))
       } else {
-        const urls = await Promise.all(files.slice(0, 10).map(file => uploadMedia(file, kind)))
-        if (kind === "gallery") setGallery(prev => [...prev, ...urls])
-        else setPhotos360(prev => [...prev, ...urls])
+        if (photos360.length >= 1) throw new Error("Une seule visite 360° est autorisée par établissement.")
+        const urls = await Promise.all(files.slice(0, 1).map(file => uploadMedia(file, kind)))
+        setPhotos360(urls.slice(0, 1))
       }
       toast.success("Image ajoutée")
     } catch (error: any) {
@@ -440,8 +447,8 @@ export function TrouvetouAdminClient({
           <DialogHeader><DialogTitle>Médias de l'établissement</DialogTitle><DialogDescription>Ajoute directement les photos depuis ton téléphone ou ton ordinateur. Les images sont stockées dans Supabase Storage.</DialogDescription></DialogHeader>
           <div className="space-y-6 py-4">
             <MediaSection title="Photo principale" description="La photo de couverture de l'établissement." files={coverPhoto ? [coverPhoto] : []} multiple={false} onUpload={e=>handleMediaUpload(e,"cover")} onRemove={()=>setCoverPhoto("")} />
-            <MediaSection title="Galerie photos" description="Photos des salles, cour, activités, équipements..." files={gallery} multiple onUpload={e=>handleMediaUpload(e,"gallery")} onRemove={i=>{ if(i!==undefined) removeItem(setGallery,i) }} />
-            <MediaSection title="Photos 360°" description="Pour une visite immersive quand les fichiers 360° sont disponibles." files={photos360} multiple onUpload={e=>handleMediaUpload(e,"360")} onRemove={i=>{ if(i!==undefined) removeItem(setPhotos360,i) }} />
+            <MediaSection title="Galerie photos" description={`4 photos classiques maximum, photo principale comprise. ${gallery.length + (coverPhoto ? 1 : 0)}/4`} files={gallery} multiple={gallery.length + (coverPhoto ? 1 : 0) < 4} onUpload={e=>handleMediaUpload(e,"gallery")} onRemove={i=>{ if(i!==undefined) removeItem(setGallery,i) }} />
+            <MediaSection title="Visite 360°" description="Une seule visite 360° de l'établissement : entrée et cour, sans entrer dans les salles de classe." files={photos360} multiple={false} onUpload={e=>handleMediaUpload(e,"360")} onRemove={i=>{ if(i!==undefined) removeItem(setPhotos360,i) }} />
           </div>
           <DialogFooter><Button onClick={saveProfile} disabled={loading}>{loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Enregistrer les médias</Button></DialogFooter>
           <DialogClose onClick={()=>setModal(null)} />
