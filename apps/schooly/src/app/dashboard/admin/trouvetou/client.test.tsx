@@ -20,7 +20,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }))
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
 
 import { TrouvetouAdminClient } from "./client"
-import type { TrouvetouAd, TrouvetouReservation } from "./_lib/types"
+import type { SchoolPanorama, TrouvetouAd, TrouvetouReservation } from "./_lib/types"
 
 const SCHOOL = {
   id: "s1",
@@ -76,6 +76,7 @@ type RenderOverrides = {
   school?: typeof SCHOOL | null
   reservations?: unknown[]
   ads?: unknown[]
+  panorama?: SchoolPanorama | null
 }
 
 function renderClient(overrides: RenderOverrides = {}) {
@@ -88,6 +89,7 @@ function renderClient(overrides: RenderOverrides = {}) {
         school={overrides.school === undefined ? SCHOOL : overrides.school}
         reservations={(overrides.reservations ?? []) as TrouvetouReservation[]}
         ads={(overrides.ads ?? []) as TrouvetouAd[]}
+        panorama={overrides.panorama ?? null}
       />,
     )
   })
@@ -181,4 +183,103 @@ describe("TrouvetouAdminClient", () => {
     expect(container.textContent).toContain("Active")
     act(() => root.unmount())
   })
+
+// ---------------------------------------------------------------------------
+// Éligibilité à la publication, côté interface.
+//
+// Ces tests prouvent que le garde-fou du DASHBOARD suit la même règle que la
+// route. Sans eux, corriger la route n'aurait rien changé pour l'utilisateur :
+// le bouton resterait désactivé et la requête ne partirait jamais.
+// ---------------------------------------------------------------------------
+
+const panorama = (status: SchoolPanorama["status"]): SchoolPanorama => ({
+  id: "med-1",
+  status,
+  public_url: "https://cdn.example.com/pano.jpg",
+  width: 6000,
+  height: 3000,
+  byte_size: 6 * 1024 * 1024,
+  rejection_code: status === "rejected" ? "torn_seam" : null,
+  rejection_details: null,
+  published_at: status === "published" ? "2026-09-20T10:00:00.000Z" : null,
+})
+
+/** Établissement sans aucune photo classique. */
+const SANS_PHOTO = {
+  ...SCHOOL,
+  cover_photo_url: "",
+  gallery_photos: [],
+  photos_360: [],
+}
+
+function banniereEligibilite(container: HTMLElement) {
+  return container.textContent?.includes("Publication impossible pour le moment") ?? false
+}
+
+/**
+ * Le bouton qui applique vraiment la règle vit dans le modal « Publication »,
+ * monté par Radix dans un portail : il n'est ni dans `container` ni rendu tant
+ * que le modal est fermé. On l'atteint donc en ouvrant le modal depuis
+ * l'en-tête, puis en interrogeant `document.body`.
+ */
+function ouvrirModalPublication(container: HTMLElement) {
+  const entete = Array.from(container.querySelectorAll("button")).find((b) =>
+    b.textContent?.includes("Publier sur Trouvetou"),
+  ) as HTMLButtonElement
+  act(() => entete.click())
+}
+
+function boutonConfirmerPublication(): HTMLButtonElement {
+  const found = Array.from(document.body.querySelectorAll("button")).filter((b) =>
+    b.textContent?.includes("Publier sur Trouvetou"),
+  )
+  return found[found.length - 1]
+}
+
+describe("éligibilité à la publication — photos classiques", () => {
+  it("bloque la publication sans photo ni panorama", () => {
+    const { container, root } = renderClient({ school: SANS_PHOTO })
+    expect(banniereEligibilite(container)).toBe(true)
+    expect(container.textContent).toContain("La fiche ne peut pas être publiée sans photo")
+
+    ouvrirModalPublication(container)
+    expect(boutonConfirmerPublication().disabled).toBe(true)
+    act(() => root.unmount())
+  })
+
+  it("autorise la publication dès qu'une photo classique existe", () => {
+    const { container, root } = renderClient({ school: { ...SANS_PHOTO, cover_photo_url: "https://cdn/x.jpg" } })
+    expect(banniereEligibilite(container)).toBe(false)
+
+    ouvrirModalPublication(container)
+    expect(boutonConfirmerPublication().disabled).toBe(false)
+    act(() => root.unmount())
+  })
+})
+
+describe("éligibilité à la publication — panorama 360°", () => {
+  it("un panorama `published` débloque la publication sans aucune photo", () => {
+    const { container, root } = renderClient({ school: SANS_PHOTO, panorama: panorama("published") })
+    expect(banniereEligibilite(container)).toBe(false)
+    // Le message de l'état vide ne doit plus promettre le blocage.
+    expect(container.textContent).toContain("peut déjà être publiée avec ta photo 360°")
+
+    ouvrirModalPublication(container)
+    expect(boutonConfirmerPublication().disabled).toBe(false)
+    act(() => root.unmount())
+  })
+
+  it.each(["uploaded", "validated", "rejected"] as const)(
+    "un panorama `%s` ne débloque PAS la publication",
+    (status) => {
+      const { container, root } = renderClient({ school: SANS_PHOTO, panorama: panorama(status) })
+      expect(banniereEligibilite(container)).toBe(true)
+
+      ouvrirModalPublication(container)
+      expect(boutonConfirmerPublication().disabled).toBe(true)
+      act(() => root.unmount())
+    },
+  )
+})
+
 })

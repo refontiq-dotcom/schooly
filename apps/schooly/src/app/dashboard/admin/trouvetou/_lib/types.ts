@@ -154,3 +154,57 @@ export function normalizeAds(raw: unknown): TrouvetouAd[] {
   }
   return result
 }
+
+/**
+ * Visite 360° déjà déposée pour l'établissement.
+ *
+ * Elle est lue en base par la page serveur et affichée telle quelle : le client
+ * ne devine jamais un statut. `rejected` est un état terminal côté serveur
+ * (`canTransition` ne laisse aucune sortie), l'interface doit donc le dire
+ * comme tel plutôt que d'inviter un nouvel essai sur le même fichier.
+ */
+export type SchoolPanoramaStatus = "uploaded" | "validated" | "rejected" | "published"
+
+export type SchoolPanorama = {
+  id: string
+  status: SchoolPanoramaStatus
+  public_url: string
+  width: number | null
+  height: number | null
+  byte_size: number | null
+  rejection_code: string | null
+  rejection_details: string | null
+  published_at: string | null
+}
+
+const PANORAMA_STATUSES: readonly SchoolPanoramaStatus[] = ["uploaded", "validated", "rejected", "published"]
+
+/**
+ * Normalise une ligne `school_media.kind = 'panorama_360'`.
+ *
+ * La ligne la plus récente est retenue par la requête appelante ; ici on se
+ * contente d'écarter ce qui ne ressemble pas à un panorama exploitable, pour
+ * qu'un statut inconnu n'aboutisse jamais à un écran d'état incohérent.
+ */
+export function normalizePanorama(row: unknown): SchoolPanorama | null {
+  if (!isRecord(row)) return null
+
+  const id = asString(row.id)
+  const publicUrl = asString(row.public_url)
+  const rawStatus = asString(row.status)
+  if (!id || !publicUrl) return null
+  if (!PANORAMA_STATUSES.includes(rawStatus as SchoolPanoramaStatus)) return null
+
+  return {
+    id,
+    status: rawStatus as SchoolPanoramaStatus,
+    public_url: publicUrl,
+    width: asNumberOrNull(row.width),
+    height: asNumberOrNull(row.height),
+    byte_size: asNumberOrNull(row.byte_size),
+    rejection_code: asNullableString(row.rejection_code),
+    rejection_details: asNullableString(row.rejection_details),
+    published_at: asNullableString(row.published_at),
+  }
+}
+

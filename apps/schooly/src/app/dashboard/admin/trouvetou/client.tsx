@@ -18,13 +18,16 @@ import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { adLabel, errorMessage, profileCompletion, reservationLabel } from "./_lib/helpers"
-import type { TrouvetouAd, TrouvetouReservation, TrouvetouSchool } from "./_lib/types"
+import { Panorama360Section } from "./panorama-360-section"
+import type { SchoolPanorama, TrouvetouAd, TrouvetouReservation, TrouvetouSchool } from "./_lib/types"
 import { getInclusiveDays, getTrouvetouAdDailyRate } from "@/lib/trouvetou/ad-pricing"
 
 interface TrouvetouAdminClientProps {
   school: TrouvetouSchool | null
   reservations: TrouvetouReservation[]
   ads: TrouvetouAd[]
+  /** Visite 360° existante, lue en base par la page serveur. */
+  panorama: SchoolPanorama | null
 }
 
 type Modal = "profile" | "media" | "publication" | "reservation" | "ad" | null
@@ -33,6 +36,7 @@ export function TrouvetouAdminClient({
   school,
   reservations: initialReservations,
   ads: initialAds,
+  panorama,
 }: TrouvetouAdminClientProps) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
@@ -92,6 +96,13 @@ export function TrouvetouAdminClient({
     })
   }, [coverPhoto, description, address, latitude, longitude, phone, email, gallery, videoUrl, highlights, admissionNotes])
 
+  // Un établissement est publiable s'il possède au moins un média publiable :
+  // une photo classique, OU une visite 360° réellement publiée (`school_media`
+  // filtré sur `kind = panorama_360` ET `status = published`, valeur que la page
+  // serveur lit en base). Un panorama seulement `validated`, `uploaded` ou
+  // `rejected` ne débloque rien — la prop `panorama` porte le statut réel.
+  const hasPublishedPanorama = panorama?.status === "published"
+
   const hasPublicationPhoto = useMemo(
     () => Boolean(
       coverPhoto.trim() ||
@@ -100,6 +111,8 @@ export function TrouvetouAdminClient({
     ),
     [coverPhoto, gallery, photos360]
   )
+
+  const canPublish = hasPublicationPhoto || hasPublishedPanorama
 
   const saveProfile = useCallback(async () => {
     setLoading(true)
@@ -187,9 +200,9 @@ export function TrouvetouAdminClient({
   }, [uploadMedia, coverPhoto, gallery, photos360])
 
   const togglePublish = useCallback(async () => {
-    if (!published && !hasPublicationPhoto) {
+    if (!published && !canPublish) {
       setModal("publication")
-      toast.error("Ajoute au moins une photo avant de publier la fiche.")
+      toast.error("Ajoute au moins une photo, ou publie une photo 360°, avant de publier la fiche.")
       return
     }
     setLoading(true)
@@ -211,7 +224,7 @@ export function TrouvetouAdminClient({
     } finally {
       setLoading(false)
     }
-  }, [published, hasPublicationPhoto, router])
+  }, [published, canPublish, router])
 
   const createAd = useCallback(async () => {
     if (!adTitle.trim() || !adMessage.trim() || !adImageUrl.trim() || !adStartDate || !adEndDate) {
@@ -333,7 +346,7 @@ export function TrouvetouAdminClient({
         <KpiCard icon={<Megaphone className="h-5 w-5" />} label="Publicités actives" value={String(ads.filter((ad) => ad.payment_status === "active" && ad.is_active).length)} hint="Campagnes temporaires" />
       </div>
 
-      {!hasPublicationPhoto && (
+      {!canPublish && (
         <Card className="border-amber-300/70 bg-amber-50/60 dark:bg-amber-950/20">
           <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex gap-3">
@@ -341,12 +354,13 @@ export function TrouvetouAdminClient({
               <div>
                 <p className="font-medium">Publication impossible pour le moment</p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Ajoute au moins 1 photo de l&apos;établissement ou renseigne le lien d&apos;une photo pour pouvoir publier la fiche sur Trouvetou.
+                  Ajoute au moins une photo de l&apos;établissement, ou importe puis publie une photo 360°, pour pouvoir
+                  publier la fiche sur Trouvetou.
                 </p>
               </div>
             </div>
             <Button variant="outline" onClick={() => setModal("media")} className="shrink-0">
-              <Camera className="mr-2 h-4 w-4" /> Ajouter une photo
+              <Camera className="mr-2 h-4 w-4" /> Ajouter un média
             </Button>
           </CardContent>
         </Card>
@@ -373,7 +387,11 @@ export function TrouvetouAdminClient({
                 >
                   <Camera className="mb-3 h-10 w-10" />
                   <p className="font-medium">Ajouter une photo</p>
-                  <p className="mt-1 text-xs">La fiche ne peut pas être publiée sans photo.</p>
+                  <p className="mt-1 text-xs">
+                    {canPublish
+                      ? "La fiche peut déjà être publiée avec ta photo 360°."
+                      : "La fiche ne peut pas être publiée sans photo."}
+                  </p>
                 </button>
               )}
             </div>
@@ -497,7 +515,11 @@ export function TrouvetouAdminClient({
           <div className="space-y-6 py-4">
             <MediaSection title="Photo principale" description="La photo de couverture de l'établissement." files={coverPhoto ? [coverPhoto] : []} multiple={false} onUpload={e=>handleMediaUpload(e,"cover")} onRemove={()=>{ if (coverPhoto) removeMedia(coverPhoto, () => setCoverPhoto("")) }} />
             <MediaSection title="Galerie photos" description={`4 photos classiques maximum, photo principale comprise. ${gallery.length + (coverPhoto ? 1 : 0)}/4`} files={gallery} multiple={gallery.length + (coverPhoto ? 1 : 0) < 4} onUpload={e=>handleMediaUpload(e,"gallery")} onRemove={i=>{ const url = i !== undefined ? gallery[i] : undefined; if (url) removeMedia(url, () => removeItem(setGallery, i as number)) }} />
-            <MediaSection title="Visite 360°" description="Une seule visite 360° de l'établissement : entrée et cour, sans entrer dans les salles de classe." files={photos360} multiple={false} onUpload={e=>handleMediaUpload(e,"360")} onRemove={i=>{ const url = i !== undefined ? photos360[i] : undefined; if (url) removeMedia(url, () => removeItem(setPhotos360, i as number)) }} />
+            {/* La visite 360° passe désormais par le flux validé (POST/PUT/PATCH
+                /media/panorama). L'ancien `MediaSection kind="360"` écrivait une
+                simple URL dans `schools.photos_360` sans jamais contrôler les
+                pixels : il ne pouvait pas coexister avec ce parcours. */}
+            <Panorama360Section panorama={panorama} onPublished={() => router.refresh()} />
           </div>
           <DialogFooter><Button onClick={saveProfile} disabled={loading}>{loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Enregistrer les médias</Button></DialogFooter>
           <DialogClose onClick={()=>setModal(null)} />
@@ -509,8 +531,8 @@ export function TrouvetouAdminClient({
           <DialogHeader><DialogTitle>{published ? "Publication Trouvetou" : "Préparer la publication"}</DialogTitle><DialogDescription>{published ? "Ton établissement est actuellement visible." : "Schooly vérifie les informations renseignées avant publication."}</DialogDescription></DialogHeader>
           <div className="space-y-3 py-4">
             <div className="rounded-xl bg-muted/60 p-4"><p className="font-medium">Qualité du profil : {completion.percent}%</p><p className="mt-1 text-sm text-muted-foreground">{completion.done}/{completion.total} éléments recommandés.</p></div>
-            {!published && !hasPublicationPhoto && <p className="rounded-xl border border-amber-300/70 bg-amber-50/70 p-3 text-sm text-amber-900 dark:bg-amber-950/20 dark:text-amber-200"><Info className="mr-1 inline h-4 w-4" /> Publication bloquée : il faut au moins une photo. Ajoute-la via « Gérer les photos ».</p>}
-            {!published && hasPublicationPhoto && <p className="rounded-xl bg-emerald-50 p-3 text-xs text-emerald-800 dark:bg-emerald-950/20 dark:text-emerald-200"><CheckCircle2 className="mr-1 inline h-3.5 w-3.5" /> Ta fiche possède au moins une photo et peut être publiée.</p>}
+            {!published && !canPublish && <p className="rounded-xl border border-amber-300/70 bg-amber-50/70 p-3 text-sm text-amber-900 dark:bg-amber-950/20 dark:text-amber-200"><Info className="mr-1 inline h-4 w-4" /> Publication bloquée : il faut au moins une photo, ou une photo 360° publiée. Ajoute-la via « Gérer les médias ».</p>}
+            {!published && canPublish && <p className="rounded-xl bg-emerald-50 p-3 text-xs text-emerald-800 dark:bg-emerald-950/20 dark:text-emerald-200"><CheckCircle2 className="mr-1 inline h-3.5 w-3.5" /> Ta fiche possède au moins un média publiable et peut être publiée.</p>}
             {!published && completion.percent < 75 && <p className="text-sm text-amber-700"><Info className="mr-1 inline h-4 w-4" />Tu peux publier, mais il est recommandé de compléter les éléments manquants.</p>}
             {published && <p className="text-sm text-muted-foreground">La désactivation retire l&apos;établissement du catalogue Trouvetou sans supprimer ses données.</p>}
           </div>
@@ -558,7 +580,7 @@ export function TrouvetouAdminClient({
               } finally {
                 setLoading(false)
               }
-            }} disabled={loading || (!published && !hasPublicationPhoto)}>
+            }} disabled={loading || (!published && !canPublish)}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {published ? <><PowerOff className="mr-2 h-4 w-4" />Dépublier</> : <><Megaphone className="mr-2 h-4 w-4" />Publier sur Trouvetou</>}
             </Button>
