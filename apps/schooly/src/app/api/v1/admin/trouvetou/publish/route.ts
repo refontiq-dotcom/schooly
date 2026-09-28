@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { TROUVETOU_ADMIN_ROLES } from "@/utils/supabase/roles"
 import { createClient } from "@/utils/supabase/server"
 import { createClient as createAdminClient, type SupabaseClient } from "@supabase/supabase-js"
+import { toTrouvetouMediaContract, type TrouvetouMediaContract } from "@/lib/media/panorama-state"
 
 type SyncLevel = {
   id: string
@@ -10,6 +11,59 @@ type SyncLevel = {
   prix_min: number | null
   prix_max: number | null
   places_disponibles: number
+}
+
+/** Seule valeur de `school_media.kind` qui décrit une visite 360°. */
+const PANORAMA_KIND = "panorama_360"
+
+/**
+ * Visites 360° RÉELLEMENT publiées pour cet établissement.
+ *
+ * La sélection se fait en base (`status = published`, `kind = panorama_360`) et
+ * non en mémoire : c'est la seule façon de garantir qu'un média `uploaded`,
+ * `validated` ou `rejected` ne parte jamais vers Trouvetou. Le filtre en base
+ * fait aussi office de garde-fou si un contrôle devait être contourné.
+ *
+ * Chaque ligne passe ensuite par `toTrouvetouMediaContract()`, qui refuse
+ * elle-même tout média non `published` et construit le contrat du §12. Le
+ * format n'est donc pas redéfini ici : il n'existe qu'à un seul endroit.
+ *
+ * `room_id` est recopié tel quel, sans être utilisé : il désigne un
+ * `dorm_rooms` Schooly, non interopérable avec les identifiants Trouvetou.
+ */
+async function loadPublishedPanoramas(admin: SupabaseClient, schoolId: string) {
+  const { data, error } = await admin
+    .from("school_media")
+    .select("id, status, r2_key, public_url, width, height, byte_size, content_type, room_id, validated_at")
+    .eq("school_id", schoolId)
+    .eq("kind", PANORAMA_KIND)
+    .eq("status", "published")
+    // Pas de filtre `deleted_at` : `school_media` n'a pas cette colonne — la
+    // suppression y est physique (`delete` sur la ligne), et le fichier
+    // R2 supprimé en amont. Le statut `published` est donc bien la seule
+    // source de vérité.
+
+  // Un échec de lecture ne doit pas publier l'établissement à moitié : mieux
+  // vaut refuser la synchronisation que pousser une fiche sans ses panoramas,
+  // ce qui effacerait chez Trouvetou des visites déjà visibles.
+  if (error) throw error
+
+  return (data ?? [])
+    .map((media) =>
+      toTrouvetouMediaContract({
+        id: media.id,
+        status: media.status,
+        r2_key: media.r2_key,
+        public_url: media.public_url,
+        width: media.width,
+        height: media.height,
+        byte_size: media.byte_size,
+        content_type: media.content_type,
+        room_id: media.room_id,
+        validated_at: media.validated_at,
+      }),
+    )
+    .filter((contract) => contract !== null)
 }
 
 function getTrouvetouConfig() {
@@ -22,7 +76,19 @@ function getTrouvetouConfig() {
   }
 }
 
-async function syncSchoolToTrouvetou(admin: SupabaseClient, schoolId: string, published: boolean) {
+/**
+ * @param panoramas Visites déjà publiées, lorsqu'elles ont été chargées en
+ *   amont pour décider de l'éligibilité. Les passer évite une seconde lecture
+ *   ET surtout une incohérence : la décision de publier et le corps réellement
+ *   transmis ne reposeraient plus sur le même état de la base. Absentes
+ *   (dépublication), elles sont relues ici, comme avant.
+ */
+async function syncSchoolToTrouvetou(
+  admin: SupabaseClient,
+  schoolId: string,
+  published: boolean,
+  panoramas?: TrouvetouMediaContract[],
+) {
   const { data: school, error: schoolError } = await admin
     .from("schools")
     .select("id, name, city, latitude, longitude, description_publique, itineraire, photos_360, video_url, grille_tarifaire_publique, cover_photo_url, gallery_photos, public_address, public_phone, public_email, public_website_url, public_highlights, admission_notes")
@@ -48,6 +114,12 @@ async function syncSchoolToTrouvetou(admin: SupabaseClient, schoolId: string, pu
     places_disponibles: 0,
   }))
 
+  // Visites 360° réellement publiées. LECTURE AVANT la construction du
+  // payload : une erreur de lecture doit interrompre la synchronisation, sinon
+  // Trouvetou recevrait une fiche sans panoramas et effacerait les visites
+  // qu'il affiche déjà.
+  const publishedPanoramas = panoramas ?? (await loadPublishedPanoramas(admin, schoolId))
+
   const schoolPayload = {
     id: school.id,
     schooly_instance_url: process.env.TROUVETOU_INSTANCE_URL || "https://admin.schooly.ci",
@@ -60,6 +132,12 @@ async function syncSchoolToTrouvetou(admin: SupabaseClient, schoolId: string, pu
     cover_photo: school.cover_photo_url,
     gallery: Array.isArray(school.gallery_photos) ? school.gallery_photos : [],
     photos_360: Array.isArray(school.photos_360) ? school.photos_360 : [],
+    // NOUVEAU (§12) : contrat riche des visites 360° publiées. Ajouté À CÔTÉ
+    // de `photos_360`, jamais à sa place : `cover_photo`, `gallery` et
+    // `photos_360` continuent d'arriver exactement comme avant, comme l'exige
+    // le contrat. Tableau vide quand l'établissement n'a rien de publié —
+    // Trouvetou le traitera comme « aucune visite », pas comme une erreur.
+    panoramas: publishedPanoramas,
     video_url: school.video_url,
     grille_tarifaire_publique: school.grille_tarifaire_publique || [],
     contact: {
@@ -110,6 +188,11 @@ export async function POST(request: Request) {
     const { published } = await request.json()
     const nextPublished = !!published
 
+    // Chargé avant toute décision, et réutilisé tel quel par la
+    // synchronisation : une seule lecture de `school_media`, et surtout aucune
+    // fenêtre entre « l'établissement est publiable » et « ce que l'on envoie ».
+    let publishedPanoramas: TrouvetouMediaContract[] | undefined
+
     if (nextPublished) {
       const { data: publicationSchool, error: publicationSchoolError } = await admin
         .from("schools")
@@ -125,7 +208,10 @@ export async function POST(request: Request) {
         )
       }
 
-      const hasPhoto = Boolean(
+      // Photos classiques : définition INCHANGÉE. `photos_360` reste lu ici
+      // parce qu'il fait partie de l'historique des fiches publiées ; il ne sert
+      // toutefois plus à décider à lui seul (voir `hasPublishedPanorama`).
+      const hasClassicPhoto = Boolean(
         typeof publicationSchool.cover_photo_url === "string" &&
           publicationSchool.cover_photo_url.trim()
       ) ||
@@ -138,10 +224,19 @@ export async function POST(request: Request) {
             (photo) => typeof photo === "string" && photo.trim()
           ))
 
-      if (!hasPhoto) {
+      // Source de vérité du nouveau parcours : `school_media`, filtrée en base
+      // sur `kind = panorama_360` ET `status = published`. Un panorama
+      // `uploaded`, `validated` ou `rejected` ne débloque RIEN —
+      // `loadPublishedPanoramas` filtre déjà, donc la liste obtenue ne contient
+      // que des visites publiables. Une simple ligne dans `school_media`, même
+      // présente, ne suffirait pas.
+      publishedPanoramas = await loadPublishedPanoramas(admin, role.school_id)
+      const hasPublishedPanorama = publishedPanoramas.length > 0
+
+      if (!hasClassicPhoto && !hasPublishedPanorama) {
         return NextResponse.json(
           {
-            error: "Publication impossible : ajoutez au moins une photo ou renseignez le lien d'une photo avant de publier la fiche Trouvetou.",
+            error: "Publication impossible : ajoutez au moins une photo, ou importez puis publiez une photo 360°, avant de publier la fiche Trouvetou.",
             code: "PHOTO_REQUIRED",
           },
           { status: 400 }
