@@ -40,7 +40,7 @@ export interface MatrixTabProps {
  * @see tabs/page.test.tsx — la matrice "ne s'affiche pas au montage".
   */
 
-export function MatrixTab({
+function MatrixTab({
   assignments,
   classes,
   subjects,
