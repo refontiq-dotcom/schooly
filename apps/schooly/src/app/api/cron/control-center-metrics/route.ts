@@ -1,106 +1,36 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-
-function authorized(req: Request) {
-  const secret = process.env.CRON_SECRET?.trim();
-  return Boolean(secret && req.headers.get("authorization") === `Bearer ${secret}`);
-}
+import { describePushFailure, hasValidBearer, pushControlCenterMetrics, readConfig } from "@/lib/control-center-metrics";
 
 export async function GET(req: Request) {
-  if (!authorized(req)) {
+  if (!hasValidBearer(req.headers.get("authorization"), process.env.CRON_SECRET)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
-  const key = process.env.SUPABASE_SECRET_KEY?.trim();
-  const controlCenterUrl = process.env.CONTROL_CENTER_URL?.replace(/\/$/, "");
-  const pushSecret = process.env.METRICS_PUSH_SECRET?.trim();
-
-  if (!url || !key || !controlCenterUrl || !pushSecret) {
-    return NextResponse.json({ error: "Configuration metrics incomplète" }, { status: 503 });
-  }
-
-  const supabase = createClient(url, key, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-
-  const [
-    { data: ledger, error: ledgerError },
-    { count: schoolCount, error: schoolError },
-    { data: enrollments, error: enrollmentError },
-  ] = await Promise.all([
-    supabase
-      .from("platform_fee_ledger")
-      .select("amount,status,tenant_id")
-      .eq("product_id", "schooly"),
-    supabase
-      .from("schools")
-      .select("id", { count: "exact", head: true })
-      .is("deleted_at", null),
-    supabase
-      .from("enrollments")
-      .select("school_id")
-      .is("deleted_at", null)
-      .limit(10000),
-  ]);
-
-  if (ledgerError || schoolError || enrollmentError) {
-    console.error("[schooly metrics cron]", {
-      ledgerError,
-      schoolError,
-      enrollmentError,
+  try {
+    // Configuration d'abord : un défaut se voit tout de suite, sans lecture en base.
+    const config = readConfig();
+    const supabase = createClient(config.supabaseUrl, config.supabaseKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
     });
-    return NextResponse.json({ error: "Lecture Schooly impossible" }, { status: 500 });
+    const { payload, result, attempts } = await pushControlCenterMetrics({
+      supabase,
+      baseUrl: config.baseUrl,
+      secret: config.secret,
+    });
+    return NextResponse.json({
+      ok: true,
+      run_id: payload.run_id,
+      collected_at: payload.collected_at,
+      attempts,
+      control_center: { status: result.status ?? null, schema: result.schema ?? null, warnings: result.warnings ?? [] },
+      payload,
+    });
+  } catch (error) {
+    const failure = describePushFailure(error);
+    console.error("[schooly metrics cron]", { stage: failure.body.stage, code: failure.body.code, upstream_status: failure.body.upstream_status });
+    return NextResponse.json(failure.body, { status: failure.status });
   }
-
-  const rows = ledger ?? [];
-  const activeEnrollmentRows = enrollments ?? [];
-  const activeSchools =
-    new Set(activeEnrollmentRows.map((row) => row.school_id)).size || schoolCount || 0;
-  const collected = rows.filter((row) => row.status === "collected");
-  const mrr = collected.reduce((sum, row) => sum + (Number(row.amount) || 0), 0);
-  const billedTenants = new Set(rows.map((row) => row.tenant_id));
-
-  const payload = {
-    projet: "schooly",
-    nom: "Schooly",
-    mrr,
-    comptes_actifs: billedTenants.size || activeSchools,
-    statut_sante:
-      billedTenants.size || activeSchools
-        ? billedTenants.size
-          ? "healthy"
-          : "warning"
-        : "unknown",
-    details: {
-      ecoles: schoolCount || 0,
-      inscriptions_actives: activeEnrollmentRows.length,
-      etablissements_actifs: activeSchools,
-      clients_factures: billedTenants.size,
-      lignes_ledger: rows.length,
-      revenus_collectes: mrr,
-    },
-  };
-
-  const response = await fetch(`${controlCenterUrl}/api/metrics/push`, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${pushSecret}`,
-    },
-    body: JSON.stringify(payload),
-    cache: "no-store",
-    signal: AbortSignal.timeout(10000),
-  });
-
-  const result = await response.json().catch(() => ({}));
-
-  if (!response.ok) {
-    return NextResponse.json(
-      { error: "Control Center rejected metrics", details: result },
-      { status: 502 },
-    );
-  }
-
-  return NextResponse.json({ ok: true, payload });
 }
+
+export const dynamic = "force-dynamic";
