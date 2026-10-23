@@ -1,8 +1,11 @@
 -- ============================================================================
 -- Correction de la génération des factures de plateforme (3 défauts).
 --
--- ÉTAT : PRÉPARÉE, NON APPLIQUÉE. À relire puis appliquer par le propriétaire.
--- Avant toute application : lire « Vérifications avant application » ci-dessous.
+-- ÉTAT : APPLIQUÉE en production le 23/10/2026 (autorisation du propriétaire), sous le nom
+-- « fix_platform_invoice_generation ». Avant : 0 facture, 2 frais « due » sans période ;
+-- après : mêmes données (aucune ligne modifiée). Essai annulé sur les données réelles :
+-- 1 facture de 2 événements / 2 000 F, génération idempotente, encaissement = 2 lignes.
+-- Le fichier peut être rejoué sans risque (CREATE OR REPLACE).
 --
 -- Défauts corrigés (reproduits sur un PostgreSQL local avec les fonctions d'origine) :
 --
