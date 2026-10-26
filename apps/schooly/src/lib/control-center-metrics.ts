@@ -141,10 +141,12 @@ export async function collect(supabase: SupabaseLike) {
     countRows(supabase, "enrollments", (q) => q.is("deleted_at", null).eq("status", "active")),
   ]);
 
-  const paidInvoices = invoices.filter((i) => i.status === "paid");
-  const open = invoices.filter((i) => i.status === "pending" || i.status === "overdue");
-  const generated = sum(ledger, "amount");
-  const collected = sum(paidInvoices, "paid_amount");
+  // Argent reçu = somme des montants imputés aux factures, payées OU partiellement payées.
+  // (Avant les paiements partiels, paid_amount n'était renseigné que sur les factures payées :
+  // la formule reste donc exacte avant et après la migration des paiements.)
+  const open = invoices.filter((i) => i.status !== "paid")
+  const generated = sum(ledger, "amount")
+  const collected = sum(invoices, "paid_amount")
   const billedTenants = new Set(ledger.map((r) => r.tenant_id));
 
   return {
@@ -152,7 +154,8 @@ export async function collect(supabase: SupabaseLike) {
     fraisEncaisses: collected,
     // jamais négatif : si une facture encaissée dépasse les frais enregistrés, on n'invente pas de « crédit »
     fraisAEncaisser: Math.max(0, generated - collected),
-    facturesOuvertesMontant: sum(open, "total_due"),
+    facturesOuvertesMontant: open.reduce((t, i) => t + Math.max(0, (Number(i.total_due) || 0) - (Number(i.paid_amount) || 0)), 0),
+    facturesPartielles: invoices.filter((i) => i.status === "partial").length,
     facturesEnRetard: invoices.filter((i) => i.status === "overdue").length,
     inscriptionsFacturables: ledger.length,
     inscriptionsTotal: enrTotal,
@@ -183,6 +186,7 @@ export function buildPayload(src: SourceMetrics, meta: { collectedAt: Date; runI
       frais_a_encaisser: src.fraisAEncaisser,
       factures_ouvertes_montant: src.facturesOuvertesMontant,
       factures_en_retard: src.facturesEnRetard,
+      factures_partielles: src.facturesPartielles,
       inscriptions_facturables: src.inscriptionsFacturables,
       inscriptions_total: src.inscriptionsTotal,
       inscriptions_en_attente: src.inscriptionsEnAttente,
