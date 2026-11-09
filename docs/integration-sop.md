@@ -14,4 +14,4 @@ Le pepper reste exclusivement dans l'environnement serveur Trouvetou. Il doit ê
 
 ## 3. Authentification des appels Trouvetou → partenaire
 
-Les routes partenaires acceptent `x-trouvetou-api-key: <TROUVETOU_API_KEY>` (format recommandé). `Authorization: Bearer <TROUVETOU_API_KEY>` est conservé temporairement pour compatibilité. Elles comparent la clé dédiée en temps constant et refusent systématiquement le pepper HMAC. Ne jamais utiliser `TROUVETOU_API_KEY_PEPPER` comme jeton d'API.
+Les appels Schooly → Trouvetou (synchronisation) utilisent `x-trouvetou-api-key: <TROUVETOU_API_KEY>`. Les appels Trouvetou → Schooly (réservation) utilisent `x-trouvetou-booking-secret: <TROUVETOU_SCHOOLY_BOOKING_SHARED_SECRET>`. Ces deux secrets sont distincts. Les routes comparent les secrets en temps constant et refusent systématiquement le pepper HMAC. Ne jamais utiliser `TROUVETOU_API_KEY_PEPPER` comme jeton d'API.
