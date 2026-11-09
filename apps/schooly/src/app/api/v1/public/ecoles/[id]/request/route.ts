@@ -1,14 +1,10 @@
 import { NextResponse } from "next/server"
+import { isTrouvetouRequest } from "@/lib/trouvetou-auth"
 import { createClient } from "@supabase/supabase-js"
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SECRET_KEY!)
 
-function checkAuth(request: Request) {
-  const value = request.headers.get("authorization")
-  if (!value?.startsWith("Bearer ")) return false
-  const token = value.slice(7)
-  return token === process.env.TROUVETOU_API_KEY_PEPPER || token === process.env.TROUVETOU_API_KEY
-}
+
 const clean = (value: unknown, max = 180) => typeof value === "string" ? value.trim().slice(0, max) : ""
 function validDate(value: unknown) {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
@@ -17,7 +13,7 @@ function validDate(value: unknown) {
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  if (!checkAuth(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  if (!isTrouvetouRequest(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   const { id: schoolId } = await params
   try {
     const body = await request.json()
