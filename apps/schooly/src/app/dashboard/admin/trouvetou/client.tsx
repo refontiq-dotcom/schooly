@@ -530,7 +530,7 @@ export function TrouvetouAdminClient({
 
       <Dialog open={modal === "reservation"} onOpenChange={(open)=>setModal(open ? "reservation" : null)} label="Détails de la demande">
         <DialogContent>
-          <DialogHeader><DialogTitle>Demande de pré-inscription</DialogTitle><DialogDescription>Informations reçues depuis Trouvetou.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>Demande de place</DialogTitle><DialogDescription>La famille a envoyé cette demande depuis Trouvetou. Aucun paiement ni inscription définitive n’a été effectué en ligne. L’établissement peut qualifier le dossier puis poursuivre l’inscription directement avec le parent.</DialogDescription></DialogHeader>
           {selectedReservation && <div className="space-y-4 py-4">
             <div className="rounded-xl bg-muted/60 p-3 text-sm"><Sparkles className="mr-1 inline h-4 w-4" />Qualification intelligente : complète les informations critiques avant de finaliser l&apos;inscription.</div>
             <Field label="Nom complet de l'élève"><Input value={selectedReservation.student_full_name || ""} onChange={e=>setSelectedReservation((v)=>(v?{...v,student_full_name:e.target.value}:v))} /></Field>
