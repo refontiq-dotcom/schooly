@@ -66,133 +66,75 @@ retourné par l'API Trouvetou.
 
 ## 4. Contrat API Schooly pour Trouvetou
 
-Toutes les routes partenaires sont protégées par :
+Les appels serveur-à-serveur de réservation utilisent le secret dédié :
 
 ```http
 x-trouvetou-booking-secret: <TROUVETOU_SCHOOLY_BOOKING_SHARED_SECRET>
 ```
 
-URL de base en production :
+Le pepper HMAC `TROUVETOU_API_KEY_PEPPER` n'est jamais accepté comme jeton et ne doit jamais être transmis à Schooly.
 
-```text
-https://<domaine-schooly>/api/trouvetou
-```
+URL de base en production : `https://<domaine-schooly>/api/v1/public`.
 
 ### 4.1 Catalogue des écoles
 
 ```http
-GET /api/trouvetou
-x-trouvetou-booking-secret: <secret de réservation>
+GET /ecoles
+x-trouvetou-booking-secret: <secret>
 ```
 
-La réponse contient les établissements publiés. Chaque élément contient :
+Retourne les établissements publiés avec leur catégorie, leurs informations publiques et leurs médias.
 
-- `category: "ecoles"` ;
-- les informations de l'établissement ;
-- `availability`, la liste des places par niveau ;
-- `advertisements`, les publicités actives dans leur période.
-
-Exemple de forme de réponse :
-
-```json
-{
-  "establishments": [
-    {
-      "id": "uuid",
-      "name": "École Exemple",
-      "description": "Présentation de l'école",
-      "city": "Abidjan",
-      "address": "Cocody",
-      "school_type": "college",
-      "latitude": 5.35,
-      "longitude": -4.01,
-      "website_url": "https://ecole.example",
-      "cover_image_url": "https://.../photo.jpg",
-      "reservation_fee_amount": 25000,
-      "category": "ecoles",
-      "availability": [
-        {
-          "level_id": "uuid",
-          "establishment_id": "uuid",
-          "level_name": "6ème",
-          "total_capacity": 120,
-          "total_taken": 80,
-          "seats_available": 40
-        }
-      ],
-      "advertisements": []
-    }
-  ]
-}
-```
-
-### 4.2 Création d'un dossier de réservation
+### 4.2 Disponibilité par niveau
 
 ```http
-POST /api/trouvetou
-Authorization: Bearer <clé>
+GET /schools/{school_id}/availability
+```
+
+Cette route publique en lecture seule retourne les niveaux, capacités, inscriptions confirmées et places encore disponibles. La disponibilité doit être revalidée au moment de la demande et de la confirmation du paiement.
+
+### 4.3 Création d'une demande de réservation
+
+```http
+POST /ecoles/{school_id}/request
+x-trouvetou-booking-secret: <secret>
 Content-Type: application/json
 ```
 
-Corps minimal :
+Corps attendu :
 
 ```json
 {
-  "establishment_id": "uuid",
   "level_id": "uuid",
   "student_full_name": "Nom de l'élève",
+  "student_birthdate": "2018-04-12",
   "parent_full_name": "Nom du parent",
-  "parent_phone": "+225..."
+  "parent_phone": "+225...",
+  "parent_email": "parent@example.com"
 }
 ```
 
-Champs facultatifs : `student_birthdate`, `parent_email`.
+Schooly vérifie la publication de l'école et l'appartenance du niveau, puis crée une demande `pending_payment`. Cette étape ne réserve pas encore la capacité.
 
-Cette route :
+### 4.4 Confirmation après paiement
 
-- vérifie que l'école est publiée ;
-- vérifie que le niveau appartient à l'école ;
-- choisit une section qui possède une place ;
-- crée une réservation `pending_payment` ;
-- ne décrémente pas encore la capacité.
-
-Réponses principales :
-
-- `201` : dossier créé ;
-- `400` : données invalides ;
-- `401` : clé absente ou invalide ;
-- `409` : école non publiée ou aucune place disponible.
-
-### 4.3 Confirmation du paiement
-
-Après confirmation réelle du paiement côté Trouvetou :
+Uniquement après confirmation serveur du paiement :
 
 ```http
-POST /api/trouvetou/reservations/<reservation_id>/payment
-Authorization: Bearer <clé>
+POST /ecoles/{school_id}/reserve
+x-trouvetou-booking-secret: <secret>
 Content-Type: application/json
 ```
 
 ```json
 {
-  "payment_reference": "transaction-123",
-  "amount_paid": 25000
+  "reservation_id": "uuid",
+  "payment_reference": "reference-fournisseur",
+  "amount": 25000
 }
 ```
 
-Schooly appelle la fonction PostgreSQL `reserve_seat`, qui verrouille la section
-avant de vérifier et décrémenter la capacité. Deux demandes concurrentes ne
-peuvent donc pas prendre la même dernière place.
-
-Réponses principales :
-
-- `200` : réservation payée et statut `reserved` ;
-- `400` : paiement incomplet ou réservation invalide ;
-- `401` : clé absente ou invalide ;
-- `404` : réservation introuvable ;
-- `409` : réservation expirée, déjà traitée ou place devenue indisponible.
-
-La réponse contient notamment `id`, `status`, `qr_code_token` et `expires_at`.
+Schooly appelle `reserve_seat()`, verrouille la section et réserve atomiquement une place. Une réservation déjà traitée répond `409`.
 
 ## 5. Confirmation par l'administrateur
 
