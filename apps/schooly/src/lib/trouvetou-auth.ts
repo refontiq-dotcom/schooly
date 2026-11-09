@@ -1,21 +1,15 @@
 import { timingSafeEqual } from "node:crypto";
 
 /**
- * Authentifie les appels serveur-à-serveur provenant de Trouvetou.
+ * Authentifie les appels de réservation serveur-à-serveur depuis Trouvetou.
  *
- * TROUVETOU_API_KEY est la clé API propre à ce provider (tv_live_<id>.<secret>).
- * TROUVETOU_API_KEY_PEPPER est uniquement le pepper HMAC utilisé côté Trouvetou
- * pour vérifier les empreintes : il ne doit jamais être accepté comme jeton.
+ * Le secret de réservation est distinct de la clé de synchronisation provider
+ * et du pepper HMAC. Il n'est jamais placé dans les annonces ni côté navigateur.
  */
 export function isTrouvetouRequest(request: Request): boolean {
-  const expected = process.env.TROUVETOU_API_KEY?.trim();
-  if (!expected) return false;
-
-  const headerKey = request.headers.get("x-trouvetou-api-key")?.trim();
-  const authorization = request.headers.get("authorization") ?? "";
-  const bearerKey = /^Bearer\s+(.+)$/i.exec(authorization)?.[1]?.trim();
-  const provided = headerKey || bearerKey || "";
-  if (!provided) return false;
+  const expected = process.env.TROUVETOU_SCHOOLY_BOOKING_SHARED_SECRET?.trim();
+  const provided = request.headers.get("x-trouvetou-booking-secret")?.trim() ?? "";
+  if (!expected || !provided) return false;
 
   const expectedBytes = Buffer.from(expected, "utf8");
   const providedBytes = Buffer.from(provided, "utf8");
