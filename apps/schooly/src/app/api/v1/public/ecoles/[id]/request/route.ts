@@ -38,16 +38,28 @@ async function responseForExisting(reservation: {
       return NextResponse.json({ error: "La réservation n'a pas pu être finalisée. Réessayez avec la même demande." }, { status: 500 })
     }
     if (!reserved.success) {
-      await supabase.from("trouvetou_reservations").update({ status: "expired" }).eq("id", reservation.id)
-      return NextResponse.json({ error: "Ce niveau ne dispose plus de place disponible.", code: "LEVEL_FULL" }, { status: 409 })
+      const { data: current } = await supabase
+        .from("trouvetou_reservations")
+        .select("id, status, created_at, qr_code_token, expires_at")
+        .eq("id", reservation.id)
+        .maybeSingle()
+      if (current && (current.status === "reserved" || current.status === "confirmed")) {
+        reservation = current
+      } else {
+        if (current?.status === "pending_payment") {
+          await supabase.from("trouvetou_reservations").update({ status: "expired" }).eq("id", reservation.id)
+        }
+        return NextResponse.json({ error: "Ce niveau ne dispose plus de place disponible.", code: "LEVEL_FULL" }, { status: 409 })
+      }
+    } else {
+      const { data: updated, error } = await supabase
+        .from("trouvetou_reservations")
+        .select("id, status, created_at, qr_code_token, expires_at")
+        .eq("id", reservation.id)
+        .single()
+      if (error || !updated) return NextResponse.json({ error: "La réservation a été créée mais son état ne peut pas être confirmé." }, { status: 502 })
+      reservation = updated
     }
-    const { data: updated, error } = await supabase
-      .from("trouvetou_reservations")
-      .select("id, status, created_at, qr_code_token, expires_at")
-      .eq("id", reservation.id)
-      .single()
-    if (error || !updated) return NextResponse.json({ error: "La réservation a été créée mais son état ne peut pas être confirmé." }, { status: 502 })
-    reservation = updated
   }
 
   if (reservation.status === "reserved" && reservation.expires_at && new Date(reservation.expires_at) <= new Date()) {
