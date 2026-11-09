@@ -325,6 +325,7 @@ son URL et son contrat avant de modifier l'API partenaire.
 ## 12. Parcours actuel sans paiement
 
 La migration `20261109090000_trouvetou_requests_without_payment.sql` ajoute
+le statut `requested` pour les niveaux dont la capacité n'est pas configurée,
 une clé UUID unique par école et renforce `reserve_seat()` pour sérialiser les
 réservations concurrentes d'un même niveau. Elle doit être appliquée manuellement dans le projet Supabase
 Schooly avant mise en production.
