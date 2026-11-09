@@ -35,7 +35,7 @@ export default async function TrouvetouAdminPage() {
 
   const { data: reservations } = await admin
     .from("trouvetou_reservations")
-    .select("id, student_full_name, parent_full_name, parent_phone, status, created_at, grade_level_id")
+    .select("id, student_full_name, student_birthdate, parent_full_name, parent_phone, parent_email, status, created_at, grade_level_id")
     .eq("school_id", schoolId)
     .order("created_at", { ascending: false })
     .limit(20)
