@@ -69,7 +69,7 @@ retourné par l'API Trouvetou.
 Toutes les routes partenaires sont protégées par :
 
 ```http
-Authorization: Bearer <TROUVETOU_API_KEY_PEPPER>
+x-trouvetou-booking-secret: <TROUVETOU_SCHOOLY_BOOKING_SHARED_SECRET>
 ```
 
 URL de base en production :
@@ -82,7 +82,7 @@ https://<domaine-schooly>/api/trouvetou
 
 ```http
 GET /api/trouvetou
-Authorization: Bearer <clé>
+x-trouvetou-booking-secret: <secret de réservation>
 ```
 
 La réponse contient les établissements publiés. Chaque élément contient :
@@ -241,8 +241,11 @@ Important : la migration `20260902200000` doit être exécutée après
 Dans Schooly, configurer côté serveur :
 
 ```env
-TROUVETOU_API_KEY_PEPPER=<clé-secrète-partagée>
+TROUVETOU_API_KEY=<clé provider tv_live_... pour la synchronisation>
+TROUVETOU_SCHOOLY_BOOKING_SHARED_SECRET=<secret serveur-à-serveur dédié aux réservations>
 ```
+
+`TROUVETOU_API_KEY_PEPPER` n'est jamais un secret d'API partenaire : il sert uniquement au calcul HMAC côté Trouvetou et ne doit pas être transmis à Schooly.
 
 Le code accepte aussi temporairement `TROUVETOU_API_KEY` comme solution de
 compatibilité locale, mais le nom recommandé est `TROUVETOU_API_KEY_PEPPER`.
