@@ -51,8 +51,8 @@ retourné par l'API Trouvetou.
 3. Il ouvre la fiche de l'école et voit ses détails, sa photo si elle est
    renseignée, son adresse et son itinéraire, notamment avec ses coordonnées
    GPS, ainsi que ses niveaux et places disponibles.
-4. Il choisit un niveau et remplit le formulaire avec le nom de l'élève, le nom
-   du parent et son téléphone. La date de naissance et l'email sont facultatifs.
+4. Il choisit un niveau et remplit le formulaire avec le nom de l'élève, sa date
+   de naissance, le nom du parent et son téléphone. L'email est facultatif.
 5. Trouvetou transmet la demande à Schooly avec une clé d'idempotence.
 6. Schooly vérifie que l'école et le niveau sont valides et que des places sont
    encore annoncées disponibles au moment de la demande.
@@ -163,8 +163,8 @@ Rôle de chaque migration :
 
 - `20260902190000` ajoute `establishments.published_to_trouvetou` et la fonction
   de création de réservation partenaire ;
-- `20260902200000` remplace cette fonction pour créer `pending_payment`, afin
-  que la capacité ne soit réservée qu'après paiement ;
+- `20260902200000` correspond à l'ancien parcours avec paiement et réservation
+  de place après paiement ; il n'est pas appelé par le nouveau parcours Trouvetou ;
 - `20260902210000` crée `trouvetou_ads`, ses index, ses grants et sa policy RLS.
 
 Important : la migration `20260902200000` doit être exécutée après
@@ -226,7 +226,7 @@ supabase/migrations/20260902190000_trouvetou_integration.sql
   Publication et première fonction de réservation partenaire.
 
 supabase/migrations/20260902200000_trouvetou_payment_flow.sql
-  Version finale du flux pending_payment puis reserved.
+  Ancien flux post-paiement conservé pour compatibilité historique.
 
 supabase/migrations/20260902210000_trouvetou_ads.sql
   Publicités Trouvetou.
@@ -234,10 +234,9 @@ supabase/migrations/20260902210000_trouvetou_ads.sql
 
 ## 9. Points à terminer ou améliorer
 
-- Connecter réellement le module de paiement Trouvetou au callback
-  `/api/trouvetou/reservations/<id>/payment`.
-- Ajouter un mécanisme de signature ou d'idempotence des callbacks de paiement,
-  en complément de la clé Bearer.
+- Le paiement en ligne est hors périmètre du parcours actuel : ne pas appeler
+  le callback de paiement et ne pas utiliser l'endpoint `/reserve`.
+- L'inscription définitive est poursuivie directement entre le parent et l'école.
 - Ajouter une interface Schooly pour modifier directement la fiche publiée et
   téléverser une photo, au lieu de dépendre de `cover_image_url` déjà enregistré.
 - Ajouter l'édition, la désactivation et la suppression des publicités.
