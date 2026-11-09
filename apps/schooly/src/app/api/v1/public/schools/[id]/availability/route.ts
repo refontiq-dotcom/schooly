@@ -45,6 +45,6 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       highlights: Array.isArray(school.public_highlights) ? school.public_highlights : [], admission_notes: school.admission_notes
     },
     niveaux,
-    flow: ["recherche", "disponibilite", "demande", "qualification", "paiement", "inscription"]
+    flow: ["recherche", "disponibilite", "demande", "qualification", "inscription_sur_place"]
   })
 }
