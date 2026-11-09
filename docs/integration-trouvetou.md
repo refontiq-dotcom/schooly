@@ -127,26 +127,16 @@ La réponse de création contient :
 L'endpoint `/reserve` et la RPC `reserve_seat()` sont conservés pour le flux
 historique, mais ne sont pas appelés dans le parcours Trouvetou actuel.
 
-## 5. Confirmation par l'administrateur
+## 5. Traitement de la demande dans l'établissement
 
-Les demandes apparaissent dans le dashboard admin, dans le bloc **Demandes reçues**.
-Elles portent le statut **Demande reçue**. L'équipe peut compléter les informations
-et poursuivre le dossier avec la famille. Le bouton de finalisation de l'inscription
-reste réservé au parcours d'inscription effectué directement par l'établissement.
+Les demandes apparaissent dans le dashboard Schooly, dans le bloc **Demandes reçues**,
+avec le statut **Demande reçue**. L'équipe peut consulter les coordonnées du parent,
+compléter les informations manquantes et contacter la famille.
 
-Cette action appelle la fonction Supabase :
-
-```text
-finalize_reservation(reservation_id)
-```
-
-La fonction :
-
-- vérifie que l'utilisateur est admin, secrétariat ou censeur ;
-- vérifie que la réservation appartient à son établissement ;
-- crée la ligne dans `students` ;
-- rattache automatiquement le parent lorsqu'un email ou téléphone correspond ;
-- passe la réservation à `confirmed`.
+La demande Trouvetou ne crée pas d'élève, ne réserve pas définitivement une place
+et ne lance pas la fonction `finalize_reservation()`. Le parent poursuit l'inscription
+et les formalités directement auprès de l'établissement. La finalisation dans Schooly
+se fait ensuite selon le parcours normal d'inscription de l'école.
 
 ## 6. Données et migrations Supabase
 
