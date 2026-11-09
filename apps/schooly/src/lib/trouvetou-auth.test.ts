@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { isTrouvetouRequest } from "./trouvetou-auth";
+import { isTrouvetouProviderRequest, isTrouvetouRequest } from "./trouvetou-auth";
 
 const providerKey = "tv_live_12345678-1234-1234-1234-123456789abc.test-secret";
 
@@ -51,5 +51,24 @@ describe("isTrouvetouRequest", () => {
       headers: { "x-trouvetou-booking-secret": providerKey },
     });
     expect(isTrouvetouRequest(request)).toBe(false);
+  });
+});
+
+describe("isTrouvetouProviderRequest", () => {
+  it("accepts the provider key for sync/service endpoints", () => {
+    vi.stubEnv("TROUVETOU_API_KEY", providerKey);
+    const request = new Request("https://schooly.example/api", {
+      headers: { "x-trouvetou-api-key": providerKey },
+    });
+    expect(isTrouvetouProviderRequest(request)).toBe(true);
+  });
+
+  it("does not accept the global HMAC pepper", () => {
+    vi.stubEnv("TROUVETOU_API_KEY", providerKey);
+    vi.stubEnv("TROUVETOU_API_KEY_PEPPER", "global-hmac-pepper");
+    const request = new Request("https://schooly.example/api", {
+      headers: { authorization: "Bearer global-hmac-pepper" },
+    });
+    expect(isTrouvetouProviderRequest(request)).toBe(false);
   });
 });
