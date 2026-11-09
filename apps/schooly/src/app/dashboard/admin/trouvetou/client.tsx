@@ -250,7 +250,7 @@ export function TrouvetouAdminClient({
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Impossible de mettre à jour la demande")
-      setSelectedReservation(data.reservation)
+      setSelectedReservation({ ...selectedReservation, ...data.reservation })
       toast.success("Dossier qualifié et mis à jour")
       router.refresh()
     } catch (error) {
