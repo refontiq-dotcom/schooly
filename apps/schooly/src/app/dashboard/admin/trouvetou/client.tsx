@@ -417,7 +417,7 @@ export function TrouvetouAdminClient({
                 <div className="divide-y divide-border/50">
                   {reservations.map((r) => (
                     <div key={r.id} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
-                      <div><p className="font-medium">{r.student_full_name}</p><p className="text-xs text-muted-foreground">Parent : {r.parent_full_name} • {r.parent_phone}</p><p className="text-xs text-muted-foreground">{new Date(r.created_at).toLocaleDateString("fr-FR")}</p></div>
+                      <div><p className="font-medium">{r.student_full_name}</p><p className="text-xs text-muted-foreground">Niveau : {r.grade_level_label || "À vérifier"} • Parent : {r.parent_full_name} • {r.parent_phone}</p><p className="text-xs text-muted-foreground">{new Date(r.created_at).toLocaleDateString("fr-FR")}</p></div>
                       <div className="flex items-center gap-2"><Badge variant="outline">{reservationLabel(r.status)}</Badge><Button size="sm" variant="outline" onClick={() => { setSelectedReservation(r); setModal("reservation") }}><Eye className="mr-1 h-4 w-4" /> Détails</Button>{r.status === "reserved" && <Button size="sm" onClick={() => { setSelectedReservation(r); setModal("reservation") }} disabled={loading}>Finaliser</Button>}</div>
                     </div>
                   ))}
