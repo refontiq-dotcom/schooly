@@ -6,6 +6,7 @@
 // Le ZIP est signé (X-Schooly-Signature) pour garantir l'origine.
 
 import { NextResponse } from "next/server"
+import { isTrouvetouProviderRequest } from "@/lib/trouvetou-auth"
 import { createClient } from "@supabase/supabase-js"
 import { fmt, toCSV, isValidSchoolId, isValidFormat } from "../helpers"
 
@@ -15,13 +16,7 @@ const supabase = createClient(
 )
 
 function checkAuth(request: Request): boolean {
-  const authHeader = request.headers.get("authorization")
-  if (!authHeader || !authHeader.startsWith("Bearer ")) return false
-  const token = authHeader.split(" ")[1]
-  return (
-    token === process.env.TROUVETOU_API_KEY ||
-    token === process.env.TROUVETOU_API_KEY_PEPPER
-  )
+  return isTrouvetouProviderRequest(request)
 }
 
 // ─── GET : liste des exports ────────────────────────────────────────────────
