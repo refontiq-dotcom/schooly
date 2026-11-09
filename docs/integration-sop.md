@@ -4,7 +4,7 @@
 
 * **Trouvetou (Vercel) :** stocke `TROUVETOU_API_KEY_PEPPER` uniquement pour calculer et vérifier les empreintes HMAC des clés entrantes. Ce pepper n'est jamais transmis aux partenaires.
 * **Supabase Trouvetou :** stocke l'empreinte `HMAC-SHA256` de chaque clé partenaire.
-* **Projet partenaire (Vercel) :** stocke uniquement sa clé API dédiée `TROUVETOU_API_KEY` au format `tv_live_<UUID>.<SECRET>`. Cette même clé est envoyée à Trouvetou lors des synchronisations et présentée par Trouvetou aux routes partenaires.
+* **Projet partenaire (Vercel) :** stocke sa clé API `TROUVETOU_API_KEY` au format `tv_live_<UUID>.<SECRET>` pour les synchronisations, ainsi qu'un secret de réservation dédié `TROUVETOU_SCHOOLY_BOOKING_SHARED_SECRET`. Les deux valeurs ont des usages distincts.
 
 ---
 
