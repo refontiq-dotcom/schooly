@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import {
   Megaphone, Power, PowerOff, Plus, MapPin, Image as ImageIcon, Video,
-  Users, CheckCircle2, XCircle, Loader2, Sparkles, Camera, Globe2,
+  Users, CheckCircle2, XCircle, Loader2, Sparkles, Camera, Globe2, GraduationCap,
   Phone, Mail, ExternalLink, Eye, Pencil, Trash2, Info, Upload,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
