@@ -16,3 +16,23 @@ export function isTrouvetouRequest(request: Request): boolean {
   return expectedBytes.length === providedBytes.length &&
     timingSafeEqual(expectedBytes, providedBytes);
 }
+
+/**
+ * Authentifie une requête de synchronisation / service provider Trouvetou.
+ * Cette clé est distincte du secret de réservation et du pepper HMAC.
+ */
+export function isTrouvetouProviderRequest(request: Request): boolean {
+  const expected = process.env.TROUVETOU_API_KEY?.trim();
+  if (!expected) return false;
+
+  const headerKey = request.headers.get("x-trouvetou-api-key")?.trim();
+  const authorization = request.headers.get("authorization") ?? "";
+  const bearerKey = /^Bearer\s+(.+)$/i.exec(authorization)?.[1]?.trim();
+  const provided = headerKey || bearerKey || "";
+  if (!provided) return false;
+
+  const expectedBytes = Buffer.from(expected, "utf8");
+  const providedBytes = Buffer.from(provided, "utf8");
+  return expectedBytes.length === providedBytes.length &&
+    timingSafeEqual(expectedBytes, providedBytes);
+}
