@@ -50,6 +50,11 @@ async function responseForExisting(reservation: {
     reservation = updated
   }
 
+  if (reservation.status === "reserved" && reservation.expires_at && new Date(reservation.expires_at) <= new Date()) {
+    await supabase.from("trouvetou_reservations").update({ status: "expired" }).eq("id", reservation.id)
+    return NextResponse.json({ error: "Cette réservation a expiré. Envoyez une nouvelle demande.", code: "RESERVATION_EXPIRED" }, { status: 409 })
+  }
+
   if (reservation.status === "expired") {
     return NextResponse.json({ error: "Cette réservation a expiré. Envoyez une nouvelle demande.", code: "RESERVATION_EXPIRED" }, { status: 409 })
   }
