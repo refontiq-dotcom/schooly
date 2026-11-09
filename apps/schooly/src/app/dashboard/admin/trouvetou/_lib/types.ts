@@ -59,6 +59,8 @@ export type TrouvetouReservation = {
   created_at: string
   grade_level_id: string | null
   grade_level_label?: string | null
+  qr_code_token?: string | null
+  expires_at?: string | null
   /** Champs de qualification (absents du select initial, renseignés après PATCH). */
   student_birthdate?: string | null
   parent_email?: string | null
@@ -126,6 +128,8 @@ export function normalizeReservations(raw: unknown): TrouvetouReservation[] {
         const relation = Array.isArray(row.grade_levels) ? row.grade_levels[0] : row.grade_levels
         return isRecord(relation) ? asNullableString(relation.name) : null
       })(),
+      qr_code_token: asNullableString(row.qr_code_token),
+      expires_at: asNullableString(row.expires_at),
       student_birthdate: asNullableString(row.student_birthdate),
       parent_email: asNullableString(row.parent_email),
     })
