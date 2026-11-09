@@ -56,12 +56,15 @@ retourné par l'API Trouvetou.
 5. Trouvetou transmet la demande à Schooly avec une clé d'idempotence.
 6. Schooly vérifie que l'école et le niveau sont valides et que des places sont
    encore annoncées disponibles au moment de la demande.
-7. Schooly crée un dossier `requested` et le rend visible dans le dashboard de
-   l'établissement.
-8. Trouvetou confirme au parent que sa demande a été transmise. Aucun paiement,
-   blocage de place, QR code ou inscription définitive n'est créé.
-9. Le parent contacte ou rencontre l'école pour poursuivre l'inscription.
-10. L'établissement traite le dossier directement dans Schooly.
+7. Quand la capacité du niveau est configurée et qu'une place est disponible,
+   Schooly réserve immédiatement cette place pour 72 heures, sans paiement, et
+   génère une référence/QR de réservation. Si la capacité n'est pas configurée,
+   la demande reste au statut `requested` pour confirmation par l'école.
+8. Trouvetou confirme au parent la réservation ou la demande transmise. Aucun
+   paiement en ligne ni inscription définitive n'est déclenché.
+9. Le parent se présente ou contacte l'école pour compléter l'inscription.
+10. L'établissement finalise l'inscription dans Schooly lorsque le parent a
+    fourni les pièces et informations requises.
 
 ## 4. Contrat API Schooly pour Trouvetou
 
@@ -113,30 +116,34 @@ Corps attendu :
 }
 ```
 
-Schooly vérifie la publication de l'école, l'appartenance du niveau et la disponibilité indicative. Il crée une demande `requested`. Cette demande ne bloque pas une place et n'entraîne aucun paiement.
+Schooly vérifie la publication de l'école et l'appartenance du niveau. Si la capacité est configurée, il vérifie puis réserve atomiquement une place via `reserve_seat()` sans paiement (référence et montant nuls). La réservation passe à `reserved` pour 72 heures. Si aucune capacité n'est configurée, Schooly conserve une demande `requested` à confirmer par l'établissement.
 
 ### 4.4 Confirmation au parent
 
 La réponse de création contient :
 
 - `reservation_id` : identifiant du dossier Schooly ;
-- `status: "requested"` ;
+- `status: "reserved"` si une place a été bloquée, sinon `"requested"` ;
+- `availability_confirmed: true|false` ;
+- `qr_code` et `expires_at` si une place a été réservée ;
 - `payment_required: false` ;
 - `next_step: "school_contact"`.
 
-L'endpoint `/reserve` et la RPC `reserve_seat()` sont conservés pour le flux
-historique, mais ne sont pas appelés dans le parcours Trouvetou actuel.
+Le nouvel endpoint `/request` appelle directement `reserve_seat()` avec des
+paramètres de paiement nuls lorsque la capacité est connue. L'endpoint historique
+`/reserve` reste disponible pour compatibilité, mais Trouvetou ne l'appelle plus.
 
 ## 5. Traitement de la demande dans l'établissement
 
-Les demandes apparaissent dans le dashboard Schooly, dans le bloc **Demandes reçues**,
-avec le statut **Demande reçue**. L'équipe peut consulter les coordonnées du parent,
-compléter les informations manquantes et contacter la famille.
+Les dossiers apparaissent dans le dashboard Schooly, dans le bloc **Demandes reçues**.
+Une place bloquée porte le statut **Réservée** et expire après 72 heures ; si la
+capacité n'est pas configurée, le dossier porte **Demande reçue** et doit être
+confirmé par l'école. L'équipe peut consulter les coordonnées du parent et compléter
+les informations manquantes.
 
-La demande Trouvetou ne crée pas d'élève, ne réserve pas définitivement une place
-et ne lance pas la fonction `finalize_reservation()`. Le parent poursuit l'inscription
-et les formalités directement auprès de l'établissement. La finalisation dans Schooly
-se fait ensuite selon le parcours normal d'inscription de l'école.
+La réservation ne crée pas encore d'élève et ne finalise pas l'inscription.
+Lorsque le parent se présente à l'établissement, l'équipe peut utiliser
+`finalize_reservation()` depuis le dossier réservé, après qualification complète.
 
 ## 6. Données et migrations Supabase
 
@@ -316,10 +323,9 @@ son URL et son contrat avant de modifier l'API partenaire.
 
 ## 12. Parcours actuel sans paiement
 
-La demande Trouvetou utilise le statut `requested`. La migration
-`20261109090000_trouvetou_requests_without_payment.sql` ajoute ce statut à la
-contrainte et une clé UUID unique par école pour rendre les nouvelles tentatives
-idempotentes. Elle doit être appliquée manuellement dans le projet Supabase
+La migration `20261109090000_trouvetou_requests_without_payment.sql` ajoute
+une clé UUID unique par école et renforce `reserve_seat()` pour sérialiser les
+réservations concurrentes d'un même niveau. Elle doit être appliquée manuellement dans le projet Supabase
 Schooly avant mise en production.
 
 Le secret de réservation reste côté serveur. Trouvetou envoie une clé UUID stable
