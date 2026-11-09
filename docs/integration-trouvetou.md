@@ -54,8 +54,8 @@ retourné par l'API Trouvetou.
 4. Il choisit un niveau et remplit le formulaire avec le nom de l'élève, sa date
    de naissance, le nom du parent et son téléphone. L'email est facultatif.
 5. Trouvetou transmet la demande à Schooly avec une clé d'idempotence.
-6. Schooly vérifie que l'école et le niveau sont valides et que des places sont
-   encore annoncées disponibles au moment de la demande.
+6. Schooly vérifie que l'école et le niveau sont valides et consulte la capacité
+   connue du niveau avant de tenter la réservation.
 7. Quand la capacité du niveau est configurée et qu'une place est disponible,
    Schooly réserve immédiatement cette place pour 72 heures, sans paiement, et
    génère une référence/QR de réservation. Si la capacité n'est pas configurée,
@@ -112,11 +112,12 @@ Corps attendu :
   "student_birthdate": "2018-04-12",
   "parent_full_name": "Nom du parent",
   "parent_phone": "+225...",
-  "parent_email": "parent@example.com"
+  "parent_email": "parent@example.com",
+  "idempotency_key": "550e8400-e29b-41d4-a716-446655440000"
 }
 ```
 
-Schooly vérifie la publication de l'école et l'appartenance du niveau. Si la capacité est configurée, il vérifie puis réserve atomiquement une place via `reserve_seat()` sans paiement (référence et montant nuls). La réservation passe à `reserved` pour 72 heures. Si aucune capacité n'est configurée, Schooly conserve une demande `requested` à confirmer par l'établissement.
+Schooly vérifie la publication de l'école et l'appartenance du niveau. La clé UUID `idempotency_key` est conservée pour tous les retries d'une même soumission. Si la capacité est configurée, il vérifie puis réserve atomiquement une place via `reserve_seat()` sans paiement (référence et montant nuls). La réservation passe à `reserved` pour 72 heures. Si aucune capacité n'est configurée, Schooly conserve une demande `requested` à confirmer par l'établissement.
 
 ### 4.4 Confirmation au parent
 
