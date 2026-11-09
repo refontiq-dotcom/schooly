@@ -16,7 +16,7 @@ describe("isTrouvetouRequest", () => {
     expect(isTrouvetouRequest(request)).toBe(true);
   });
 
-  it("accepts the provider key as a Bearer token for compatibility", () => {
+  it("accepts the dedicated booking secret in the partner header", () => {
     vi.stubEnv("TROUVETOU_SCHOOLY_BOOKING_SHARED_SECRET", providerKey);
     const request = new Request("https://schooly.example/api", {
       headers: { "x-trouvetou-booking-secret": providerKey },
@@ -26,7 +26,7 @@ describe("isTrouvetouRequest", () => {
 
   it("never accepts the global HMAC pepper as an API key", () => {
     vi.stubEnv("TROUVETOU_SCHOOLY_BOOKING_SHARED_SECRET", providerKey);
-    vi.stubEnv("TROUVETOU_SCHOOLY_BOOKING_SHARED_SECRET_PEPPER", "global-hmac-pepper");
+    vi.stubEnv("TROUVETOU_API_KEY_PEPPER", "global-hmac-pepper");
     const request = new Request("https://schooly.example/api", {
       headers: { "x-trouvetou-booking-secret": "global-hmac-pepper" },
     });
