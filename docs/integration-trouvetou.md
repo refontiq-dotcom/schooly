@@ -184,16 +184,14 @@ Dans Schooly, configurer côté serveur :
 
 ```env
 TROUVETOU_API_KEY=<clé provider tv_live_... pour la synchronisation>
-TROUVETOU_SCHOOLY_BOOKING_SHARED_SECRET=<secret serveur-à-serveur dédié aux réservations>
+TROUVETOU_SCHOOLY_BOOKING_SHARED_SECRET=<secret dédié aux appels de réservation>
+TROUVETOU_SYNC_URL=https://trouvetou.vercel.app
+TROUVETOU_INSTANCE_URL=https://admin.schooly.ci
 ```
 
-`TROUVETOU_API_KEY_PEPPER` n'est jamais un secret d'API partenaire : il sert uniquement au calcul HMAC côté Trouvetou et ne doit pas être transmis à Schooly.
+La valeur de `TROUVETOU_SCHOOLY_BOOKING_SHARED_SECRET` doit correspondre à la variable `TROUVETOU_BOOKING_SECRET_SCHOOLY` dans Trouvetou. Ce secret est transmis uniquement dans l'en-tête `x-trouvetou-booking-secret`.
 
-Le code accepte aussi temporairement `TROUVETOU_API_KEY` comme solution de
-compatibilité locale, mais le nom recommandé est `TROUVETOU_API_KEY_PEPPER`.
-
-La même clé doit être configurée dans Trouvetou. Elle ne doit jamais être
-exposée dans le frontend, dans un fichier commité ou dans une URL.
+`TROUVETOU_API_KEY_PEPPER` appartient exclusivement à l'environnement serveur Trouvetou pour vérifier les empreintes HMAC. Il ne doit pas être configuré comme jeton partenaire ni envoyé à Schooly.
 
 Autres variables nécessaires à Schooly :
 
@@ -203,8 +201,7 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=...
 SUPABASE_SECRET_KEY=...
 ```
 
-Le client service role est utilisé uniquement côté serveur pour les appels
-partenaires et ne doit jamais être envoyé à Trouvetou.
+La clé Supabase secrète reste exclusivement côté serveur Schooly et n'est jamais transmise à Trouvetou.
 
 ## 8. Fichiers importants
 
@@ -221,11 +218,17 @@ src/app/dashboard/admin/_ops-forms.tsx
 src/lib/operations/actions.ts
   Actions serveur de publication, publicité et confirmation d'inscription.
 
-src/app/api/trouvetou/route.ts
-  Catalogue et création de dossier de réservation.
+apps/schooly/src/app/api/v1/public/ecoles/route.ts
+  Catalogue des établissements publiés (authentification partenaire).
 
-src/app/api/trouvetou/reservations/[id]/payment/route.ts
-  Confirmation du paiement partenaire.
+apps/schooly/src/app/api/v1/public/schools/[id]/availability/route.ts
+  Disponibilité publique par niveau.
+
+apps/schooly/src/app/api/v1/public/ecoles/[id]/request/route.ts
+  Création d'une demande pending_payment.
+
+apps/schooly/src/app/api/v1/public/ecoles/[id]/reserve/route.ts
+  Confirmation post-paiement et réservation atomique de la place.
 
 supabase/migrations/20260902190000_trouvetou_integration.sql
   Publication et première fonction de réservation partenaire.
