@@ -70,14 +70,41 @@ for (const school of schools) {
     continue;
   }
 
-  const niveaux = (levels || []).map((l) => ({
-    id: l.id,
-    label: l.name,
-    capacity: 0,
-    prix_min: null,
-    prix_max: null,
-    places_disponibles: 0,
-  }));
+  const levelIds = (levels || []).map((level) => level.id);
+  const [{ data: classes, error: classesErr }, { data: enrollments, error: enrollmentsErr }, { data: reservations, error: reservationsErr }] = await Promise.all([
+    levelIds.length
+      ? schooly.from("classes").select("grade_level_id, capacity").eq("school_id", school.id).is("deleted_at", null).in("grade_level_id", levelIds)
+      : Promise.resolve({ data: [], error: null }),
+    levelIds.length
+      ? schooly.from("enrollments").select("grade_level_id").eq("school_id", school.id).in("status", ["confirmed", "active"]).is("deleted_at", null).in("grade_level_id", levelIds)
+      : Promise.resolve({ data: [], error: null }),
+    levelIds.length
+      ? schooly.from("trouvetou_reservations").select("grade_level_id").eq("school_id", school.id).eq("status", "reserved").gt("expires_at", new Date().toISOString()).in("grade_level_id", levelIds)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+
+  if (classesErr || enrollmentsErr || reservationsErr) {
+    console.error(`[trouvetou:sync] Echec lecture disponibilites pour ${school.name}:`, classesErr?.message || enrollmentsErr?.message || reservationsErr?.message);
+    continue;
+  }
+
+  const capacities = {};
+  const occupied = {};
+  for (const row of classes || []) capacities[row.grade_level_id] = (capacities[row.grade_level_id] || 0) + (Number(row.capacity) || 0);
+  for (const row of enrollments || []) occupied[row.grade_level_id] = (occupied[row.grade_level_id] || 0) + 1;
+  for (const row of reservations || []) occupied[row.grade_level_id] = (occupied[row.grade_level_id] || 0) + 1;
+
+  const niveaux = (levels || []).map((level) => {
+    const capacity = capacities[level.id] || 0;
+    return {
+      id: level.id,
+      label: level.name,
+      capacity,
+      prix_min: null,
+      prix_max: null,
+      places_disponibles: Math.max(0, capacity - (occupied[level.id] || 0)),
+    };
+  });
 
   // Règles médias Trouvetou, alignées sur la contrainte SQL
   // schools_trouvetou_gallery_max_4 / schools_trouvetou_photos_360_max_1
