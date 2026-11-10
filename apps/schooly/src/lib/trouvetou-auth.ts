@@ -5,6 +5,7 @@ import { timingSafeEqual } from "node:crypto";
  *
  * Le secret de réservation est distinct de la clé de synchronisation provider
  * et du pepper HMAC. Il n'est jamais placé dans les annonces ni côté navigateur.
+ * Les valeurs Preview et Production sont configurées séparément.
  */
 export function isTrouvetouRequest(request: Request): boolean {
   const expected = process.env.TROUVETOU_SCHOOLY_BOOKING_SHARED_SECRET?.trim();
