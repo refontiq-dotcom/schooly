@@ -75,17 +75,28 @@ describe("collecte Schooly", () => {
     expect(s).toMatchObject({ inscriptionsTotal: 163, inscriptionsEnAttente: 150, inscriptionsConfirmees: 2, inscriptionsActives: 11 })
   })
 
-  it("l'argent reçu = factures PAYÉES, même si les lignes du grand livre restent « due »", async () => {
+  it("l'argent reçu = montants imputés aux factures ; le restant dû tient compte des paiements partiels", async () => {
     const t = GOOD()
     t.platform_invoices = [
       { product_id: "schooly", status: "paid", total_due: 2000, paid_amount: 2000, tenant_id: "t1" },
+      { product_id: "schooly", status: "partial", total_due: 3000, paid_amount: 1000, tenant_id: "t4" }, // 2000 F restent dus
       { product_id: "schooly", status: "overdue", total_due: 5000, paid_amount: null, tenant_id: "t2" },
       { product_id: "schooly", status: "pending", total_due: 3000, paid_amount: null, tenant_id: "t3" },
       { product_id: "autre_produit", status: "paid", total_due: 7777, paid_amount: 7777, tenant_id: "t9" }, // ignorée
     ]
     const s = await collect(fakeSupabase(t))
-    expect(s).toMatchObject({ fraisEncaisses: 2000, facturesOuvertesMontant: 8000, facturesEnRetard: 1 })
-    expect(s.fraisAEncaisser).toBe(0) // 2000 générés − 2000 encaissés
+    expect(s).toMatchObject({ fraisEncaisses: 3000, facturesOuvertesMontant: 10000, facturesEnRetard: 1, facturesPartielles: 1 })
+    expect(s.fraisAEncaisser).toBe(0) // 2000 générés − 3000 encaissés, plancher à 0
+  })
+
+  it("avant la migration des paiements (statuts pending/paid/overdue uniquement) le calcul reste exact", async () => {
+    const t = GOOD()
+    t.platform_invoices = [
+      { product_id: "schooly", status: "paid", total_due: 1500, paid_amount: 1500, tenant_id: "t1" },
+      { product_id: "schooly", status: "pending", total_due: 500, paid_amount: null, tenant_id: "t2" },
+    ]
+    const s = await collect(fakeSupabase(t))
+    expect(s).toMatchObject({ fraisEncaisses: 1500, facturesOuvertesMontant: 500, facturesPartielles: 0 })
   })
 
   it("fraisAEncaisser n'est jamais négatif", async () => {
