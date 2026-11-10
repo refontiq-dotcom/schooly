@@ -108,7 +108,7 @@ begin
      set status = 'reserved',
          payment_reference = p_payment_ref,
          amount_paid = p_amount,
-         qr_code_token = encode(gen_random_bytes(16), 'hex'),
+         qr_code_token = encode(extensions.gen_random_bytes(16), 'hex'),
          expires_at = now() + interval '72 hours'
    where id = p_reservation_id;
 
