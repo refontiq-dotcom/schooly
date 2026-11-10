@@ -39,14 +39,39 @@ async function syncSchoolToTrouvetou(admin: SupabaseClient, schoolId: string, pu
     .order("level", { ascending: true })
   if (levelsError) throw new Error(levelsError.message)
 
-  const niveaux: SyncLevel[] = (levels || []).map((level) => ({
-    id: level.id,
-    label: level.name,
-    capacity: 0,
-    prix_min: null,
-    prix_max: null,
-    places_disponibles: 0,
-  }))
+  const levelIds = (levels || []).map((level) => level.id)
+  const [{ data: classes, error: classesError }, { data: enrollments, error: enrollmentsError }, { data: reservations, error: reservationsError }] = await Promise.all([
+    levelIds.length
+      ? admin.from("classes").select("grade_level_id, capacity").eq("school_id", schoolId).is("deleted_at", null).in("grade_level_id", levelIds)
+      : Promise.resolve({ data: [], error: null }),
+    levelIds.length
+      ? admin.from("enrollments").select("grade_level_id").eq("school_id", schoolId).in("status", ["confirmed", "active"]).is("deleted_at", null).in("grade_level_id", levelIds)
+      : Promise.resolve({ data: [], error: null }),
+    levelIds.length
+      ? admin.from("trouvetou_reservations").select("grade_level_id").eq("school_id", schoolId).eq("status", "reserved").gt("expires_at", new Date().toISOString()).in("grade_level_id", levelIds)
+      : Promise.resolve({ data: [], error: null }),
+  ])
+  if (classesError || enrollmentsError || reservationsError) {
+    throw new Error(classesError?.message || enrollmentsError?.message || reservationsError?.message || "Impossible de calculer les disponibilités.")
+  }
+
+  const capacities: Record<string, number> = {}
+  const occupied: Record<string, number> = {}
+  for (const row of classes || []) capacities[row.grade_level_id] = (capacities[row.grade_level_id] || 0) + (Number(row.capacity) || 0)
+  for (const row of enrollments || []) occupied[row.grade_level_id] = (occupied[row.grade_level_id] || 0) + 1
+  for (const row of reservations || []) occupied[row.grade_level_id] = (occupied[row.grade_level_id] || 0) + 1
+
+  const niveaux: SyncLevel[] = (levels || []).map((level) => {
+    const capacity = capacities[level.id] || 0
+    return {
+      id: level.id,
+      label: level.name,
+      capacity,
+      prix_min: null,
+      prix_max: null,
+      places_disponibles: Math.max(0, capacity - (occupied[level.id] || 0)),
+    }
+  })
 
   const schoolPayload = {
     id: school.id,
