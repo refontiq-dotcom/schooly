@@ -107,8 +107,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: "Nom de l'élève, date de naissance, niveau, parent et téléphone sont obligatoires." }, { status: 400 })
     if (!validDate(studentBirthdate)) return NextResponse.json({ error: "Date de naissance invalide." }, { status: 400 })
     if (parentEmail && !/^\S+@\S+\.\S+$/.test(parentEmail)) return NextResponse.json({ error: "Adresse email invalide." }, { status: 400 })
-    if (rawIdempotencyKey !== undefined && !idempotencyKey)
-      return NextResponse.json({ error: "idempotency_key doit être un UUID valide." }, { status: 400 })
+    if (!idempotencyKey)
+      return NextResponse.json({ error: "Une clé d'idempotence UUID valide est obligatoire." }, { status: 400 })
 
     const { data: school } = await supabase.from("schools").select("id, published_to_trouvetou").eq("id", schoolId).is("deleted_at", null).maybeSingle()
     if (!school?.published_to_trouvetou) return NextResponse.json({ error: "École non trouvée ou non publiée" }, { status: 404 })
