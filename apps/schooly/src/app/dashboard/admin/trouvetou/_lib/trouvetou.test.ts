@@ -18,7 +18,8 @@ const FULL_STATE = {
 
 describe("reservationLabel", () => {
   it("traduit les statuts connus et renvoie le brut sinon", () => {
-    expect(reservationLabel("pending_payment")).toBe("Attente paiement")
+    expect(reservationLabel("requested")).toBe("Demande reçue")
+    expect(reservationLabel("pending_payment")).toBe("En attente de traitement")
     expect(reservationLabel("reserved")).toBe("Réservée")
     expect(reservationLabel("confirmed")).toBe("Confirmée")
     expect(reservationLabel("expired")).toBe("Expirée")
