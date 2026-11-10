@@ -158,7 +158,7 @@ describe("TrouvetouAdminClient", () => {
     clickByText(container, "Demandes (1)")
     expect(container.textContent).toContain("Awa Koné")
     expect(container.textContent).toContain("Parent : Bintou Koné")
-    expect(container.textContent).toContain("Attente paiement")
+    expect(container.textContent).toContain("En attente de traitement")
     act(() => root.unmount())
   })
 
