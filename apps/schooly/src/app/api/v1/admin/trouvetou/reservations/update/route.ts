@@ -25,7 +25,7 @@ export async function PATCH(request: Request) {
     const { data: reservation } = await admin.from("trouvetou_reservations").select("id, school_id, status").eq("id", id).maybeSingle()
     if (!reservation) return NextResponse.json({ error: "Reservation non trouvee" }, { status: 404 })
     if (role.role_code !== "super_admin" && reservation.school_id !== role.school_id) return NextResponse.json({ error: "Non autorise" }, { status: 403 })
-    if (!["pending_payment", "reserved"].includes(reservation.status)) return NextResponse.json({ error: "Cette demande ne peut plus être modifiée." }, { status: 409 })
+    if (!["requested", "pending_payment", "reserved"].includes(reservation.status)) return NextResponse.json({ error: "Cette demande ne peut plus être modifiée." }, { status: 409 })
 
     const studentFullName = clean(body.student_full_name)
     const studentBirthdate = clean(body.student_birthdate, 10)
