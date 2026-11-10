@@ -42,6 +42,20 @@ export async function POST(request: Request) {
     if (role.role_code !== "super_admin" && reservation.school_id !== role.school_id) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 403 })
     }
+    const reservationFields = "id, status, created_at, qr_code_token, expires_at, student_full_name, student_birthdate, parent_full_name, parent_phone, parent_email"
+
+    if (reservation.status === "reserved") {
+      const { data: existing } = await admin
+        .from("trouvetou_reservations")
+        .select(reservationFields)
+        .eq("id", reservationId)
+        .maybeSingle()
+      return NextResponse.json({
+        success: true,
+        reservation: existing ?? { id: reservationId, status: "reserved" },
+        reused: true,
+      })
+    }
     if (reservation.status !== "requested") {
       return NextResponse.json({ error: "Seules les demandes à confirmer peuvent être réservées." }, { status: 409 })
     }
@@ -55,24 +69,25 @@ export async function POST(request: Request) {
       console.error("[Trouvetou admin confirm]", reserveError.message)
       return NextResponse.json({ error: "La réservation de la place n'a pas pu être effectuée." }, { status: 500 })
     }
-    if (reserved !== true) {
+
+    const { data: updated } = await admin
+      .from("trouvetou_reservations")
+      .select(reservationFields)
+      .eq("id", reservationId)
+      .maybeSingle()
+
+    if (reserved !== true && updated?.status !== "reserved") {
       return NextResponse.json({
         error: "Capacité non configurée ou niveau complet. Vérifiez les classes et les places disponibles avant de confirmer.",
         code: "CAPACITY_NOT_AVAILABLE",
       }, { status: 409 })
     }
 
-    const { data: updated, error: updateError } = await admin
-      .from("trouvetou_reservations")
-      .select("id, status, created_at, qr_code_token, expires_at, student_full_name, student_birthdate, parent_full_name, parent_phone, parent_email")
-      .eq("id", reservationId)
-      .single()
-
-    if (updateError || !updated) {
-      return NextResponse.json({ error: "La place est réservée, mais son état ne peut pas être relu." }, { status: 502 })
-    }
-
-    return NextResponse.json({ success: true, reservation: updated })
+    return NextResponse.json({
+      success: true,
+      reservation: updated ?? { id: reservationId, status: "reserved" },
+      reused: reserved !== true,
+    })
   } catch (error) {
     console.error("[Trouvetou admin confirm]", error)
     return NextResponse.json({ error: "Une erreur est survenue pendant la confirmation." }, { status: 500 })
