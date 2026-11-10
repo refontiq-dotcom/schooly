@@ -13,10 +13,10 @@ Pour les écoles :
 - l'utilisateur consulte la fiche, les informations, la photo, la localisation,
   l'itinéraire et les places disponibles par niveau ;
 - l'utilisateur remplit le formulaire de réservation depuis Trouvetou ;
-- Trouvetou gère le paiement ;
-- Schooly vérifie la place au dernier moment, crée la réservation et protège la
-  capacité contre la survente ;
-- l'administrateur Schooly reçoit la réservation et confirme l'inscription.
+- Trouvetou transmet une demande de place à Schooly ;
+- aucun paiement ni inscription définitive n'est réalisé en ligne ;
+- Schooly enregistre la demande et l'affiche dans le tableau de bord de l'établissement ;
+- la famille poursuit ensuite l'inscription directement auprès de l'école.
 
 ## 2. Fonctionnalité dans Schooly
 
@@ -51,168 +51,113 @@ retourné par l'API Trouvetou.
 3. Il ouvre la fiche de l'école et voit ses détails, sa photo si elle est
    renseignée, son adresse et son itinéraire, notamment avec ses coordonnées
    GPS, ainsi que ses niveaux et places disponibles.
-4. Il choisit un niveau et remplit le formulaire avec le nom de l'élève, le nom
-   du parent et son téléphone. La date de naissance et l'email sont facultatifs.
-5. Trouvetou appelle Schooly. Schooly crée un dossier `pending_payment`.
-6. L'utilisateur paie les frais de réservation dans Trouvetou.
-7. Trouvetou confirme le paiement à Schooly.
-8. Schooly réserve atomiquement une place dans une section du niveau choisi.
-9. La réservation devient `reserved` et un délai d'expiration est appliqué.
-10. L'administrateur voit la réservation dans son dashboard Schooly.
-11. Il clique sur **Confirmer**. Schooly crée l'élève et passe la réservation à
-    `confirmed`.
-12. Le QR code de réservation peut ensuite être présenté à l'établissement pour
-    finaliser l'inscription sur place.
+4. Il choisit un niveau et remplit le formulaire avec le nom de l'élève, sa date
+   de naissance, le nom du parent et son téléphone. L'email est facultatif.
+5. Trouvetou transmet la demande à Schooly avec une clé d'idempotence.
+6. Schooly vérifie que l'école et le niveau sont valides et consulte la capacité
+   connue du niveau avant de tenter la réservation.
+7. Quand la capacité du niveau est configurée et qu'une place est disponible,
+   Schooly réserve immédiatement cette place pour 72 heures, sans paiement, et
+   génère une référence/QR de réservation. Si la capacité n'est pas configurée,
+   la demande reste au statut `requested` pour confirmation par l'école.
+8. Trouvetou confirme au parent la réservation ou la demande transmise. Aucun
+   paiement en ligne ni inscription définitive n'est déclenché.
+9. Le parent se présente ou contacte l'école pour compléter l'inscription.
+10. L'établissement finalise l'inscription dans Schooly lorsque le parent a
+    fourni les pièces et informations requises.
 
 ## 4. Contrat API Schooly pour Trouvetou
 
-Toutes les routes partenaires sont protégées par :
+Les appels serveur-à-serveur de réservation utilisent le secret dédié :
 
 ```http
-Authorization: Bearer <TROUVETOU_API_KEY_PEPPER>
+x-trouvetou-booking-secret: <TROUVETOU_SCHOOLY_BOOKING_SHARED_SECRET>
 ```
 
-URL de base en production :
+Le pepper HMAC `TROUVETOU_API_KEY_PEPPER` n'est jamais accepté comme jeton et ne doit jamais être transmis à Schooly.
 
-```text
-https://<domaine-schooly>/api/trouvetou
-```
+URL de base en production : `https://<domaine-schooly>/api/v1/public`.
 
 ### 4.1 Catalogue des écoles
 
 ```http
-GET /api/trouvetou
-Authorization: Bearer <clé>
+GET /ecoles
+x-trouvetou-booking-secret: <secret>
 ```
 
-La réponse contient les établissements publiés. Chaque élément contient :
+Retourne les établissements publiés avec leur catégorie, leurs informations publiques et leurs médias.
 
-- `category: "ecoles"` ;
-- les informations de l'établissement ;
-- `availability`, la liste des places par niveau ;
-- `advertisements`, les publicités actives dans leur période.
-
-Exemple de forme de réponse :
-
-```json
-{
-  "establishments": [
-    {
-      "id": "uuid",
-      "name": "École Exemple",
-      "description": "Présentation de l'école",
-      "city": "Abidjan",
-      "address": "Cocody",
-      "school_type": "college",
-      "latitude": 5.35,
-      "longitude": -4.01,
-      "website_url": "https://ecole.example",
-      "cover_image_url": "https://.../photo.jpg",
-      "reservation_fee_amount": 25000,
-      "category": "ecoles",
-      "availability": [
-        {
-          "level_id": "uuid",
-          "establishment_id": "uuid",
-          "level_name": "6ème",
-          "total_capacity": 120,
-          "total_taken": 80,
-          "seats_available": 40
-        }
-      ],
-      "advertisements": []
-    }
-  ]
-}
-```
-
-### 4.2 Création d'un dossier de réservation
+### 4.2 Disponibilité par niveau
 
 ```http
-POST /api/trouvetou
-Authorization: Bearer <clé>
+GET /schools/{school_id}/availability
+```
+
+Cette route publique en lecture seule retourne les niveaux, capacités, inscriptions confirmées et places encore disponibles. La disponibilité doit être revalidée au moment de la demande et de la confirmation du paiement.
+
+### 4.3 Création d'une demande de réservation
+
+```http
+POST /ecoles/{school_id}/request
+x-trouvetou-booking-secret: <secret>
 Content-Type: application/json
 ```
 
-Corps minimal :
+Corps attendu (la clé d'idempotence UUID est obligatoire) :
 
 ```json
 {
-  "establishment_id": "uuid",
   "level_id": "uuid",
   "student_full_name": "Nom de l'élève",
+  "student_birthdate": "2018-04-12",
   "parent_full_name": "Nom du parent",
-  "parent_phone": "+225..."
+  "parent_phone": "+225...",
+  "parent_email": "parent@example.com",
+  "idempotency_key": "550e8400-e29b-41d4-a716-446655440000"
 }
 ```
 
-Champs facultatifs : `student_birthdate`, `parent_email`.
+Schooly vérifie la publication de l'école et l'appartenance du niveau. La clé UUID
+`idempotency_key` est obligatoire et conservée pour tous les retries d'une même
+soumission. Si la capacité est configurée, il vérifie puis réserve atomiquement
+une place via `reserve_seat()` sans paiement (référence et montant nuls). La
+réservation passe à `reserved` pour 72 heures. Si aucune capacité n'est
+configurée, Schooly conserve une demande `requested` sans bloquer de place.
 
-Cette route :
+### 4.4 Confirmation au parent
 
-- vérifie que l'école est publiée ;
-- vérifie que le niveau appartient à l'école ;
-- choisit une section qui possède une place ;
-- crée une réservation `pending_payment` ;
-- ne décrémente pas encore la capacité.
+La réponse de création contient :
 
-Réponses principales :
+- `reservation_id` : identifiant du dossier Schooly ;
+- `status: "reserved"` si une place a été bloquée, sinon `"requested"` ;
+- `availability_confirmed: true|false` ;
+- `qr_code` et `expires_at` si une place a été réservée ;
+- `payment_required: false` ;
+- `next_step: "school_contact"`.
 
-- `201` : dossier créé ;
-- `400` : données invalides ;
-- `401` : clé absente ou invalide ;
-- `409` : école non publiée ou aucune place disponible.
+Le nouvel endpoint `/request` appelle directement `reserve_seat()` avec des
+paramètres de paiement nuls lorsque la capacité est connue. L'endpoint historique
+`/reserve` reste disponible pour compatibilité, mais Trouvetou ne l'appelle plus.
 
-### 4.3 Confirmation du paiement
+## 5. Traitement de la demande dans l'établissement
 
-Après confirmation réelle du paiement côté Trouvetou :
+Les dossiers apparaissent dans le dashboard Schooly, dans le bloc **Demandes reçues**.
+Une place bloquée porte le statut **Réservée** et expire après 72 heures ; si
+la capacité n'est pas configurée, le dossier porte **Demande reçue** et ne bloque
+aucune place. L'équipe peut consulter les coordonnées du parent et compléter
+les informations manquantes.
 
-```http
-POST /api/trouvetou/reservations/<reservation_id>/payment
-Authorization: Bearer <clé>
-Content-Type: application/json
-```
+Pour confirmer une demande `requested`, l'établissement doit d'abord configurer
+la capacité des classes du niveau, puis ouvrir le dossier et cliquer sur
+**Confirmer la disponibilité**. L'API admin
+`POST /api/v1/admin/trouvetou/reservations/confirm` recontrôle la capacité de
+façon atomique et réserve la place 72 heures. Si la capacité reste nulle ou si le
+niveau est complet, la confirmation est refusée avec une explication. Cette
+action est réservée aux rôles `direction` et `secretariat`.
 
-```json
-{
-  "payment_reference": "transaction-123",
-  "amount_paid": 25000
-}
-```
-
-Schooly appelle la fonction PostgreSQL `reserve_seat`, qui verrouille la section
-avant de vérifier et décrémenter la capacité. Deux demandes concurrentes ne
-peuvent donc pas prendre la même dernière place.
-
-Réponses principales :
-
-- `200` : réservation payée et statut `reserved` ;
-- `400` : paiement incomplet ou réservation invalide ;
-- `401` : clé absente ou invalide ;
-- `404` : réservation introuvable ;
-- `409` : réservation expirée, déjà traitée ou place devenue indisponible.
-
-La réponse contient notamment `id`, `status`, `qr_code_token` et `expires_at`.
-
-## 5. Confirmation par l'administrateur
-
-Les réservations apparaissent dans le dashboard admin, dans le bloc **Dernières
-réservations**. Une réservation au statut `reserved` possède le bouton
-**Confirmer**.
-
-Cette action appelle la fonction Supabase :
-
-```text
-finalize_reservation(reservation_id)
-```
-
-La fonction :
-
-- vérifie que l'utilisateur est admin, secrétariat ou censeur ;
-- vérifie que la réservation appartient à son établissement ;
-- crée la ligne dans `students` ;
-- rattache automatiquement le parent lorsqu'un email ou téléphone correspond ;
-- passe la réservation à `confirmed`.
+La réservation ne crée pas encore d'élève et ne finalise pas l'inscription.
+Lorsque le parent se présente à l'établissement, l'équipe peut utiliser
+`finalize_reservation()` depuis le dossier réservé, après qualification complète.
 
 ## 6. Données et migrations Supabase
 
@@ -229,26 +174,35 @@ Rôle de chaque migration :
 
 - `20260902190000` ajoute `establishments.published_to_trouvetou` et la fonction
   de création de réservation partenaire ;
-- `20260902200000` remplace cette fonction pour créer `pending_payment`, afin
-  que la capacité ne soit réservée qu'après paiement ;
+- `20260902200000` correspond à l'ancien parcours avec paiement et réservation
+  de place après paiement ; il n'est pas appelé par le nouveau parcours Trouvetou ;
 - `20260902210000` crée `trouvetou_ads`, ses index, ses grants et sa policy RLS.
 
 Important : la migration `20260902200000` doit être exécutée après
 `20260902190000`, car elle met à jour la même fonction SQL.
+
+Le nouveau parcours sans paiement utilise également les migrations
+`20261109090000_trouvetou_requests_without_payment.sql` et
+`20261110010000_allow_admin_confirm_requested_trouvetou_reservations.sql`,
+déjà appliquées sur le projet Supabase Schooly. La première ajoute le statut
+`requested`, la clé d'idempotence et la réservation atomique sans paiement ;
+la seconde permet au secrétariat de réserver une demande `requested` après
+configuration et vérification de la capacité.
 
 ## 7. Variables d'environnement
 
 Dans Schooly, configurer côté serveur :
 
 ```env
-TROUVETOU_API_KEY_PEPPER=<clé-secrète-partagée>
+TROUVETOU_API_KEY=<clé provider tv_live_... pour la synchronisation>
+TROUVETOU_SCHOOLY_BOOKING_SHARED_SECRET=<secret dédié aux appels de réservation>
+TROUVETOU_SYNC_URL=https://trouvetou.refontiq.com
+TROUVETOU_INSTANCE_URL=https://schooly.refontiq.com
 ```
 
-Le code accepte aussi temporairement `TROUVETOU_API_KEY` comme solution de
-compatibilité locale, mais le nom recommandé est `TROUVETOU_API_KEY_PEPPER`.
+La valeur de `TROUVETOU_SCHOOLY_BOOKING_SHARED_SECRET` doit correspondre à la variable `TROUVETOU_BOOKING_SECRET_SCHOOLY` dans Trouvetou. Ce secret est transmis uniquement dans l'en-tête `x-trouvetou-booking-secret`.
 
-La même clé doit être configurée dans Trouvetou. Elle ne doit jamais être
-exposée dans le frontend, dans un fichier commité ou dans une URL.
+`TROUVETOU_API_KEY_PEPPER` appartient exclusivement à l'environnement serveur Trouvetou pour vérifier les empreintes HMAC. Il ne doit pas être configuré comme jeton partenaire ni envoyé à Schooly.
 
 Autres variables nécessaires à Schooly :
 
@@ -258,8 +212,7 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=...
 SUPABASE_SECRET_KEY=...
 ```
 
-Le client service role est utilisé uniquement côté serveur pour les appels
-partenaires et ne doit jamais être envoyé à Trouvetou.
+La clé Supabase secrète reste exclusivement côté serveur Schooly et n'est jamais transmise à Trouvetou.
 
 ## 8. Fichiers importants
 
@@ -276,17 +229,23 @@ src/app/dashboard/admin/_ops-forms.tsx
 src/lib/operations/actions.ts
   Actions serveur de publication, publicité et confirmation d'inscription.
 
-src/app/api/trouvetou/route.ts
-  Catalogue et création de dossier de réservation.
+apps/schooly/src/app/api/v1/public/ecoles/route.ts
+  Catalogue des établissements publiés (authentification partenaire).
 
-src/app/api/trouvetou/reservations/[id]/payment/route.ts
-  Confirmation du paiement partenaire.
+apps/schooly/src/app/api/v1/public/schools/[id]/availability/route.ts
+  Disponibilité publique par niveau.
+
+apps/schooly/src/app/api/v1/public/ecoles/[id]/request/route.ts
+  Création idempotente d'une demande requested sans paiement.
+
+apps/schooly/src/app/api/v1/public/ecoles/[id]/reserve/route.ts
+  Ancien endpoint de confirmation post-paiement, non utilisé dans le parcours actuel.
 
 supabase/migrations/20260902190000_trouvetou_integration.sql
   Publication et première fonction de réservation partenaire.
 
 supabase/migrations/20260902200000_trouvetou_payment_flow.sql
-  Version finale du flux pending_payment puis reserved.
+  Ancien flux post-paiement conservé pour compatibilité historique.
 
 supabase/migrations/20260902210000_trouvetou_ads.sql
   Publicités Trouvetou.
@@ -294,10 +253,9 @@ supabase/migrations/20260902210000_trouvetou_ads.sql
 
 ## 9. Points à terminer ou améliorer
 
-- Connecter réellement le module de paiement Trouvetou au callback
-  `/api/trouvetou/reservations/<id>/payment`.
-- Ajouter un mécanisme de signature ou d'idempotence des callbacks de paiement,
-  en complément de la clé Bearer.
+- Le paiement en ligne est hors périmètre du parcours actuel : ne pas appeler
+  le callback de paiement et ne pas utiliser l'endpoint `/reserve`.
+- L'inscription définitive est poursuivie directement entre le parent et l'école.
 - Ajouter une interface Schooly pour modifier directement la fiche publiée et
   téléverser une photo, au lieu de dépendre de `cover_image_url` déjà enregistré.
 - Ajouter l'édition, la désactivation et la suppression des publicités.
@@ -383,3 +341,16 @@ trouvetou :
 La clé locale doit être présente dans `.env.local`, qui ne doit pas être
 commitée. Le dépôt Trouvetou fourni précédemment était inaccessible ; vérifier
 son URL et son contrat avant de modifier l'API partenaire.
+
+
+## 12. Parcours actuel sans paiement
+
+La migration `20261109090000_trouvetou_requests_without_payment.sql` ajoute
+le statut `requested` pour les niveaux dont la capacité n'est pas configurée,
+une clé UUID unique par école et renforce `reserve_seat()` pour sérialiser les
+réservations concurrentes d'un même niveau. Elle doit être appliquée manuellement dans le projet Supabase
+Schooly avant mise en production.
+
+Le secret de réservation reste côté serveur. Trouvetou envoie une clé UUID stable
+pour chaque soumission et réutilise cette clé lors des retries réseau. Schooly
+retourne le dossier existant en cas de répétition au lieu de créer un doublon.

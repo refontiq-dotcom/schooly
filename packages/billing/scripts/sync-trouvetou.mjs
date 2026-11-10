@@ -70,14 +70,41 @@ for (const school of schools) {
     continue;
   }
 
-  const niveaux = (levels || []).map((l) => ({
-    id: l.id,
-    label: l.name,
-    capacity: 0,
-    prix_min: null,
-    prix_max: null,
-    places_disponibles: 0,
-  }));
+  const levelIds = (levels || []).map((level) => level.id);
+  const [{ data: classes, error: classesErr }, { data: enrollments, error: enrollmentsErr }, { data: reservations, error: reservationsErr }] = await Promise.all([
+    levelIds.length
+      ? schooly.from("classes").select("grade_level_id, capacity").eq("school_id", school.id).is("deleted_at", null).in("grade_level_id", levelIds)
+      : Promise.resolve({ data: [], error: null }),
+    levelIds.length
+      ? schooly.from("enrollments").select("grade_level_id").eq("school_id", school.id).in("status", ["confirmed", "active"]).is("deleted_at", null).in("grade_level_id", levelIds)
+      : Promise.resolve({ data: [], error: null }),
+    levelIds.length
+      ? schooly.from("trouvetou_reservations").select("grade_level_id").eq("school_id", school.id).eq("status", "reserved").gt("expires_at", new Date().toISOString()).in("grade_level_id", levelIds)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+
+  if (classesErr || enrollmentsErr || reservationsErr) {
+    console.error(`[trouvetou:sync] Echec lecture disponibilites pour ${school.name}:`, classesErr?.message || enrollmentsErr?.message || reservationsErr?.message);
+    continue;
+  }
+
+  const capacities = {};
+  const occupied = {};
+  for (const row of classes || []) capacities[row.grade_level_id] = (capacities[row.grade_level_id] || 0) + (Number(row.capacity) || 0);
+  for (const row of enrollments || []) occupied[row.grade_level_id] = (occupied[row.grade_level_id] || 0) + 1;
+  for (const row of reservations || []) occupied[row.grade_level_id] = (occupied[row.grade_level_id] || 0) + 1;
+
+  const niveaux = (levels || []).map((level) => {
+    const capacity = capacities[level.id] || 0;
+    return {
+      id: level.id,
+      label: level.name,
+      capacity,
+      prix_min: null,
+      prix_max: null,
+      places_disponibles: Math.max(0, capacity - (occupied[level.id] || 0)),
+    };
+  });
 
   // Règles médias Trouvetou, alignées sur la contrainte SQL
   // schools_trouvetou_gallery_max_4 / schools_trouvetou_photos_360_max_1
@@ -123,12 +150,23 @@ for (const school of schools) {
       body: JSON.stringify({ school: schoolPayload, levels: niveaux }),
     });
     const body = await res.json().catch(() => ({}));
-    if (!res.ok || body?.ok !== true) {
-      console.error(`[trouvetou:sync] Echec sync ${school.name} (${res.status}): ${body?.error || "réponse inattendue"}`);
+    if (!res.ok || body?.ok !== true || typeof body?.listing_id !== "string") {
+      console.error(`[trouvetou:sync] Echec sync ${school.name} (${res.status}): ${body?.error || "identifiant de fiche manquant"}`);
+      continue;
+    }
+    const { error: confirmationError } = await schooly
+      .from("schools")
+      .update({
+        trouvetou_listing_id: body.listing_id,
+        trouvetou_synced_at: new Date().toISOString(),
+      })
+      .eq("id", school.id);
+    if (confirmationError) {
+      console.error(`[trouvetou:sync] Fiche créée mais confirmation Schooly impossible pour ${school.name}: ${confirmationError.message}`);
       continue;
     }
     synced++;
-    console.log(`[trouvetou:sync] OK: ${school.name} (${niveaux.length} niveaux)`);
+    console.log(`[trouvetou:sync] OK: ${school.name} (${niveaux.length} niveaux, fiche ${body.listing_id})`);
   } catch (fetchErr) {
     console.error(`[trouvetou:sync] Echec reseau pour ${school.name}: ${fetchErr.message}`);
   }
