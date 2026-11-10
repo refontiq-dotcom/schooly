@@ -103,7 +103,7 @@ x-trouvetou-booking-secret: <secret>
 Content-Type: application/json
 ```
 
-Corps attendu :
+Corps attendu (la clé d'idempotence UUID est obligatoire) :
 
 ```json
 {
@@ -117,7 +117,12 @@ Corps attendu :
 }
 ```
 
-Schooly vérifie la publication de l'école et l'appartenance du niveau. La clé UUID `idempotency_key` est conservée pour tous les retries d'une même soumission. Si la capacité est configurée, il vérifie puis réserve atomiquement une place via `reserve_seat()` sans paiement (référence et montant nuls). La réservation passe à `reserved` pour 72 heures. Si aucune capacité n'est configurée, Schooly conserve une demande `requested` à confirmer par l'établissement.
+Schooly vérifie la publication de l'école et l'appartenance du niveau. La clé UUID
+`idempotency_key` est obligatoire et conservée pour tous les retries d'une même
+soumission. Si la capacité est configurée, il vérifie puis réserve atomiquement
+une place via `reserve_seat()` sans paiement (référence et montant nuls). La
+réservation passe à `reserved` pour 72 heures. Si aucune capacité n'est
+configurée, Schooly conserve une demande `requested` sans bloquer de place.
 
 ### 4.4 Confirmation au parent
 
@@ -137,10 +142,18 @@ paramètres de paiement nuls lorsque la capacité est connue. L'endpoint histori
 ## 5. Traitement de la demande dans l'établissement
 
 Les dossiers apparaissent dans le dashboard Schooly, dans le bloc **Demandes reçues**.
-Une place bloquée porte le statut **Réservée** et expire après 72 heures ; si la
-capacité n'est pas configurée, le dossier porte **Demande reçue** et doit être
-confirmé par l'école. L'équipe peut consulter les coordonnées du parent et compléter
+Une place bloquée porte le statut **Réservée** et expire après 72 heures ; si
+la capacité n'est pas configurée, le dossier porte **Demande reçue** et ne bloque
+aucune place. L'équipe peut consulter les coordonnées du parent et compléter
 les informations manquantes.
+
+Pour confirmer une demande `requested`, l'établissement doit d'abord configurer
+la capacité des classes du niveau, puis ouvrir le dossier et cliquer sur
+**Confirmer la disponibilité**. L'API admin
+`POST /api/v1/admin/trouvetou/reservations/confirm` recontrôle la capacité de
+façon atomique et réserve la place 72 heures. Si la capacité reste nulle ou si le
+niveau est complet, la confirmation est refusée avec une explication. Cette
+action est réservée aux rôles `direction` et `secretariat`.
 
 La réservation ne crée pas encore d'élève et ne finalise pas l'inscription.
 Lorsque le parent se présente à l'établissement, l'équipe peut utiliser
@@ -167,6 +180,14 @@ Rôle de chaque migration :
 
 Important : la migration `20260902200000` doit être exécutée après
 `20260902190000`, car elle met à jour la même fonction SQL.
+
+Le nouveau parcours sans paiement utilise également les migrations
+`20261109090000_trouvetou_requests_without_payment.sql` et
+`20261110010000_allow_admin_confirm_requested_trouvetou_reservations.sql`,
+déjà appliquées sur le projet Supabase Schooly. La première ajoute le statut
+`requested`, la clé d'idempotence et la réservation atomique sans paiement ;
+la seconde permet au secrétariat de réserver une demande `requested` après
+configuration et vérification de la capacité.
 
 ## 7. Variables d'environnement
 
