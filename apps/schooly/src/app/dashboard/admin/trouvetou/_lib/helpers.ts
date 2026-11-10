@@ -2,7 +2,8 @@
 
 /** Traduit le statut d'une réservation en libellé français. */
 export function reservationLabel(status: string): string {
-  if (status === "pending_payment") return "Attente paiement"
+  if (status === "requested") return "Demande reçue"
+  if (status === "pending_payment") return "En attente de traitement"
   if (status === "reserved") return "Réservée"
   if (status === "confirmed") return "Confirmée"
   if (status === "expired") return "Expirée"
