@@ -196,8 +196,8 @@ Dans Schooly, configurer côté serveur :
 ```env
 TROUVETOU_API_KEY=<clé provider tv_live_... pour la synchronisation>
 TROUVETOU_SCHOOLY_BOOKING_SHARED_SECRET=<secret dédié aux appels de réservation>
-TROUVETOU_SYNC_URL=https://trouvetou.vercel.app
-TROUVETOU_INSTANCE_URL=https://admin.schooly.ci
+TROUVETOU_SYNC_URL=https://trouvetou.refontiq.com
+TROUVETOU_INSTANCE_URL=https://schooly.refontiq.com
 ```
 
 La valeur de `TROUVETOU_SCHOOLY_BOOKING_SHARED_SECRET` doit correspondre à la variable `TROUVETOU_BOOKING_SECRET_SCHOOLY` dans Trouvetou. Ce secret est transmis uniquement dans l'en-tête `x-trouvetou-booking-secret`.
