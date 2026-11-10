@@ -109,7 +109,9 @@ async function syncSchoolToTrouvetou(admin: SupabaseClient, schoolId: string, pu
   if (!response.ok || body?.ok !== true) {
     throw new Error(body?.error || ("Trouvetou a refusé la synchronisation (" + response.status + ")"))
   }
-  return { levels: niveaux.length, result: body?.result ?? null }
+  const listingId = typeof body?.listing_id === "string" ? body.listing_id : null
+  if (!listingId) throw new Error("Trouvetou n'a pas renvoyé l'identifiant de la fiche synchronisée.")
+  return { levels: niveaux.length, listingId, result: body?.result ?? null }
 }
 
 export async function POST(request: Request) {
@@ -182,10 +184,18 @@ export async function POST(request: Request) {
 
     try {
       const sync = await syncSchoolToTrouvetou(admin, role.school_id, nextPublished)
+      const { error: confirmationError } = await admin
+        .from("schools")
+        .update({
+          trouvetou_listing_id: sync.listingId,
+          trouvetou_synced_at: new Date().toISOString(),
+        })
+        .eq("id", role.school_id)
+      if (confirmationError) throw new Error("La fiche est synchronisée, mais sa confirmation n'a pas pu être enregistrée dans Schooly.")
       return NextResponse.json({
         success: true,
         published: nextPublished,
-        trouvetou: { synced: true, levels: sync.levels, result: sync.result },
+        trouvetou: { synced: true, listing_id: sync.listingId, levels: sync.levels, result: sync.result },
       })
     } catch (syncError) {
       await admin
