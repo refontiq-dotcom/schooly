@@ -61,7 +61,7 @@ export function TrouvetouAdminClient({
   const [highlights, setHighlights] = useState<string[]>(school?.public_highlights ?? [])
   const [admissionNotes, setAdmissionNotes] = useState(school?.admission_notes || "")
 
-  const [reservations] = useState(initialReservations)
+  const [reservations, setReservations] = useState(initialReservations)
   const [ads, setAds] = useState(initialAds)
   const [adTitle, setAdTitle] = useState("")
   const [adMessage, setAdMessage] = useState("")
@@ -251,6 +251,7 @@ export function TrouvetouAdminClient({
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Impossible de mettre à jour la demande")
       setSelectedReservation({ ...selectedReservation, ...data.reservation })
+      setReservations((current) => current.map((item) => item.id === selectedReservation.id ? { ...item, ...data.reservation } : item))
       toast.success("Dossier qualifié et mis à jour")
       router.refresh()
     } catch (error) {
@@ -274,6 +275,7 @@ export function TrouvetouAdminClient({
         throw new Error(data.error || "Impossible de confirmer la disponibilité")
       }
       setSelectedReservation({ ...selectedReservation, ...data.reservation })
+      setReservations((current) => current.map((item) => item.id === selectedReservation.id ? { ...item, ...data.reservation } : item))
       toast.success("Place confirmée et réservée pour 72 heures")
       router.refresh()
     } catch (error) {
@@ -565,7 +567,7 @@ export function TrouvetouAdminClient({
             <Field label="Email parent"><Input type="email" value={selectedReservation.parent_email || ""} onChange={e=>setSelectedReservation((v)=>(v?{...v,parent_email:e.target.value}:v))} /></Field>
             <div className="grid gap-3 sm:grid-cols-2"><InfoLine icon={<GraduationCap />} label="Niveau demandé" value={selectedReservation.grade_level_label || "Niveau non renseigné"} /><InfoLine icon={<Info />} label="Référence" value={selectedReservation.qr_code_token || selectedReservation.id} /><InfoLine icon={<Info />} label="Expire le" value={selectedReservation.expires_at ? new Date(selectedReservation.expires_at).toLocaleString("fr-FR") : "—"} /><InfoLine icon={<CheckCircle2 />} label="Statut" value={reservationLabel(selectedReservation.status)} /><InfoLine icon={<Info />} label="Reçue le" value={selectedReservation.created_at ? new Date(selectedReservation.created_at).toLocaleString("fr-FR") : "—"} /></div>
           </div>}
-          <DialogFooter><Button variant="outline" onClick={()=>setModal(null)}>Fermer</Button>{selectedReservation && ["requested","pending_payment","reserved"].includes(selectedReservation.status) && <><Button onClick={updateReservation} disabled={qualificationLoading}>{qualificationLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Enregistrer la qualification</Button>{selectedReservation.status === "requested" && <Button onClick={confirmRequestedReservation} disabled={qualificationLoading}>{qualificationLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Confirmer la disponibilité</Button>}{selectedReservation.status === "reserved" && <Button onClick={async()=>{ if(!selectedReservation) return; setQualificationLoading(true); try { const res=await fetch("/api/v1/admin/trouvetou/reservations/finalize",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({reservation_id:selectedReservation.id})}); const data=await res.json(); if(!res.ok) throw new Error(data.error||"Finalisation impossible"); toast.success("Inscription finalisée"); setModal(null); router.refresh() } catch(error){ toast.error(errorMessage(error,"Finalisation impossible")) } finally { setQualificationLoading(false) } }}>{qualificationLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Finaliser l&apos;inscription</Button>}</>}</DialogFooter><DialogClose onClick={()=>setModal(null)} />
+          <DialogFooter><Button variant="outline" onClick={()=>setModal(null)}>Fermer</Button>{selectedReservation && ["requested","pending_payment","reserved"].includes(selectedReservation.status) && <><Button onClick={updateReservation} disabled={qualificationLoading}>{qualificationLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Enregistrer la qualification</Button>{selectedReservation.status === "requested" && <Button onClick={confirmRequestedReservation} disabled={qualificationLoading}>{qualificationLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Confirmer la disponibilité</Button>}{selectedReservation.status === "reserved" && <Button onClick={async()=>{ if(!selectedReservation) return; setQualificationLoading(true); try { const res=await fetch("/api/v1/admin/trouvetou/reservations/finalize",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({reservation_id:selectedReservation.id})}); const data=await res.json(); if(!res.ok) throw new Error(data.error||"Finalisation impossible"); setSelectedReservation({ ...selectedReservation, status: "confirmed" }); setReservations((current) => current.map((item) => item.id === selectedReservation.id ? { ...item, status: "confirmed" } : item)); toast.success("Inscription finalisée"); setModal(null); router.refresh() } catch(error){ toast.error(errorMessage(error,"Finalisation impossible")) } finally { setQualificationLoading(false) } }}>{qualificationLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Finaliser l&apos;inscription</Button>}</>}</DialogFooter><DialogClose onClick={()=>setModal(null)} />
         </DialogContent>
       </Dialog>
 
