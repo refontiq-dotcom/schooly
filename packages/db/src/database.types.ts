@@ -4547,6 +4547,7 @@ export type Database = {
           amount_paid: number | null
           created_at: string
           expires_at: string | null
+          external_idempotency_key: string | null
           grade_level_id: string
           id: string
           parent_email: string | null
@@ -4564,6 +4565,7 @@ export type Database = {
           amount_paid?: number | null
           created_at?: string
           expires_at?: string | null
+          external_idempotency_key?: string | null
           grade_level_id: string
           id?: string
           parent_email?: string | null
@@ -4581,6 +4583,7 @@ export type Database = {
           amount_paid?: number | null
           created_at?: string
           expires_at?: string | null
+          external_idempotency_key?: string | null
           grade_level_id?: string
           id?: string
           parent_email?: string | null
@@ -5108,8 +5111,8 @@ export type Database = {
       }
       reserve_seat: {
         Args: {
-          p_amount: number
-          p_payment_ref: string
+          p_amount: number | null
+          p_payment_ref: string | null
           p_reservation_id: string
         }
         Returns: boolean
