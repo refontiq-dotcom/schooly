@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { isTrouvetouRequest } from "@/lib/trouvetou-auth"
 import { createClient } from "@supabase/supabase-js"
 
 const supabase = createClient(
@@ -6,12 +7,7 @@ const supabase = createClient(
   process.env.SUPABASE_SECRET_KEY!
 )
 
-function checkAuth(request: Request) {
-  const authHeader = request.headers.get("authorization")
-  if (!authHeader || !authHeader.startsWith("Bearer ")) return false
-  const token = authHeader.split(" ")[1]
-  return token === process.env.TROUVETOU_API_KEY_PEPPER || token === process.env.TROUVETOU_API_KEY
-}
+
 
 /**
  * POST /api/v1/public/ecoles/[id]/reserve
@@ -25,7 +21,7 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  if (!checkAuth(request)) {
+  if (!isTrouvetouRequest(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
