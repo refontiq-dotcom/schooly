@@ -150,12 +150,23 @@ for (const school of schools) {
       body: JSON.stringify({ school: schoolPayload, levels: niveaux }),
     });
     const body = await res.json().catch(() => ({}));
-    if (!res.ok || body?.ok !== true) {
-      console.error(`[trouvetou:sync] Echec sync ${school.name} (${res.status}): ${body?.error || "réponse inattendue"}`);
+    if (!res.ok || body?.ok !== true || typeof body?.listing_id !== "string") {
+      console.error(`[trouvetou:sync] Echec sync ${school.name} (${res.status}): ${body?.error || "identifiant de fiche manquant"}`);
+      continue;
+    }
+    const { error: confirmationError } = await schooly
+      .from("schools")
+      .update({
+        trouvetou_listing_id: body.listing_id,
+        trouvetou_synced_at: new Date().toISOString(),
+      })
+      .eq("id", school.id);
+    if (confirmationError) {
+      console.error(`[trouvetou:sync] Fiche créée mais confirmation Schooly impossible pour ${school.name}: ${confirmationError.message}`);
       continue;
     }
     synced++;
-    console.log(`[trouvetou:sync] OK: ${school.name} (${niveaux.length} niveaux)`);
+    console.log(`[trouvetou:sync] OK: ${school.name} (${niveaux.length} niveaux, fiche ${body.listing_id})`);
   } catch (fetchErr) {
     console.error(`[trouvetou:sync] Echec reseau pour ${school.name}: ${fetchErr.message}`);
   }
